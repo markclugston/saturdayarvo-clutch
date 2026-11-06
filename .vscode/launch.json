@@ -24,7 +24,16 @@
       "request": "launch",
       "program": "${workspaceFolder}/src/clutch-web/node_modules/vite/bin/vite.js",
       "cwd": "${workspaceFolder}/src/clutch-web",
-      "console": "integratedTerminal",
+      "args": ["--port", "5173", "--strictPort"],
+      "console": "internalConsole",
+      "env": {
+        "NO_COLOR": "1"
+      },
+      "serverReadyAction": {
+        "pattern": "Local:\\s+(http://localhost:5173/)",
+        "uriFormat": "%s",
+        "action": "openExternally"
+      },
       "presentation": {
         "hidden": true
       }
