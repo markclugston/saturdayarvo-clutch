@@ -1,0 +1,43 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "API",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-api",
+      "program": "${workspaceFolder}/src/Clutch.API/bin/Debug/net10.0/Clutch.API.dll",
+      "cwd": "${workspaceFolder}/src/Clutch.API",
+      "stopAtEntry": false,
+      "console": "internalConsole",
+      "presentation": {
+        "hidden": true
+      },
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "https://localhost:7180;http://localhost:5041"
+      }
+    },
+    {
+      "name": "Frontend",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/clutch-web/node_modules/vite/bin/vite.js",
+      "cwd": "${workspaceFolder}/src/clutch-web",
+      "console": "integratedTerminal",
+      "presentation": {
+        "hidden": true
+      }
+    }
+  ],
+  "compounds": [
+    {
+      "name": "API + Frontend",
+      "configurations": ["API", "Frontend"],
+      "stopAll": true,
+      "presentation": {
+        "order": 1
+      }
+    }
+  ]
+}
