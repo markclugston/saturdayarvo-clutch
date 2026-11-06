@@ -1,0 +1,548 @@
+openapi: 3.1.0
+info:
+  title: SaturdayArvo Clutch Accounts and Transaction Import API
+  version: 1.0.0
+  description: >
+    Same-origin cookie-authenticated API. All state-changing JSON and multipart requests
+    require the antiforgery request token. Validation errors never echo rejected source values.
+servers:
+  - url: /
+security:
+  - cookieAuth: []
+tags:
+  - name: Security
+  - name: Families
+  - name: Accounts
+  - name: Transactions
+  - name: Imports
+  - name: Administration
+paths:
+  /api/security/csrf-token:
+    get:
+      tags: [Security]
+      security: []
+      summary: Issue an antiforgery request token
+      responses:
+        "200":
+          description: Token and antiforgery cookie issued.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requestToken]
+                properties:
+                  requestToken:
+                    type: string
+  /api/currencies:
+    get:
+      tags: [Accounts]
+      summary: List supported currencies
+      responses:
+        "200":
+          description: Supported ISO 4217 currencies.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Currency"
+  /api/families:
+    get:
+      tags: [Families]
+      summary: Get the caller's owned Family, if one exists
+      responses:
+        "200":
+          description: The caller's owned Family or an empty array.
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 1
+                items:
+                  $ref: "#/components/schemas/Family"
+    post:
+      tags: [Families]
+      summary: Create the caller's one owner-only Family
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      responses:
+        "201":
+          description: Family created with the caller as owner.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Family"
+        "409":
+          description: The caller already owns a Family.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+  /api/accounts:
+    get:
+      tags: [Accounts]
+      summary: List accounts belonging to the caller's Family
+      responses:
+        "200":
+          description: Accounts in the caller's Family only.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Account"
+    post:
+      tags: [Accounts]
+      summary: Create an account in the caller's Family with an immutable currency
+      description: Requires an existing owned Family; the server assigns the account to it.
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [description, currencyCode]
+              properties:
+                description:
+                  type: string
+                  minLength: 1
+                currencyCode:
+                  type: string
+                  pattern: "^[A-Z]{3}$"
+      responses:
+        "201":
+          description: Account created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: The caller has not created a Family.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+  /api/accounts/{accountId}:
+    parameters:
+      - $ref: "#/components/parameters/AccountId"
+    get:
+      tags: [Accounts]
+      summary: Get an authorized account
+      responses:
+        "200":
+          description: Account details, including the last successful import timestamp.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        "404":
+          $ref: "#/components/responses/Problem"
+    patch:
+      tags: [Accounts]
+      summary: Change an account description
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [description]
+              properties:
+                description:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: Description updated; currency and transactions are unchanged.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /api/accounts/{accountId}/transactions:
+    parameters:
+      - $ref: "#/components/parameters/AccountId"
+    get:
+      tags: [Transactions]
+      summary: List transactions for an authorized account
+      parameters:
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Transaction page; dates and decimal amounts remain locale-neutral.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionPage"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /api/accounts/{accountId}/import-reviews:
+    parameters:
+      - $ref: "#/components/parameters/AccountId"
+    post:
+      tags: [Imports]
+      summary: Validate a CSV and create a temporary review
+      description: >
+        Acquires the per-account import lease, validates all mapped rows, discards the original
+        file after processing, and stores only normalized mapped review rows. Limit failures and
+        validation errors do not persist transactions. Error responses identify row/column without
+        echoing sensitive values.
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, mapping]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                mapping:
+                  type: string
+                  description: JSON-serialized ImportMapping.
+      responses:
+        "201":
+          description: Validated review created; user confirmation is still required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportReview"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "413":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+  /api/import-reviews/{reviewId}/confirm:
+    parameters:
+      - $ref: "#/components/parameters/ReviewId"
+    post:
+      tags: [Imports]
+      summary: Confirm and atomically import all review rows
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [confirmPossibleDuplicates]
+              properties:
+                confirmPossibleDuplicates:
+                  type: boolean
+      responses:
+        "200":
+          description: Import completed successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [importedCount, completedAtUtc]
+                properties:
+                  importedCount:
+                    type: integer
+                  completedAtUtc:
+                    type: string
+                    format: date-time
+        "400":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+  /api/import-reviews/{reviewId}:
+    parameters:
+      - $ref: "#/components/parameters/ReviewId"
+    delete:
+      tags: [Imports]
+      summary: Cancel a review and release its account import lease
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      responses:
+        "204":
+          description: Review cancelled and staged rows removed.
+        "404":
+          $ref: "#/components/responses/Problem"
+  /api/admin/import-limits:
+    get:
+      tags: [Administration]
+      summary: Get shared import limits
+      description: Administrator role required.
+      responses:
+        "200":
+          description: Effective shared settings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportLimits"
+        "403":
+          $ref: "#/components/responses/Problem"
+    put:
+      tags: [Administration]
+      summary: Update shared import limits at runtime
+      description: Administrator role required; valid settings take effect without redeployment.
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportLimits"
+      responses:
+        "200":
+          description: Shared settings persisted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportLimits"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: .AspNetCore.Identity.Application
+  parameters:
+    AccountId:
+      name: accountId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ReviewId:
+      name: reviewId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CsrfToken:
+      name: X-CSRF-TOKEN
+      in: header
+      required: true
+      schema:
+        type: string
+  responses:
+    Problem:
+      description: RFC 9457 problem details; no rejected source values are included.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+  schemas:
+    Family:
+      type: object
+      required: [id, ownerUserId]
+      properties:
+        id:
+          type: string
+          format: uuid
+        ownerUserId:
+          type: string
+    Currency:
+      type: object
+      required: [code, name]
+      properties:
+        code:
+          type: string
+          pattern: "^[A-Z]{3}$"
+        name:
+          type: string
+    Account:
+      type: object
+      required: [id, familyId, description, currencyCode]
+      properties:
+        id:
+          type: string
+          format: uuid
+        familyId:
+          type: string
+          format: uuid
+        description:
+          type: string
+        currencyCode:
+          type: string
+        lastSuccessfulImportAtUtc:
+          type: string
+          format: date-time
+          nullable: true
+    Transaction:
+      type: object
+      required: [id, transactionDate, description, amount, direction]
+      properties:
+        id:
+          type: string
+          format: uuid
+        transactionDate:
+          type: string
+          format: date
+        description:
+          type: string
+        amount:
+          type: string
+          pattern: "^[0-9]+(\\.[0-9]+)?$"
+          description: Exact decimal string; formatted as currency by the client.
+        direction:
+          type: string
+          enum: [Incoming, Outgoing]
+    TransactionPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Transaction"
+        nextCursor:
+          type: string
+          nullable: true
+    ImportMapping:
+      type: object
+      required: [dateColumn, descriptionColumn, dateFormat, amountMode]
+      properties:
+        dateColumn:
+          type: integer
+          minimum: 0
+        descriptionColumn:
+          type: integer
+          minimum: 0
+        dateFormat:
+          type: string
+          description: Explicit supported date pattern selected by the user.
+        amountMode:
+          type: string
+          enum: [Signed, SeparateIncomingOutgoing, AmountWithDirection]
+        signedAmountColumn:
+          type: integer
+          minimum: 0
+        incomingAmountColumn:
+          type: integer
+          minimum: 0
+        outgoingAmountColumn:
+          type: integer
+          minimum: 0
+        amountColumn:
+          type: integer
+          minimum: 0
+        directionColumn:
+          type: integer
+          minimum: 0
+        incomingSign:
+          type: string
+          enum: [Positive, Negative]
+        incomingDirectionValue:
+          type: string
+        outgoingDirectionValue:
+          type: string
+        numberFormat:
+          type: string
+          description: Explicit decimal/group separator convention when confirmation is required.
+    ImportReview:
+      type: object
+      required: [id, accountId, currencyCode, rowCount, duplicateConfirmationRequired, expiresAtUtc, rows]
+      properties:
+        id:
+          type: string
+          format: uuid
+        accountId:
+          type: string
+          format: uuid
+        currencyCode:
+          type: string
+        rowCount:
+          type: integer
+        duplicateConfirmationRequired:
+          type: boolean
+        expiresAtUtc:
+          type: string
+          format: date-time
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImportReviewRow"
+    ImportReviewRow:
+      type: object
+      description: Temporary preview row identified by its source row number, not a transaction ID.
+      required: [sourceRowNumber, transactionDate, description, amount, direction, isPossibleDuplicate]
+      properties:
+        sourceRowNumber:
+          type: integer
+        transactionDate:
+          type: string
+          format: date
+        description:
+          type: string
+        amount:
+          type: string
+          pattern: "^[0-9]+(\\.[0-9]+)?$"
+          description: Exact decimal string; formatted as currency by the client.
+        direction:
+          type: string
+          enum: [Incoming, Outgoing]
+        isPossibleDuplicate:
+          type: boolean
+    ImportLimits:
+      type: object
+      required: [maxFileSizeBytes, maxRowsPerImport, maxImportAttemptsPerUserPerMinute]
+      properties:
+        maxFileSizeBytes:
+          type: integer
+          minimum: 1
+          default: 10485760
+        maxRowsPerImport:
+          type: integer
+          minimum: 1
+          default: 10000
+        maxImportAttemptsPerUserPerMinute:
+          type: integer
+          minimum: 1
+          default: 5
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
