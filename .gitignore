@@ -9,6 +9,7 @@
 [Cc]overage*/
 *.coverage
 *.coveragexml
+testdata/
 
 # Visual Studio
 .vs/
