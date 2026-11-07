@@ -1,9 +1,3 @@
-<!--
-Sync Impact Report
-Version: 4.0.0
-Removed project-wide external payment-security certification, evidence, and acceptance requirements at user request.
-General security, authorization, privacy, and sensitive-data protections remain.
--->
 # SaturdayArvo Clutch Constitution
 
 ## Core Principles
