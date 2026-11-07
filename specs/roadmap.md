@@ -1,4 +1,6 @@
 [] complete ui redesign including styles for themes.
+[] import balance and display it for the account.
+[] update constitution to make sure the seed.sql is updated when database migrations are created.
 [] support creating a budget via categories.
 [] support proper identity provider such as entraid, google and facebook.
 [] on transaction import support selecting/deselecting so not all transactions are imported.
