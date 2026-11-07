@@ -8,11 +8,6 @@
 
 **Input**: User description: "$ARGUMENTS"
 
-**Constitution note**: `.specify/memory/constitution.md` is the authoritative source for project
-requirements. Plans and task/implementation records MUST identify applicable requirement IDs and
-principles from its Requirement Applicability Index, cite the constitution, and state how the work
-complies. Flag conflicts rather than silently resolving them.
-
 ## User Scenarios & Testing *(mandatory)*
 
 <!--

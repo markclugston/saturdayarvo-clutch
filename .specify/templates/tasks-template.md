@@ -13,16 +13,6 @@ description: "Task list template for feature implementation"
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
-**Constitution**: Before producing tasks, read `.specify/memory/constitution.md` and identify
-applicable requirements from its Requirement Applicability Index. Resolve conflicts in favor of the
-constitution and flag each conflict; do not silently reconcile it. List applicable requirement IDs,
-the relevant principle/section, and task compliance below, or explicitly state "None".
-
-## Applicable Constitutional Requirements
-
-[List each applicable requirement ID and constitution principle/section with task compliance, or
-write "None" if none apply]
-
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: Can run in parallel (different files, no dependencies)

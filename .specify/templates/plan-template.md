@@ -40,18 +40,7 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-Before completing this check, read `.specify/memory/constitution.md` and identify each applicable
-requirement from its Requirement Applicability Index. The constitution is the authoritative project
-requirements source. Resolve conflicts in favor of the constitution and flag each conflict; do not
-silently reconcile it.
-
-- Constitution requirements: [List applicable requirements and how the design complies]
-- Applicable requirements: [For each, list its ID, constitution principle/section, and how the
-  design complies; explicitly state "None" if no indexed requirements apply]
-- Conflicts: [List conflicts with constitutional requirements and how they are flagged for
-  resolution, or "None"]
-
-This gate is incomplete if applicable requirements are omitted or their compliance is not addressed.
+[Gates determined based on constitution file]
 
 ## Project Structure
 
