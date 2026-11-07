@@ -2,6 +2,12 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "prepare-api",
+      "dependsOrder": "sequence",
+      "dependsOn": ["build-api", "migrate-api"],
+      "problemMatcher": []
+    },
+    {
       "label": "build-api",
       "command": "dotnet",
       "type": "process",
@@ -12,6 +18,26 @@
         "/consoleloggerparameters:NoSummary"
       ],
       "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "migrate-api",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "ef",
+        "database",
+        "update",
+        "--project",
+        "${workspaceFolder}/src/Clutch.API/Clutch.API.csproj",
+        "--no-build"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "ASPNETCORE_ENVIRONMENT": "Development"
+        }
+      },
+      "problemMatcher": []
     }
   ]
 }

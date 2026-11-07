@@ -5,7 +5,7 @@
       "name": "API",
       "type": "coreclr",
       "request": "launch",
-      "preLaunchTask": "build-api",
+      "preLaunchTask": "prepare-api",
       "program": "${workspaceFolder}/src/Clutch.API/bin/Debug/net10.0/Clutch.API.dll",
       "cwd": "${workspaceFolder}/src/Clutch.API",
       "stopAtEntry": false,
