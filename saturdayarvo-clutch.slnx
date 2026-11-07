@@ -2,4 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Clutch.API/Clutch.API.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Clutch.API.Tests/Clutch.API.Tests.csproj" />
+  </Folder>
 </Solution>

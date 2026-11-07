@@ -1,41 +1,104 @@
+using Clutch.API.Api.ProblemDetails;
+using Clutch.API.Api.Endpoints;
+using Clutch.API.Api.Security;
+using Clutch.API.Infrastructure;
+using Clutch.API.Infrastructure.Identity;
+using Clutch.API.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<ApiExceptionHandler>();
+builder.Services.AddHealthChecks();
+builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-CSRF-TOKEN";
+    options.Cookie.Name = "__Host-Clutch.Antiforgery";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.Path = "/";
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+});
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+app.UseExceptionHandler();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+}
+
+app.UseHttpsRedirection();
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.TryAdd("X-Content-Type-Options", "nosniff");
+    context.Response.Headers.TryAdd("X-Frame-Options", "DENY");
+    context.Response.Headers.TryAdd("Referrer-Policy", "strict-origin-when-cross-origin");
+    context.Response.Headers.TryAdd("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none'");
+    await next();
+});
+
+app.UseAuthentication();
+app.Use(async (context, next) =>
+{
+    var method = context.Request.Method;
+    var isMutation = HttpMethods.IsPost(method)
+        || HttpMethods.IsPut(method)
+        || HttpMethods.IsPatch(method)
+        || HttpMethods.IsDelete(method);
+
+    if (context.Request.Path.StartsWithSegments("/api") && isMutation)
+    {
+        var antiforgery = context.RequestServices.GetRequiredService<IAntiforgery>();
+        if (!await antiforgery.IsRequestValidAsync(context))
+        {
+            await Results.Problem(
+                title: "A valid anti-forgery token is required.",
+                statusCode: StatusCodes.Status400BadRequest).ExecuteAsync(context);
+            return;
+        }
+    }
+
+    await next();
+});
+app.UseAuthorization();
+app.UseAntiforgery();
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
-
-var summaries = new[]
+app.MapSecurityEndpoints();
+app.MapFamilyEndpoints();
+app.MapAccountEndpoints();
+app.MapImportEndpoints();
+app.MapTransactionEndpoints();
+app.MapAdminImportLimitEndpoints();
+app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
+    Predicate = _ => false,
+}).AllowAnonymous();
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+    Predicate = check => check.Tags.Contains("ready"),
+}).AllowAnonymous();
+
+if (builder.Configuration["AdminBootstrap:Email"] is not null
+    || builder.Configuration["AdminBootstrap:Password"] is not null)
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    await scope.ServiceProvider
+        .GetRequiredService<AdminBootstrapper>()
+        .ProvisionAsync(CancellationToken.None);
+}
 
 app.Run();
 
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
+public partial class Program;

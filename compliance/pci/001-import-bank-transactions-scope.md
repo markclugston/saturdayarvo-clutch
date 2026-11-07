@@ -64,12 +64,12 @@ in approved access-controlled storage; do not copy it, cardholder data, or secre
 
 | Control area | Planned control | Verification evidence / status |
 |---|---|---|
-| Data minimization | Reject specified identifier patterns, do not retain uploaded source files or unmapped fields, and expire temporary reviews. | Pending implementation; test mapped and unmapped fields, buffering, temporary storage, expiry, failure paths, and backups. |
+| Data minimization | Reject specified identifier patterns, do not retain uploaded source files or unmapped fields, and expire temporary reviews. | Server parser and validation are implemented; the full SQL Server integration suite passes (37 tests), including malformed uploads, review expiry, stale-review replacement, and lease release. Request buffering, temporary storage, and backup handling remain unverified in the deployment. |
 | Transmission and infrastructure | Protect data in transit and verify Cloudflare-to-Azure configuration. | Pending deployment inventory, TLS configuration, and provider responsibility evidence. |
-| Authentication and authorization | Require authentication and enforce Family-owner authorization server-side; protect administrator settings. | Pending implementation and tests, including cross-user isolation. |
+| Authentication and authorization | Require authentication and enforce Family-owner authorization server-side; protect administrator settings. | Server-side owner and administrator authorization are implemented and covered by the passing SQL Server integration suite. Deployment configuration remains unverified. |
 | Diagnostics and audit | Omit sensitive data, descriptions, transaction values, and raw uploads from import audit events and diagnostics. | Pending log, trace, error, and crash-dump configuration review and tests. |
 | Storage and recovery | Secure persisted and temporary data, including copies, and define cleanup/retention. | Pending database, backup, access, retention, and recovery evidence. |
-| Independent security review | Review changed code for the OWASP Top 10 and check dependencies for known vulnerabilities. | Pending independent review, remediation, and verification required by SEC-001. |
+| Independent security review | Review changed code for the OWASP Top 10 and check dependencies for known vulnerabilities. | Independent feature review found no security findings. `npm audit --audit-level=low` and `dotnet list ... package --vulnerable --include-transitive` reported zero vulnerable packages. Deployment-specific controls remain unverified. |
 
 ## Open actions before implementation acceptance
 
@@ -81,11 +81,13 @@ in approved access-controlled storage; do not copy it, cardholder data, or secre
 4. Implement and verify the planned controls, including tests using synthetic data, and attach
    safe links to the resulting evidence. Investigate any location where unrecognized cardholder
    data could be retained.
-5. Complete independent security and dependency reviews, remediate findings, and update this
-   record with final evidence and sign-off.
+5. Independent source and dependency reviews found no findings. Complete deployment-specific
+   control verification and update this record with the final scope decision and sign-off.
 
 ## Review history
 
 | Date | Reviewer | Decision or change |
 |---|---|---|
 | 2026-11-07 | Project owner - Mark Clugston | Supplied intended deployment and access model; clarified that cardholder data has no intended use but user-controlled input could evade warnings or validation. Preliminary assessment documented; final scope and control verification remain pending. |
+| 2026-11-07 | Independent security review | Reviewed feature code and dependency manifests; no security findings, and both npm and .NET vulnerability checks reported zero vulnerable packages. This does not verify the deployed infrastructure or determine final PCI scope. |
+| 2026-11-07 | Implementation verification | SQL Server integration suite passed (37 tests); `npm audit --audit-level=low` and the .NET transitive vulnerability check reported no vulnerable packages. Deployment-specific controls and final scope remain pending. |

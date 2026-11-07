@@ -1,16 +1,24 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { ThemeProvider } from '@/components/theme/ThemeProvider'
 import './index.css'
 import App from './App.tsx'
 
-const colorScheme = window.matchMedia('(prefers-color-scheme: dark)')
-const applyColorScheme = () =>
-  document.documentElement.classList.toggle('dark', colorScheme.matches)
-applyColorScheme()
-colorScheme.addEventListener('change', applyColorScheme)
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+    },
+  },
+})
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </ThemeProvider>
   </StrictMode>,
 )

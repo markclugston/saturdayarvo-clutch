@@ -33,6 +33,100 @@ paths:
                 properties:
                   requestToken:
                     type: string
+  /api/security/register:
+    post:
+      tags: [Security]
+      security: []
+      summary: Register an application user
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  maxLength: 256
+                password:
+                  type: string
+                  maxLength: 256
+      responses:
+        "201":
+          description: Account created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id]
+                properties:
+                  id:
+                    type: string
+        "400":
+          $ref: "#/components/responses/Problem"
+  /api/security/login:
+    post:
+      tags: [Security]
+      security: []
+      summary: Sign in with an application cookie
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  maxLength: 256
+                password:
+                  type: string
+                  maxLength: 256
+      responses:
+        "204":
+          description: Signed in; the server issued an HttpOnly cookie.
+        "401":
+          $ref: "#/components/responses/Problem"
+  /api/security/logout:
+    post:
+      tags: [Security]
+      summary: Sign out and clear the application cookie
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      responses:
+        "204":
+          description: Signed out.
+        "401":
+          $ref: "#/components/responses/Problem"
+  /api/security/session:
+    get:
+      tags: [Security]
+      summary: Get the authenticated user's session identity
+      responses:
+        "200":
+          description: The authenticated user's identifier and application roles.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, roles]
+                properties:
+                  id:
+                    type: string
+                  roles:
+                    type: array
+                    items:
+                      type: string
+        "401":
+          $ref: "#/components/responses/Problem"
   /api/currencies:
     get:
       tags: [Accounts]
@@ -108,9 +202,11 @@ paths:
                 description:
                   type: string
                   minLength: 1
+                  maxLength: 200
                 currencyCode:
                   type: string
                   pattern: "^[A-Z]{3}$"
+                  maxLength: 3
       responses:
         "201":
           description: Account created.
@@ -159,6 +255,7 @@ paths:
                 description:
                   type: string
                   minLength: 1
+                  maxLength: 200
       responses:
         "200":
           description: Description updated; currency and transactions are unchanged.
@@ -202,8 +299,8 @@ paths:
       tags: [Imports]
       summary: Validate a CSV and create a temporary review
       description: >
-        Acquires the per-account import lease, validates all mapped rows, discards the original
-        file after processing, and stores only normalized mapped review rows. Limit failures and
+        Validates all mapped rows, then atomically acquires the per-account import lease and
+        stores the review. The original file is discarded after processing. Limit failures and
         validation errors do not persist transactions. Error responses identify row/column without
         echoing sensitive values.
       parameters:
@@ -236,6 +333,25 @@ paths:
         "413":
           $ref: "#/components/responses/Problem"
         "429":
+          $ref: "#/components/responses/Problem"
+  /api/accounts/{accountId}/active-import-review:
+    parameters:
+      - $ref: "#/components/parameters/AccountId"
+    delete:
+      tags: [Imports]
+      summary: Discard the account's active review after an interrupted import
+      description: >
+        Explicitly cancels the currently active ready review, even if it was created in another
+        tab. Does not cancel a review being processed or confirmed. Imported transactions are
+        not affected.
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      responses:
+        "204":
+          description: The active review was cancelled, or there was no active review.
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
           $ref: "#/components/responses/Problem"
   /api/import-reviews/{reviewId}/confirm:
     parameters:
@@ -371,12 +487,32 @@ components:
           type: string
     Currency:
       type: object
-      required: [code, name]
+      required: [code, name, amountFormats]
       properties:
         code:
           type: string
           pattern: "^[A-Z]{3}$"
         name:
+          type: string
+        amountFormats:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/CurrencyAmountFormat"
+    CurrencyAmountFormat:
+      type: object
+      required: [id, decimalSeparator, groupSeparator, reference, version]
+      properties:
+        id:
+          type: string
+        decimalSeparator:
+          type: string
+        groupSeparator:
+          type: string
+        reference:
+          type: string
+          description: Version-controlled reference for the number-format convention.
+        version:
           type: string
     Account:
       type: object

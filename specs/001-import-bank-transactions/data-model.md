@@ -123,6 +123,6 @@ Audit records MUST NOT contain account/transaction descriptions, amounts, upload
 - Use exact decimal arithmetic and persist currency code through the account relationship.
 - Database uniqueness/constraints and a transaction provide all-or-nothing import persistence and account-scoped concurrency.
 - Enforce one Family per owner with a database uniqueness constraint and prevent clients assigning accounts to another user's Family.
-- Apply maximum description and field lengths before identifier regex/Luhn checks to bound processing.
+- Apply maximum description and field lengths before identifier pattern checks to bound processing.
 - Validate every account description at create/update and every mapped transaction description before review or persistence.
 - Review data is short-lived; cleanup must release active account leases and remove staged descriptions on cancel, expiry, success, and failed processing.
