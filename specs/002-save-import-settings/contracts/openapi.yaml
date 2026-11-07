@@ -1,0 +1,197 @@
+openapi: 3.1.0
+info:
+  title: Account CSV Import Settings API
+  version: 1.0.0
+  description: >
+    Additive contract for account-scoped CSV import defaults. Uses the existing same-origin,
+    cookie-authenticated API. State-changing requests require the existing antiforgery token.
+servers:
+  - url: /
+security:
+  - cookieAuth: []
+paths:
+  /api/accounts/{accountId}/import-settings:
+    parameters:
+      - $ref: "#/components/parameters/AccountId"
+    get:
+      tags: [Imports]
+      summary: Get the caller-owned account's current CSV import defaults
+      description: >
+        Returns mapping null when the account has no saved defaults. Retrieval errors are
+        returned as ProblemDetails and must not be interpreted as an empty settings record.
+        When a mapping is returned, the client uses it in the existing multipart import-review
+        request unless the user opens and changes the mapping form.
+      responses:
+        "200":
+          description: The current mapping or an explicit indication that no defaults exist.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportSettings"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /api/import-reviews/{reviewId}/confirm:
+    parameters:
+      - $ref: "#/components/parameters/ReviewId"
+    post:
+      tags: [Imports]
+      summary: Confirm and atomically import all review rows
+      description: >
+        Preserves existing import validation and confirmation behavior. Once transactions have
+        been committed, saves the review's mapping as account defaults. A settings-save failure
+        does not undo the imported transactions or replace previous defaults.
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [confirmPossibleDuplicates]
+              properties:
+                confirmPossibleDuplicates:
+                  type: boolean
+      responses:
+        "200":
+          description: Transactions were imported; settingsSaved reports the separate defaults outcome.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfirmImportResponse"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: .AspNetCore.Identity.Application
+  parameters:
+    AccountId:
+      name: accountId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ReviewId:
+      name: reviewId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CsrfToken:
+      name: X-CSRF-TOKEN
+      in: header
+      required: true
+      schema:
+        type: string
+  responses:
+    Problem:
+      description: RFC 9457 problem details; no sensitive settings or source values are included.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+  schemas:
+    ImportSettings:
+      type: object
+      additionalProperties: false
+      required: [mapping]
+      properties:
+        mapping:
+          oneOf:
+            - $ref: "#/components/schemas/ImportMapping"
+            - type: "null"
+          description: Null only when this account has no saved defaults.
+    ImportMapping:
+      type: object
+      additionalProperties: false
+      required: [dateColumn, descriptionColumn, dateFormat, amountMode, numberFormat]
+      properties:
+        dateColumn:
+          type: integer
+          minimum: 0
+        descriptionColumn:
+          type: integer
+          minimum: 0
+        dateFormat:
+          type: string
+          minLength: 1
+        amountMode:
+          type: string
+          enum: [Signed, SeparateIncomingOutgoing, AmountWithDirection]
+        signedAmountColumn:
+          type: [integer, "null"]
+          minimum: 0
+        incomingAmountColumn:
+          type: [integer, "null"]
+          minimum: 0
+        outgoingAmountColumn:
+          type: [integer, "null"]
+          minimum: 0
+        amountColumn:
+          type: [integer, "null"]
+          minimum: 0
+        directionColumn:
+          type: [integer, "null"]
+          minimum: 0
+        incomingSign:
+          oneOf:
+            - type: string
+              enum: [Positive, Negative]
+            - type: "null"
+        incomingDirectionValue:
+          type: [string, "null"]
+        outgoingDirectionValue:
+          type: [string, "null"]
+        numberFormat:
+          type: string
+          description: Existing currency-format registry identifier.
+      description: >
+        Signed mode uses signedAmountColumn and incomingSign; separate-column mode uses
+        incomingAmountColumn and outgoingAmountColumn; amount-with-direction mode uses
+        amountColumn, directionColumn, incomingDirectionValue, and outgoingDirectionValue.
+    ConfirmImportResponse:
+      type: object
+      additionalProperties: false
+      required: [importedCount, completedAtUtc, settingsSaved]
+      properties:
+        importedCount:
+          type: integer
+          minimum: 1
+        completedAtUtc:
+          type: string
+          format: date-time
+        settingsSaved:
+          type: boolean
+          description: >
+            False means transactions were imported but defaults were not saved; previous defaults
+            remain unchanged.
+    ProblemDetails:
+      type: object
+      description: RFC 9457 Problem Details response.
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
