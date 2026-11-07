@@ -1,0 +1,10 @@
+1. support proper identity provider such as entraid, google and facebook.
+2. on transaction import support selecting/deselecting so not all transactions are imported.
+3. on transaction import turn in to a wizard so that category view can be reviewed on a different screen.
+4. allow the edit and deletion of individual transaction after they have been imported.
+5. use ai to help build out a category rule engine.  ai may not be the best fit for identifying category mapping at runtime.
+6. complete ui redesign including styles for themes.
+7. determine the best way to protect data.  master key in keyvault, but what about family specific data encryption key.  database feels a better location for that.  is it best practice?
+8. what do i need to do to be compliant with regulations and best practice for storing transaction data?
+9. are there any awards i can get that are low barriers of entry.  e.g. dont need many or any customers to win.
+10. do i need to put the transaction import off to a background process or thread?  especially when categorization is part of the import.

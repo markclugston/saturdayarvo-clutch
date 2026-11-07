@@ -76,6 +76,10 @@ Database integration tests must start a disposable SQL Server instance and exerc
 
 Playwright tests require a disposable application database and protected browser storage-state files supplied through `PLAYWRIGHT_STORAGE_STATE` (owner), `PLAYWRIGHT_OTHER_STORAGE_STATE` (different user), and `PLAYWRIGHT_ADMIN_STORAGE_STATE` (administrator). Keep these files outside the repository. The tests create an account, import duplicate rows, and temporarily update an import limit; they must not run against production data.
 
+### Independent EF Core SQL/query-shape review
+
+An independent review on 2026-11-08 assessed ownership queries, transaction paging, duplicate checks, account leases, rate-window updates, indexes, and avoidable round trips against the SQL Server mappings and query shapes. It identified a duplicate import-settings read per review, which was removed by sharing the loaded settings, and missing direct coverage for rate-window boundaries/concurrency and cursor pagination. SQL Server integration tests now cover those cases; no remaining query/index bottleneck was identified in the reviewed scope.
+
 ## Acceptance scenarios
 
 - Create two accounts with different currencies; update a description without changing its currency.

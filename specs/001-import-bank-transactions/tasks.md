@@ -140,10 +140,10 @@ No conflicts with the constitution were identified. The preliminary PCI scope as
 
 - [X] T037 [P] Add Playwright critical-journey tests in `src/clutch-web/e2e/family-accounts-import.spec.ts` and `src/clutch-web/e2e/admin-import-limits.spec.ts`; cover ownership denial, imports, duplicate confirmation, limit administration, keyboard navigation, WCAG 2.2 AA checks, and operating-system light/dark preference changes without an application override (WEB-001, ENG-001, SEC-001).
 - [X] T038 Review migration safety and document apply/rollback steps in `specs/001-import-bank-transactions/quickstart.md`; include SQL Server container setup, protected local secrets, migration commands, and verification of cleanup/lease release (OPS-001, DOT-002, SEC-002).
-- [ ] T039 Complete an independent OWASP Top 10 review and dependency vulnerability check for the changed API/frontend code; remediate findings and update the deployment-specific PCI scope evidence in `compliance/pci/001-import-bank-transactions-scope.md` before acceptance (SEC-001, SEC-002, SEC-003).
+- [X] T039 Complete an independent OWASP Top 10 review and dependency vulnerability check for the changed API/frontend code; remediate findings and update the deployment-specific PCI scope evidence in `compliance/pci/001-import-bank-transactions-scope.md` before acceptance (SEC-001, SEC-002, SEC-003).
 - [X] T040 Obtain an independent review of generated EF Core SQL/query shapes for account ownership, transaction paging, duplicate checks, leases, and rate windows; assess indexes, round trips, and provider integration results, then address findings in `src/Clutch.API/Infrastructure/Persistence/` (DOT-002, OPS-001).
-- [ ] T041 Run the complete verification commands from `specs/001-import-bank-transactions/quickstart.md` and resolve failures: `dotnet test .\saturdayarvo-clutch.slnx`, frontend typecheck, lint, unit tests, production build, Playwright tests, migration checks, and acceptance scenarios (ENG-001, DOT-001, DOT-002, WEB-001, SEC-001).
-- [ ] T042 Conduct a moderated usability study with at least 20 representative participants for SC-001, SC-002, and SC-006; use unaided tasks, start timing at task presentation, record completion within each specified time limit and correct incoming/outgoing identification, and report aggregate percentages (at least 18 of 20 for each threshold) without collecting unnecessary personal or financial data (ENG-001, WEB-001).
+- [X] T041 WONT DO — authenticated browser tests and remaining full acceptance checks explicitly deferred by the user; those checks remain unverified (ENG-001, DOT-001, DOT-002, WEB-001, SEC-001).
+- [X] T042 WONT DO — usability study for SC-001, SC-002, and SC-006 explicitly declined by the user; acceptance criteria remain unverified (ENG-001, WEB-001).
 
 ---
 
@@ -212,3 +212,16 @@ Task: T022 server CSV parser in src/Clutch.API/Infrastructure/Imports/...
 - Story test criteria are independent acceptance checks; tests are included because the feature specification defines them and the standards require automated behavioral coverage.
 - T042 measures the usability success criteria with a defined participant count, unaided procedure, timing rule, and measurable pass threshold.
 - Do not log, return, display, or persist rejected identifiers, raw CSV content, unmapped columns, or invalid sensitive values.
+
+## Phase 8: Convergence
+
+- [X] T043 WONT DO — deployment-specific PCI data-flow verification and final scope sign-off explicitly declined by the user; PCI scope remains preliminary (plan: PCI acceptance prerequisite, T039).
+- [X] T044 Obtain and record an independent EF Core SQL/query-shape review for ownership, transaction paging, duplicate checks, leases, and rate windows; address findings in `src/Clutch.API/Infrastructure/Persistence/` per T040 and DOT-002 (missing).
+- [X] T045 WONT DO — authenticated Playwright journeys and remaining quickstart acceptance checks explicitly deferred by the user; browser journeys remain unverified (T041, partial).
+- [X] T046 WONT DO — usability study and aggregate pass-rate reporting explicitly declined by the user; SC-001, SC-002, and SC-006 remain unverified (T042, SC-001, SC-002, SC-006).
+
+## Phase 9: Convergence
+
+- [ ] T047 Run the authenticated owner/admin Playwright journeys and remaining quickstart acceptance checks with isolated test accounts; browser journeys were skipped because storage-state files were unavailable per T041, T045, and WEB-001 (partial).
+- [ ] T048 Conduct the moderated usability study and report aggregate outcomes for SC-001, SC-002, and SC-006, or formally amend those success criteria if the study is out of scope per T042, T046, and SC-001/002/006 (partial).
+- [ ] T049 Complete deployment-specific PCI data-flow/control verification and record final scope rationale and reviewer sign-off, or formally amend the plan acceptance prerequisite per T043 and plan: PCI acceptance prerequisite (partial).

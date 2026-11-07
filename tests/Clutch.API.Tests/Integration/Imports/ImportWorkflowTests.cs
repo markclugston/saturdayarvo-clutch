@@ -75,6 +75,64 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
 
     [Fact]
     [Trait("Category", "SqlServer")]
+    public async Task Transaction_pages_cover_tied_dates_without_gaps_or_duplicates()
+    {
+        using var client = CreateClient();
+        await RegisterAndSignInAsync(client);
+        await CreateFamilyAsync(client);
+        var account = await CreateAccountAsync(client, "Paging account", "AUD");
+        const string csv = "Date,Description,Amount\n"
+            + "2025-01-15,Market 1,1.00\n"
+            + "2025-01-15,Market 2,2.00\n"
+            + "2025-01-15,Market 3,3.00\n"
+            + "2025-01-15,Market 4,4.00\n"
+            + "2025-01-15,Market 5,5.00\n"
+            + "2025-01-16,Market 6,6.00";
+
+        using var reviewResponse = await CreateReviewAsync(client, account.Id, csv, SignedMapping());
+        Assert.Equal(HttpStatusCode.Created, reviewResponse.StatusCode);
+        var review = await reviewResponse.Content.ReadFromJsonAsync<ReviewResponse>();
+        Assert.NotNull(review);
+        using var confirmationResponse = await SendJsonAsync(
+            client,
+            HttpMethod.Post,
+            $"/api/import-reviews/{review.Id}/confirm",
+            new { confirmPossibleDuplicates = false });
+        Assert.Equal(HttpStatusCode.OK, confirmationResponse.StatusCode);
+
+        var items = new List<TransactionResponse>();
+        string? cursor = null;
+        do
+        {
+            var path = $"/api/accounts/{account.Id}/transactions?pageSize=2";
+            if (cursor is not null)
+            {
+                path += $"&cursor={Uri.EscapeDataString(cursor)}";
+            }
+
+            using var pageResponse = await client.GetAsync(path);
+            Assert.Equal(HttpStatusCode.OK, pageResponse.StatusCode);
+            var page = await pageResponse.Content.ReadFromJsonAsync<TransactionPage>();
+            Assert.NotNull(page);
+            Assert.InRange(page.Items.Length, 1, 2);
+            items.AddRange(page.Items);
+            cursor = page.NextCursor;
+        }
+        while (cursor is not null);
+
+        Assert.Equal(6, items.Count);
+        Assert.Equal(6, items.Select(item => item.Id).Distinct().Count());
+        Assert.Equal(
+            ["Market 1", "Market 2", "Market 3", "Market 4", "Market 5", "Market 6"],
+            items.Select(item => item.Description).OrderBy(description => description));
+        Assert.Equal(
+            new[] { new DateOnly(2025, 1, 16) }
+                .Concat(Enumerable.Repeat(new DateOnly(2025, 1, 15), 5)),
+            items.Select(item => item.TransactionDate));
+    }
+
+    [Fact]
+    [Trait("Category", "SqlServer")]
     public async Task Merchant_reference_is_preserved_in_review_and_saved_transaction()
     {
         using var client = CreateClient();
@@ -668,7 +726,10 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
 
     private sealed class AllowImportAttempts : IImportAttemptLimiter
     {
-        public Task<bool> TryConsumeAsync(string userId, CancellationToken cancellationToken) =>
+        public Task<bool> TryConsumeAsync(
+            string userId,
+            int maxAttemptsPerUserPerMinute,
+            CancellationToken cancellationToken) =>
             Task.FromResult(true);
     }
 

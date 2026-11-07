@@ -1,4 +1,3 @@
-using Clutch.API.Domain.Imports;
 using Clutch.API.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,9 +7,13 @@ public sealed class ImportAttemptLimiter(
     AppDbContext dbContext,
     TimeProvider timeProvider) : IImportAttemptLimiter
 {
-    public async Task<bool> TryConsumeAsync(string userId, CancellationToken cancellationToken)
+    public async Task<bool> TryConsumeAsync(
+        string userId,
+        int maxAttemptsPerUserPerMinute,
+        CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userId);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxAttemptsPerUserPerMinute);
 
         var now = timeProvider.GetUtcNow();
         var windowStartedAtUtc = new DateTimeOffset(
@@ -21,14 +24,6 @@ public sealed class ImportAttemptLimiter(
             now.Minute,
             0,
             TimeSpan.Zero);
-        var limits = await dbContext.ImportLimitSettings
-            .AsNoTracking()
-            .Select(settings => new ImportLimits(
-                settings.MaxFileSizeBytes,
-                settings.MaxRowsPerImport,
-                settings.MaxImportAttemptsPerUserPerMinute))
-            .SingleOrDefaultAsync(cancellationToken) ?? ImportLimits.Default;
-
         await dbContext.ImportRateWindows
             .Where(window => window.WindowStartedAtUtc < windowStartedAtUtc.AddMinutes(-1))
             .ExecuteDeleteAsync(cancellationToken);
@@ -51,6 +46,6 @@ public sealed class ImportAttemptLimiter(
             .ToListAsync(cancellationToken);
         var attemptCount = attemptCounts.Single();
 
-        return attemptCount <= limits.MaxImportAttemptsPerUserPerMinute;
+        return attemptCount <= maxAttemptsPerUserPerMinute;
     }
 }

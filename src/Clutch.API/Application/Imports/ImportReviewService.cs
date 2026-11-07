@@ -42,7 +42,10 @@ public sealed class ImportReviewService(
         }
 
         var limits = await GetLimitsAsync(cancellationToken);
-        if (!await attemptLimiter.TryConsumeAsync(ownerUserId, cancellationToken))
+        if (!await attemptLimiter.TryConsumeAsync(
+            ownerUserId,
+            limits.MaxImportAttemptsPerUserPerMinute,
+            cancellationToken))
         {
             await auditWriter.WriteAsync(
                 accountId,
