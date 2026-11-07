@@ -40,16 +40,18 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-Before completing this check, read `standards/README.md` and load every standard whose trigger
-matches this feature. Resolve conflicts in favor of the constitution and flag each conflict; do not
+Before completing this check, read `.specify/memory/constitution.md` and identify each applicable
+requirement from its Requirement Applicability Index. The constitution is the authoritative project
+requirements source. Resolve conflicts in favor of the constitution and flag each conflict; do not
 silently reconcile it.
 
 - Constitution requirements: [List applicable requirements and how the design complies]
-- Applicable standards: [For each, list its ID, repo-root-relative path, and how the design
-  complies; explicitly state "None" if no standards apply]
-- Conflicts: [List conflicts with standards and how they are flagged for resolution, or "None"]
+- Applicable requirements: [For each, list its ID, constitution principle/section, and how the
+  design complies; explicitly state "None" if no indexed requirements apply]
+- Conflicts: [List conflicts with constitutional requirements and how they are flagged for
+  resolution, or "None"]
 
-This gate is incomplete if applicable standards are omitted or their compliance is not addressed.
+This gate is incomplete if applicable requirements are omitted or their compliance is not addressed.
 
 ## Project Structure
 

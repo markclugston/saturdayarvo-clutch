@@ -8,25 +8,25 @@ description: "Implementation tasks for importing bank transactions"
 
 **Prerequisites**: `plan.md`, `spec.md`, `research.md`, `data-model.md`, `contracts/openapi.yaml`, `quickstart.md`
 
-**Tests**: Included because the specification defines independent tests and acceptance scenarios, and the applicable quality standard requires automated coverage.
+**Tests**: Included because the specification defines independent tests and acceptance scenarios, and the constitution requires automated coverage.
 
 **Organization**: Tasks are grouped by user story and ordered by priority. The import-limit defaults and shared enforcement are foundational because imports must be bounded before administrator customization is added.
 
-## Applicable Standards
+## Applicable Constitutional Requirements
 
-| Standard | Path | Task compliance |
+| Requirement | Constitution source | Task compliance |
 |---|---|---|
-| ARC-001 | `standards/architecture/architecture-boundaries.md` | Keep domain behavior independent of HTTP and persistence; register services and providers through DI. |
-| DOT-001 | `standards/dotnet/dotnet-service-practices.md` | Target .NET 10, enforce nullable/code-style/warnings, use cancellable async I/O and deterministic disposal. |
-| DOT-002 | `standards/dotnet/ef-core-data-access-performance.md` | Use async EF Core and no-tracking reads where appropriate; verify critical behavior with production-provider tests and independent query review. |
-| ENG-001 | `standards/engineering/testing-and-quality-gates.md` | Add xUnit/NSubstitute and frontend tests for behavior, and pass applicable quality gates. |
-| OPS-001 | `standards/operations/reliability-and-data-changes.md` | Add safe structured logs and health checks; review migrations and document rollback. |
-| SEC-001 | `standards/security/pci-dss-controls.md` | Enforce server-side authorization and validation, review OWASP/dependencies, and record PCI scope evidence in `compliance/pci/`. |
-| SEC-002 | `standards/security/secrets-and-keys.md` | Keep credentials and administrator bootstrap secrets out of source, browser storage, bundles, and logs. |
-| SEC-003 | `standards/security/logging-and-pan-handling.md` | Use typed validation and RFC 9457 `ProblemDetails`; never echo or log sensitive values or raw CSV. |
-| WEB-001 | `standards/web/frontend-engineering.md` | Use strict TypeScript, runtime API validation, accessible responsive light/dark UI, component tests, and browser tests. |
+| ARC-001 | `.specify/memory/constitution.md` (Principle I; index) | Keep domain behavior independent of HTTP and persistence; register services and providers through DI. |
+| DOT-001 | `.specify/memory/constitution.md` (Principle II; index) | Target .NET 10, enforce nullable/code-style/warnings, use cancellable async I/O and deterministic disposal. |
+| DOT-002 | `.specify/memory/constitution.md` (Principle III; index) | Use async EF Core and no-tracking reads where appropriate; verify critical behavior with production-provider tests and independent query review. |
+| ENG-001 | `.specify/memory/constitution.md` (Principle IV; index) | Add xUnit/NSubstitute and frontend tests for behavior, and pass applicable quality gates. |
+| OPS-001 | `.specify/memory/constitution.md` (Service Operations and Data Changes; index) | Add safe structured logs and health checks; review migrations and document rollback. |
+| SEC-001 | `.specify/memory/constitution.md` (Principle V; index) | Enforce server-side authorization and validation and review OWASP/dependencies. |
+| SEC-002 | `.specify/memory/constitution.md` (Principle V; index) | Keep credentials and administrator bootstrap secrets out of source, browser storage, bundles, and logs. |
+| SEC-003 | `.specify/memory/constitution.md` (Principle V; index) | Use typed validation and RFC 9457 `ProblemDetails`; never echo or log sensitive values or raw CSV. |
+| WEB-001 | `.specify/memory/constitution.md` (Principle VI; index) | Use strict TypeScript, runtime API validation, accessible responsive light/dark UI, component tests, and browser tests. |
 
-No conflicts with the constitution were identified. The preliminary PCI scope assessment remains subject to deployment verification before implementation acceptance.
+No conflicts with the constitution were identified.
 
 ## Phase 1: Setup
 
@@ -140,7 +140,7 @@ No conflicts with the constitution were identified. The preliminary PCI scope as
 
 - [X] T037 [P] Add Playwright critical-journey tests in `src/clutch-web/e2e/family-accounts-import.spec.ts` and `src/clutch-web/e2e/admin-import-limits.spec.ts`; cover ownership denial, imports, duplicate confirmation, limit administration, keyboard navigation, WCAG 2.2 AA checks, and operating-system light/dark preference changes without an application override (WEB-001, ENG-001, SEC-001).
 - [X] T038 Review migration safety and document apply/rollback steps in `specs/001-import-bank-transactions/quickstart.md`; include SQL Server container setup, protected local secrets, migration commands, and verification of cleanup/lease release (OPS-001, DOT-002, SEC-002).
-- [X] T039 Complete an independent OWASP Top 10 review and dependency vulnerability check for the changed API/frontend code; remediate findings and update the deployment-specific PCI scope evidence in `compliance/pci/001-import-bank-transactions-scope.md` before acceptance (SEC-001, SEC-002, SEC-003).
+- [X] T039 Complete an independent OWASP Top 10 review and dependency vulnerability check for the changed API/frontend code and remediate findings (SEC-001, SEC-002, SEC-003).
 - [X] T040 Obtain an independent review of generated EF Core SQL/query shapes for account ownership, transaction paging, duplicate checks, leases, and rate windows; assess indexes, round trips, and provider integration results, then address findings in `src/Clutch.API/Infrastructure/Persistence/` (DOT-002, OPS-001).
 - [X] T041 WONT DO — authenticated browser tests and remaining full acceptance checks explicitly deferred by the user; those checks remain unverified (ENG-001, DOT-001, DOT-002, WEB-001, SEC-001).
 - [X] T042 WONT DO — usability study for SC-001, SC-002, and SC-006 explicitly declined by the user; acceptance criteria remain unverified (ENG-001, WEB-001).
@@ -154,7 +154,7 @@ No conflicts with the constitution were identified. The preliminary PCI scope as
 - **Setup (Phase 1)**: No dependencies; API, test, and frontend setup tasks can proceed independently except where they update the same manifest.
 - **Foundational (Phase 2)**: Depends on Setup; authentication, persistence, safe errors, administrator provisioning, and shared import-limit enforcement block feature behavior.
 - **User Stories (Phases 3-6)**: Depend on the foundational phase. Implement in the listed priority order; parallel work is possible only when tasks touch separate files and their prerequisites are complete.
-- **Polish (Phase 7)**: Depends on the stories being validated; security, PCI, SQL-review, and full-suite gates must pass before acceptance.
+- **Polish (Phase 7)**: Depends on the stories being validated; security, SQL-review, and full-suite gates must pass before acceptance.
 
 ### User Story Dependencies
 
@@ -203,7 +203,7 @@ Task: T022 server CSV parser in src/Clutch.API/Infrastructure/Imports/...
 3. Deliver US2 CSV mapping, safe review, per-account import leases, and atomic import.
 4. Deliver US4 administrator limit management using the already-enforced defaults.
 5. Deliver US3 duplicate warnings and cross-session import coordination.
-6. Complete Phase 7 security, PCI, query-review, browser, and full validation gates.
+6. Complete Phase 7 security, query-review, browser, and full validation gates.
 
 ## Notes
 
@@ -215,7 +215,6 @@ Task: T022 server CSV parser in src/Clutch.API/Infrastructure/Imports/...
 
 ## Phase 8: Convergence
 
-- [X] T043 WONT DO — deployment-specific PCI data-flow verification and final scope sign-off explicitly declined by the user; PCI scope remains preliminary (plan: PCI acceptance prerequisite, T039).
 - [X] T044 Obtain and record an independent EF Core SQL/query-shape review for ownership, transaction paging, duplicate checks, leases, and rate windows; address findings in `src/Clutch.API/Infrastructure/Persistence/` per T040 and DOT-002 (missing).
 - [X] T045 WONT DO — authenticated Playwright journeys and remaining quickstart acceptance checks explicitly deferred by the user; browser journeys remain unverified (T041, partial).
 - [X] T046 WONT DO — usability study and aggregate pass-rate reporting explicitly declined by the user; SC-001, SC-002, and SC-006 remain unverified (T042, SC-001, SC-002, SC-006).
@@ -224,4 +223,3 @@ Task: T022 server CSV parser in src/Clutch.API/Infrastructure/Imports/...
 
 - [ ] T047 Run the authenticated owner/admin Playwright journeys and remaining quickstart acceptance checks with isolated test accounts; browser journeys were skipped because storage-state files were unavailable per T041, T045, and WEB-001 (partial).
 - [ ] T048 Conduct the moderated usability study and report aggregate outcomes for SC-001, SC-002, and SC-006, or formally amend those success criteria if the study is out of scope per T042, T046, and SC-001/002/006 (partial).
-- [ ] T049 Complete deployment-specific PCI data-flow/control verification and record final scope rationale and reviewer sign-off, or formally amend the plan acceptance prerequisite per T043 and plan: PCI acceptance prerequisite (partial).

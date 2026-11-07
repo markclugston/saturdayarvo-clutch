@@ -13,14 +13,15 @@ description: "Task list template for feature implementation"
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
-**Standards**: Before producing tasks, read `standards/README.md` and load every standard whose
-trigger matches the feature. Resolve conflicts in favor of the constitution and flag each conflict;
-do not silently reconcile it. List applicable standards by ID and repo-root-relative path below,
-or explicitly state "None".
+**Constitution**: Before producing tasks, read `.specify/memory/constitution.md` and identify
+applicable requirements from its Requirement Applicability Index. Resolve conflicts in favor of the
+constitution and flag each conflict; do not silently reconcile it. List applicable requirement IDs,
+the relevant principle/section, and task compliance below, or explicitly state "None".
 
-## Applicable Standards
+## Applicable Constitutional Requirements
 
-[List each applicable standard by ID and repo-root-relative path, or write "None" if none apply]
+[List each applicable requirement ID and constitution principle/section with task compliance, or
+write "None" if none apply]
 
 ## Format: `[ID] [P?] [Story] Description`
 

@@ -59,7 +59,6 @@
 ## Dependencies & Assumptions
 
 - [X] CHK028 - Are the currency reference, currency-format conventions, and user responsibility for selecting source columns documented as dependencies or assumptions? [Dependency, Assumption, Spec §Assumptions, Research §Currency and regional formats]
-- [X] CHK029 - Is the preliminary PCI scope assessment and its evidence/acceptance prerequisite clearly distinguished from feature behavior and tied to a defined acceptance decision? [Dependency, Plan §Constitution Check, SEC-001]
 
 ## Ambiguities & Conflicts
 

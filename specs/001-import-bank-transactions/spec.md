@@ -8,11 +8,10 @@
 
 **Input**: User description: "Import transactions from bank CSV exports in different formats, with a date, description and amount and clear incoming or outgoing direction. Support multiple accounts, each with a description and a currency such as Australian Dollars (AUD). Prevent entry of account numbers, BSB/account numbers and card numbers."
 
-**Standards note**: Before producing a plan, tasks, or implementation for this feature, read
-`standards/README.md` and load every standard whose trigger matches. The plan's Constitution Check
-and task/implementation records MUST identify applicable standards by ID and repo-root-relative
-path, and state how the work complies. The constitution takes precedence; flag conflicts rather
-than silently resolving them.
+**Constitution note**: `.specify/memory/constitution.md` is the authoritative source for project
+requirements. Plans and task/implementation records MUST identify applicable requirement IDs and
+principles from its Requirement Applicability Index, cite the constitution, and state how the work
+complies. Flag conflicts rather than silently resolving them.
 
 ## Clarifications
 

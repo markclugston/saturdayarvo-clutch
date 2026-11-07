@@ -33,18 +33,18 @@ Deliver an owner-only Family, authenticated multi-currency accounts, safe CSV tr
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
 - Constitution requirements: Keep domain behavior independent of HTTP and persistence; keep UI in `clutch-web`; use Identity/DI and async I/O; validate and authorize on the server; verify all behavior with relevant tests; never expose or log credentials, PAN, rejected identifiers, raw CSV data, or sensitive error values.
-- Applicable standards:
-  - **ARC-001** — `standards/architecture/architecture-boundaries.md`: preserve API/domain/infrastructure/UI boundaries; register services and providers through DI; use modern C# features only when they improve clarity.
-  - **DOT-001** — `standards/dotnet/dotnet-service-practices.md`: target .NET 10, enable nullable/implicit usings/code-style enforcement/warnings-as-errors, use cancellable async I/O, dispose upload/database resources deterministically.
-  - **DOT-002** — `standards/dotnet/ef-core-data-access-performance.md`: use EF Core async access, no-tracking reads where appropriate, migrations, production-provider integration tests, and an independent SQL/query-shape review.
-  - **ENG-001** — `standards/engineering/testing-and-quality-gates.md`: test behavior in each project; use xUnit/NSubstitute and applicable WebApplicationFactory tests; resolve findings and pass quality gates.
-  - **OPS-001** — `standards/operations/reliability-and-data-changes.md`: structured safe logs, health checks, reviewed migrations, and rollback plan for schema changes.
-  - **SEC-001** — `standards/security/pci-dss-controls.md`: enforce authenticated account authorization and validation server-side; perform independent OWASP Top 10/dependency review; document PCI scope impact and where approved control evidence is recorded.
-  - **SEC-002** — `standards/security/secrets-and-keys.md`: keep identity secrets out of source, browser storage, bundles, and logs; provision administrators through protected configuration.
-  - **SEC-003** — `standards/security/logging-and-pan-handling.md`: typed validation failures and RFC 9457 `ProblemDetails`; never log or echo credentials, PAN, identifiers, descriptions, amounts, or raw file content.
-  - **WEB-001** — `standards/web/frontend-engineering.md`: strict TypeScript and runtime boundary validation, accessible responsive light/dark UI following system preference, Tailwind/shadcn patterns, component and browser-level tests, typecheck/lint/build CI.
+- Applicable constitutional requirements:
+  - **ARC-001** — `.specify/memory/constitution.md` (Principle I and Requirement Applicability Index): preserve API/domain/infrastructure/UI boundaries; register services and providers through DI; use modern C# features only when they improve clarity.
+  - **DOT-001** — `.specify/memory/constitution.md` (Principle II and Requirement Applicability Index): target .NET 10, enable nullable/implicit usings/code-style enforcement/warnings-as-errors, use cancellable async I/O, dispose upload/database resources deterministically.
+  - **DOT-002** — `.specify/memory/constitution.md` (Principle III and Requirement Applicability Index): use EF Core async access, no-tracking reads where appropriate, migrations, production-provider integration tests, and an independent SQL/query-shape review.
+  - **ENG-001** — `.specify/memory/constitution.md` (Principle IV and Requirement Applicability Index): test behavior in each project; use xUnit/NSubstitute and applicable WebApplicationFactory tests; resolve findings and pass quality gates.
+  - **OPS-001** — `.specify/memory/constitution.md` (Engineering Requirements: Service Operations and Data Changes; Requirement Applicability Index): structured safe logs, health checks, reviewed migrations, and rollback plan for schema changes.
+  - **SEC-001** — `.specify/memory/constitution.md` (Principle V and Requirement Applicability Index): enforce authenticated account authorization and validation server-side; perform independent OWASP Top 10/dependency review.
+  - **SEC-002** — `.specify/memory/constitution.md` (Principle V and Requirement Applicability Index): keep identity secrets out of source, browser storage, bundles, and logs; provision administrators through protected configuration.
+  - **SEC-003** — `.specify/memory/constitution.md` (Principle V and Requirement Applicability Index): typed validation failures and RFC 9457 `ProblemDetails`; never log or echo credentials, PAN, identifiers, descriptions, amounts, or raw file content.
+  - **WEB-001** — `.specify/memory/constitution.md` (Principle VI and Requirement Applicability Index): strict TypeScript and runtime boundary validation, accessible responsive light/dark UI following system preference, Tailwind/shadcn patterns, component and browser-level tests, typecheck/lint/build CI.
 - Conflicts: None identified. The feature extends the spec with the user's runtime limit configuration clarification and records it as FR-029.
-- **Gate status**: Design is consistent with the constitution and standards. The PCI evidence location is `compliance/pci/`, established per user direction. **Acceptance prerequisite**: Complete the preliminary [PCI scope assessment](../../compliance/pci/001-import-bank-transactions-scope.md) against the implemented deployment and record its evidence before implementation acceptance. It identifies potentially affected components but does not make a final scope determination. The feature must not persist cardholder data.
+- **Gate status**: Design is consistent with the constitution. The feature must not persist rejected sensitive identifiers or raw CSV content; general security review and data-minimization safeguards remain required.
 
 ## Project Structure
 
@@ -98,7 +98,7 @@ Completed in [research.md](./research.md). Decisions cover browser-cookie Identi
 - End-to-end setup and verification: [quickstart.md](./quickstart.md).
 - Account, import, and administrator screens share a system color-scheme provider; browser verification covers OS preference changes and confirms that no application-level override is available.
 - Currency parsing follows the application-maintained registry described in [research.md](./research.md); update the registry with reference/version metadata and test strict parsing, multiple conventions, and ambiguous values. Production hosting is deployment-specific and does not change the API contract.
-- Post-design Constitution Check: all applicable standards above are represented in the architecture, data model, contracts, and validation guide. No standard conflict was identified. The evidence location is established at `compliance/pci/`; the preliminary PCI scope assessment requires deployment verification and a final decision before implementation acceptance. Family access is owner-only in this feature; future member sharing is explicitly out of scope.
+- Post-design Constitution Check: all applicable constitutional requirements are represented in the architecture, data model, contracts, and validation guide. No conflict was identified. Family access is owner-only in this feature; future member sharing is explicitly out of scope.
 
 ## Complexity Tracking
 

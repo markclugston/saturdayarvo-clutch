@@ -1,3 +1,9 @@
+<!--
+Sync Impact Report
+Version: 4.0.0
+Removed project-wide external payment-security certification, evidence, and acceptance requirements at user request.
+General security, authorization, privacy, and sensitive-data protections remain.
+-->
 # SaturdayArvo Clutch Constitution
 
 ## Core Principles
@@ -56,12 +62,8 @@ remains unresolved.
 ### V. Security and Error Handling
 Security MUST be enforced at system boundaries; protected operations MUST enforce authorization,
 and untrusted input MUST be validated. Client-side checks MUST NOT replace server-side controls.
-The project is in PCI DSS 4.1 Level 1 scope. Changes affecting payment systems, cardholder data,
-or PCI DSS controls MUST identify the affected scope and applicable controls, and MUST be reviewed
-for their impact on the project's PCI DSS obligations. Contributors MUST identify where the
-applicable control implementation and evidence are recorded; if no approved location is known,
-they MUST flag that gap rather than presume compliance. This constitution does not reproduce the
-PCI DSS publication.
+Changes affecting payment functionality or sensitive financial data MUST identify relevant data
+flows and safeguards and review their impact on application security.
 
 Changed code MUST receive an independent review focused on the OWASP Top 10 before completion.
 Every vulnerability found MUST be addressed and verified; unresolved security findings block
@@ -78,8 +80,9 @@ browser local or session storage.
 Credentials, tokens, sensitive personal data, and payment account data MUST NOT be written to logs
 or diagnostic output. Logging MUST use approved redaction or omission for sensitive fields;
 structured logging MUST NOT make sensitive values available through message templates or
-properties. Payment data MUST be handled only within approved system boundaries and in accordance
-with this constitution's PCI DSS requirements. Secret material MUST NOT be written to logs.
+properties. Sensitive financial and payment data MUST be handled only within approved system
+boundaries and protected from unauthorized access and disclosure. Secret material MUST NOT be
+written to logs.
 
 Exceptions MUST NOT be used for expected control flow. Predictable validation failures MUST use
 typed errors or an established Result pattern. ASP.NET Core applications MUST use standard
@@ -161,7 +164,7 @@ traceability and do not refer to separate policy documents.
 | DOT-002 | EF Core data access and performance | A change accesses a database, changes an EF Core query or migration, or affects database performance. | Clutch.API maintainers |
 | ENG-001 | Testing and quality gates | A change adds or modifies behavior, tests, or delivery quality gates. | Repository maintainers |
 | OPS-001 | Reliability and data changes | A change affects service operations, logging, health checks, database migrations, rollback, or backfills. | Repository maintainers |
-| SEC-001 | PCI DSS and application security | Any code change requiring an independent security review; also changes affecting security controls, authentication, authorization, untrusted input, dependencies, or PCI DSS scope. | Repository maintainers |
+| SEC-001 | Application security | Any code change requiring an independent security review; also changes affecting security controls, authentication, authorization, untrusted input, or dependencies. | Repository maintainers |
 | SEC-002 | Secrets and keys | A change handles secrets, credentials, keys, certificates, or cryptographic material. | Repository maintainers |
 | SEC-003 | Logging and payment-data handling | A change touches logging, error handling, payment data, or sensitive data in diagnostics. | Repository maintainers |
 | WEB-001 | Frontend engineering | A change creates or modifies `clutch-web`, its UI, frontend dependencies, or frontend tests. | clutch-web maintainers |
@@ -262,4 +265,4 @@ Exceptions require an explicit amendment; review findings MUST NOT be waived sil
 4. Commit with message format: `docs: amend constitution to vX.Y.Z (description)`.
 5. Tag commit with `constitution-vX.Y.Z`.
 
-**Version**: 3.0.0 | **Ratified**: 2026-11-01 | **Last Amended**: 2026-11-08
+**Version**: 4.0.0 | **Ratified**: 2026-11-01 | **Last Amended**: 2026-11-08
