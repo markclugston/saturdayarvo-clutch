@@ -11,6 +11,29 @@ public static class ImportEndpoints
 
     public static IEndpointRouteBuilder MapImportEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapGet(
+            "/api/accounts/{accountId:guid}/import-settings",
+            async (
+                Guid accountId,
+                ClaimsPrincipal principal,
+                AccountImportSettingsService accountImportSettingsService,
+                CancellationToken cancellationToken) =>
+            {
+                var ownerUserId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (ownerUserId is null)
+                {
+                    return Results.Problem(statusCode: StatusCodes.Status401Unauthorized);
+                }
+
+                var settings = await accountImportSettingsService.GetAsync(
+                    ownerUserId,
+                    accountId,
+                    cancellationToken);
+                return Results.Ok(settings);
+            })
+            .WithTags("Imports")
+            .RequireAuthorization();
+
         endpoints.MapDelete(
             "/api/accounts/{accountId:guid}/active-import-review",
             async (

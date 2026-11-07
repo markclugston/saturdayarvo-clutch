@@ -1,6 +1,7 @@
 using Clutch.API.Api.ProblemDetails;
 using Clutch.API.Api.Endpoints;
 using Clutch.API.Api.Security;
+using Clutch.API.Application.Imports;
 using Clutch.API.Infrastructure;
 using Clutch.API.Infrastructure.Identity;
 using Clutch.API.Infrastructure.Persistence;
@@ -8,12 +9,17 @@ using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using OpenTelemetry.Metrics;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
+builder.Services.AddOpenTelemetry()
+    .WithMetrics(metrics => metrics
+        .AddMeter(ImportMetrics.MeterName)
+        .AddOtlpExporter());
 builder.Services.AddHealthChecks();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddAntiforgery(options =>

@@ -6,6 +6,7 @@ using Clutch.API.Domain.Imports;
 using Clutch.API.Domain.Transactions;
 using Clutch.API.Infrastructure.Imports;
 using Clutch.API.Infrastructure.Persistence;
+using Clutch.API.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Clutch.API.Application.Imports;
@@ -128,6 +129,10 @@ public sealed class ImportReviewService(
                 createdAt.Add(ReviewLifetime));
             review.AddRows(await CreateReviewRows(review.Id, parsed.Rows, accountId, cancellationToken));
             dbContext.ImportReviews.Add(review);
+            dbContext.ImportReviewMappingSnapshots.Add(ImportReviewMappingSnapshot.Create(
+                review.Id,
+                ImportMappingSettingsSerializer.CurrentSchemaVersion,
+                ImportMappingSettingsSerializer.Serialize(mapping)));
             auditWriter.Add(review.Id, accountId, ownerUserId, "ReviewCreated", createdAt);
             var result = ToResponse(review, account.CurrencyCode);
             await dbContext.SaveChangesAsync(cancellationToken);
@@ -219,6 +224,9 @@ public sealed class ImportReviewService(
 
             await dbContext.ImportReviewRows
                 .Where(row => row.ReviewId == reviewId)
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.ImportReviewMappingSnapshots
+                .Where(snapshot => snapshot.ReviewId == reviewId)
                 .ExecuteDeleteAsync(cancellationToken);
             await importLease.ReleaseAsync(accountId, reviewId, cancellationToken);
             auditWriter.Add(reviewId, accountId, ownerUserId, eventCode, timeProvider.GetUtcNow());
@@ -313,6 +321,9 @@ public sealed class ImportReviewService(
 
             await dbContext.ImportReviewRows
                 .Where(row => row.ReviewId == activeReviewId)
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.ImportReviewMappingSnapshots
+                .Where(snapshot => snapshot.ReviewId == activeReviewId)
                 .ExecuteDeleteAsync(cancellationToken);
             await importLease.ReleaseAsync(accountId, activeReviewId, cancellationToken);
             auditWriter.Add(

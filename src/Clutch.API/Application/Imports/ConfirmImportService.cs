@@ -14,6 +14,7 @@ public sealed class ConfirmImportService(
     AppDbContext dbContext,
     ImportAuditWriter auditWriter,
     ImportReviewService importReviewService,
+    AccountImportSettingsService accountImportSettingsService,
     TimeProvider timeProvider)
 {
     public async Task<ConfirmImportResponse> ConfirmAsync(
@@ -22,6 +23,7 @@ public sealed class ConfirmImportService(
         bool confirmPossibleDuplicates,
         CancellationToken cancellationToken)
     {
+        using var importMeasurement = ImportMetrics.StartImport();
         var strategy = dbContext.Database.CreateExecutionStrategy();
         ConfirmOutcome outcome;
         var completed = false;
@@ -61,7 +63,18 @@ public sealed class ConfirmImportService(
             throw outcome.Problem;
         }
 
-        return outcome.Response!;
+        var settingsSaved = false;
+        if (outcome.Mapping is not null && outcome.AccountId is Guid accountId)
+        {
+            settingsSaved = await accountImportSettingsService.SaveAfterConfirmationAsync(
+                accountId,
+                reviewId,
+                outcome.Mapping,
+                cancellationToken);
+        }
+
+        importMeasurement.MarkSucceeded(outcome.Response!.ImportedCount);
+        return outcome.Response with { SettingsSaved = settingsSaved };
     }
 
     private async Task<ConfirmOutcome> ConfirmWithinTransactionAsync(
@@ -98,6 +111,9 @@ public sealed class ConfirmImportService(
         {
             review.TryTransition(ImportReviewState.Expired);
             account.TryReleaseImport(review.Id);
+            await dbContext.ImportReviewMappingSnapshots
+                .Where(snapshot => snapshot.ReviewId == review.Id)
+                .ExecuteDeleteAsync(cancellationToken);
             auditWriter.Add(
                 review.Id,
                 account.Id,
@@ -189,13 +205,27 @@ public sealed class ConfirmImportService(
             return await RollbackOutcomeAsync(transaction, InvalidStagedData());
         }
 
+        var snapshot = await dbContext.ImportReviewMappingSnapshots
+            .AsNoTracking()
+            .SingleOrDefaultAsync(candidate => candidate.ReviewId == review.Id, cancellationToken);
+        if (snapshot is null)
+        {
+            return await RollbackOutcomeAsync(transaction, InvalidStagedData());
+        }
+
+        var mapping = ImportMappingSettingsSerializer.Deserialize(
+            snapshot.SchemaVersion,
+            snapshot.MappingJson);
         dbContext.Transactions.AddRange(transactions);
-        account.MarkSuccessfulImport(now);
+        account.MarkSuccessfulImport(now, review.Id);
         if (!account.TryReleaseImport(review.Id) || !review.TryTransition(ImportReviewState.Confirmed))
         {
             return await RollbackOutcomeAsync(transaction, LeaseNotOwned());
         }
 
+        await dbContext.ImportReviewMappingSnapshots
+            .Where(candidate => candidate.ReviewId == review.Id)
+            .ExecuteDeleteAsync(cancellationToken);
         auditWriter.Add(
             review.Id,
             account.Id,
@@ -205,7 +235,10 @@ public sealed class ConfirmImportService(
         await dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        return ConfirmOutcome.Succeeded(new ConfirmImportResponse(transactions.Count, now));
+        return ConfirmOutcome.Succeeded(
+            new ConfirmImportResponse(transactions.Count, now, SettingsSaved: false),
+            account.Id,
+            mapping);
     }
 
     private async Task<ConfirmOutcome> RollbackOutcomeAsync(
@@ -282,13 +315,22 @@ public sealed class ConfirmImportService(
     private sealed record ConfirmOutcome(
         ConfirmImportResponse? Response,
         ApiProblemException? Problem,
-        bool RetainReview)
+        bool RetainReview,
+        Guid? AccountId,
+        ImportMapping? Mapping)
     {
-        public static ConfirmOutcome Succeeded(ConfirmImportResponse response) => new(response, null, false);
+        public static ConfirmOutcome Succeeded(
+            ConfirmImportResponse response,
+            Guid accountId,
+            ImportMapping mapping) =>
+            new(response, null, false, accountId, mapping);
 
         public static ConfirmOutcome Failed(ApiProblemException problem, bool retainReview = false) =>
-            new(null, problem, retainReview);
+            new(null, problem, retainReview, null, null);
     }
 }
 
-public sealed record ConfirmImportResponse(int ImportedCount, DateTimeOffset CompletedAtUtc);
+public sealed record ConfirmImportResponse(
+    int ImportedCount,
+    DateTimeOffset CompletedAtUtc,
+    bool SettingsSaved);

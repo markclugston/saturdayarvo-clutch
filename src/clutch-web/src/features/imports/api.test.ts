@@ -1,6 +1,11 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { clearCsrfToken } from '@/lib/api/client'
-import { createImportReview, type ImportMapping } from './api'
+import {
+  confirmImportReview,
+  createImportReview,
+  getAccountImportSettings,
+  type ImportMapping,
+} from './api'
 
 const reviewId = '550e8400-e29b-41d4-a716-446655440002'
 const accountId = '550e8400-e29b-41d4-a716-446655440000'
@@ -60,4 +65,51 @@ it('does not cancel an arbitrary location from an invalid response', async () =>
   await expect(createImportReview(accountId, new File(['csv'], 'file.csv'), mapping))
     .rejects.toThrow('invalid response')
   expect(requests).toHaveLength(2)
+})
+
+it.each([
+  { mapping: null },
+  { mapping },
+])('retrieves a validated account settings response: %j', async (settings) => {
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json(settings)))
+
+  await expect(getAccountImportSettings(accountId)).resolves.toEqual(settings)
+})
+
+it('preserves a settings retrieval problem as an ApiError', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+    status: 500,
+    title: 'Saved import settings could not be read.',
+  }, { status: 500, headers: { 'Content-Type': 'application/problem+json' } })))
+
+  await expect(getAccountImportSettings(accountId)).rejects.toMatchObject({
+    name: 'ApiError',
+    status: 500,
+  })
+})
+
+it('rejects malformed saved settings instead of treating them as empty', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ mapping: { dateColumn: -1 } })))
+
+  await expect(getAccountImportSettings(accountId)).rejects.toThrow('invalid response')
+})
+
+it('parses the separate defaults-save outcome from a successful confirmation', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    if (String(input) === '/api/security/csrf-token') {
+      return Response.json({ requestToken: 'token' })
+    }
+
+    return Response.json({
+      importedCount: 1,
+      completedAtUtc: '2025-01-15T13:50:00.000Z',
+      settingsSaved: false,
+    })
+  }))
+
+  await expect(confirmImportReview(reviewId, false)).resolves.toEqual({
+    importedCount: 1,
+    completedAtUtc: '2025-01-15T13:50:00.000Z',
+    settingsSaved: false,
+  })
 })

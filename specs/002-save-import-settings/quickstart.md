@@ -7,6 +7,20 @@
 - Node.js and npm; dependencies installed for `src/clutch-web`.
 - An authenticated user with an owned Family and at least two accounts.
 
+## Apply the migration
+
+The VS Code F5 launch builds the API and applies pending migrations to the configured Development
+database before starting it. Other application launches do not automatically apply migrations.
+For those launches, apply the migration to the intended database using its protected connection
+configuration:
+
+```powershell
+dotnet ef database update --project .\src\Clutch.API\Clutch.API.csproj
+```
+
+For local development, set `ASPNETCORE_ENVIRONMENT` to `Development` so EF Core loads the
+development user secrets. Verify the database target before applying migrations.
+
 ## Validation commands
 
 From the repository root in PowerShell:
@@ -21,6 +35,18 @@ npm --prefix .\src\clutch-web run test:e2e -- e2e/import-settings.spec.ts
 ```
 
 The browser-level test is added with the feature implementation and uses the existing Playwright setup.
+
+## Migration review and rollback
+
+The `SaveAccountImportSettings` migration is additive: it adds the nullable latest-review token to
+`Accounts` and creates the account settings and active-review snapshot tables. It does not update or
+delete existing transaction data. Review the generated `Up` and `Down` methods before deployment.
+
+To roll back, first deploy the application version that does not require these schema objects, then
+run `dotnet ef database update 20261106231522_ImportWorkflow --project .\src\Clutch.API\Clutch.API.csproj`.
+The migration's `Down` method drops both settings tables and the added token column. Any saved
+import defaults and active mapping snapshots will be discarded, so export or back them up first if
+they must be retained. Existing transactions remain unchanged.
 
 ## Acceptance scenarios
 

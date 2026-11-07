@@ -76,6 +76,9 @@ public sealed class ImportReviewCleanupService(
                 await dbContext.ImportReviewRows
                     .Where(row => row.ReviewId == review.Id)
                     .ExecuteDeleteAsync(cancellationToken);
+                await dbContext.ImportReviewMappingSnapshots
+                    .Where(snapshot => snapshot.ReviewId == review.Id)
+                    .ExecuteDeleteAsync(cancellationToken);
                 await dbContext.Accounts
                     .Where(account =>
                         account.Id == review.AccountId

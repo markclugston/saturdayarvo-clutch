@@ -18,6 +18,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<ImportLimitSettings> ImportLimitSettings => Set<ImportLimitSettings>();
 
+    public DbSet<AccountImportSettings> AccountImportSettings => Set<AccountImportSettings>();
+
+    public DbSet<ImportReviewMappingSnapshot> ImportReviewMappingSnapshots =>
+        Set<ImportReviewMappingSnapshot>();
+
     public DbSet<ImportRateWindow> ImportRateWindows => Set<ImportRateWindow>();
 
     public DbSet<Transaction> Transactions => Set<Transaction>();
@@ -69,6 +74,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(account => account.LastSuccessfulImportAtUtc)
                 .HasColumnType("datetimeoffset");
             entity.Property(account => account.ActiveImportId);
+            entity.Property(account => account.LastSuccessfulImportReviewId);
             entity.HasIndex(account => account.FamilyId);
             entity.HasIndex(account => account.ActiveImportId)
                 .IsUnique()
@@ -94,6 +100,40 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .HasMaxLength(450)
                 .IsRequired();
             entity.Property(settings => settings.UpdatedAtUtc).IsRequired();
+        });
+
+        builder.Entity<AccountImportSettings>(entity =>
+        {
+            entity.ToTable("AccountImportSettings", table =>
+                table.HasCheckConstraint(
+                    "CK_AccountImportSettings_SchemaVersion",
+                    "[SchemaVersion] > 0"));
+            entity.HasKey(settings => settings.AccountId);
+            entity.Property(settings => settings.SchemaVersion).IsRequired();
+            entity.Property(settings => settings.SettingsJson).IsRequired();
+            entity.Property(settings => settings.SourceImportReviewId).IsRequired();
+            entity.Property(settings => settings.SavedAtUtc)
+                .HasColumnType("datetimeoffset")
+                .IsRequired();
+            entity.HasOne<Account>()
+                .WithOne()
+                .HasForeignKey<AccountImportSettings>(settings => settings.AccountId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<ImportReviewMappingSnapshot>(entity =>
+        {
+            entity.ToTable("ImportReviewMappingSnapshots", table =>
+                table.HasCheckConstraint(
+                    "CK_ImportReviewMappingSnapshots_SchemaVersion",
+                    "[SchemaVersion] > 0"));
+            entity.HasKey(snapshot => snapshot.ReviewId);
+            entity.Property(snapshot => snapshot.SchemaVersion).IsRequired();
+            entity.Property(snapshot => snapshot.MappingJson).IsRequired();
+            entity.HasOne<ImportReview>()
+                .WithOne()
+                .HasForeignKey<ImportReviewMappingSnapshot>(snapshot => snapshot.ReviewId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         builder.Entity<ImportRateWindow>(entity =>

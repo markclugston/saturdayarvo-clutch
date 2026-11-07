@@ -34,3 +34,17 @@
 - **Rationale**: The API is same-origin and cookie-authenticated, with antiforgery protection for state-changing requests. The existing UI already follows OS color preference. The user confirmed that this feature must preserve that behavior.
 - **Alternatives considered**: A standalone settings page or a new theme selector would exceed scope. Returning a successful-looking default when retrieval fails would contradict FR-013.
 - **Repository evidence**: `src/Clutch.API/Api/Endpoints/ImportEndpoints.cs`; `src/clutch-web/src/features/imports/ImportPage.tsx`; `src/clutch-web/src/components/theme/ThemeProvider.tsx`; `.specify/memory/constitution.md` (Principle VI).
+
+## Decision 6: Export low-cardinality import outcome metrics through OpenTelemetry
+
+- **Decision**: Instrument confirmation duration and outcome, successful transaction counts and per-import transaction rates, and separate settings-save outcomes/duration. Export the application meter through OTLP using the standard `OTEL_EXPORTER_OTLP_ENDPOINT` configuration.
+- **Rationale**: The repository had no existing OpenTelemetry registration or import metrics. The feature's applicable observability requirements need an actual exporter; low-cardinality outcome tags avoid exposing account IDs, mappings, transaction data, or file contents.
+- **Alternatives considered**: Adding only `System.Diagnostics.Metrics` instruments would leave them uncollected because the application had no meter provider or exporter. Logging import totals would duplicate sensitive operational data and would not provide duration/rate metrics.
+- **Repository evidence**: `.specify/memory/constitution.md` (Principle VIII); `src/Clutch.API/Program.cs`; `src/Clutch.API/Application/Imports/ConfirmImportService.cs`.
+
+## Decision 7: Keep settings reads and guarded upserts to one joined read each
+
+- **Decision**: The independent SQL review flagged possible N+1 reads, ownership-query overhead, and a token-check race. Settings retrieval and the guarded upsert now use explicit EF Core left joins, with SQL Server integration assertions confirming one joined `SELECT` per operation. The upsert remains inside a serializable transaction; SQL Server holds the account key's shared lock until commit, so a later confirmation cannot change the token between the check and write. Keep the existing primary/foreign-key indexes; no additional index is justified for the point lookups.
+- **Rationale**: Explicit joins make the one-round-trip query shape verifiable. Serializable isolation protects the token comparison without provider-specific raw SQL or lock hints, consistent with the EF Core-only data-access requirement. Integration tests exercise both settings-write orderings and verify stale writes do not replace the newer defaults.
+- **Review outcome**: The reviewer’s potential N+1 and race findings were not supported as stated: EF translates `Any`/correlated operations server-side, and serializable isolation protects the read through commit. The explicit-join rewrite and SQL command-count test eliminate ambiguity about the query count; no blocking query issue remains.
+- **Repository evidence**: `src/Clutch.API/Application/Imports/AccountImportSettingsService.cs`; `src/Clutch.API/Infrastructure/Persistence/AppDbContext.cs`; `tests/Clutch.API.Tests/Integration/Imports/AccountImportSettingsTests.cs`.

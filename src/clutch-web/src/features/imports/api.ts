@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { ApiError, apiRequest } from '@/lib/api/client'
 import {
   ConfirmImportResponseSchema,
+  AccountImportSettingsSchema,
   ImportReviewSchema,
   TransactionPageSchema,
   type ImportReview,
@@ -13,14 +14,14 @@ export type ImportMapping = {
   descriptionColumn: number
   dateFormat: string
   amountMode: 'Signed' | 'SeparateIncomingOutgoing' | 'AmountWithDirection'
-  signedAmountColumn?: number
-  incomingAmountColumn?: number
-  outgoingAmountColumn?: number
-  amountColumn?: number
-  directionColumn?: number
-  incomingSign?: 'Positive' | 'Negative'
-  incomingDirectionValue?: string
-  outgoingDirectionValue?: string
+  signedAmountColumn?: number | null
+  incomingAmountColumn?: number | null
+  outgoingAmountColumn?: number | null
+  amountColumn?: number | null
+  directionColumn?: number | null
+  incomingSign?: 'Positive' | 'Negative' | null
+  incomingDirectionValue?: string | null
+  outgoingDirectionValue?: string | null
   numberFormat: string
 }
 
@@ -59,6 +60,13 @@ export async function createImportReview(
     }
     throw error
   }
+}
+
+export function getAccountImportSettings(accountId: string) {
+  return apiRequest(
+    `/api/accounts/${encodeURIComponent(accountId)}/import-settings`,
+    AccountImportSettingsSchema,
+  )
 }
 
 export function confirmImportReview(

@@ -12,7 +12,7 @@ Persist the exact CSV mapping used by each successful import as that account's s
 
 **Language/Version**: C# on .NET 10; TypeScript 5.9 with strict mode and `noUncheckedIndexedAccess`.
 
-**Primary Dependencies**: Existing ASP.NET Core minimal API and Identity cookie authentication, EF Core 10 with SQL Server, React 19, TanStack Query, Zod, PapaParse, and existing Tailwind/shadcn components. No new dependency is required.
+**Primary Dependencies**: Existing ASP.NET Core minimal API and Identity cookie authentication, EF Core 10 with SQL Server, OpenTelemetry hosting and OTLP metrics export, React 19, TanStack Query, Zod, PapaParse, and existing Tailwind/shadcn components.
 
 **Storage**: SQL Server through EF Core. Add one account-scoped saved-settings record and retain the mapping snapshot only while its import review is active.
 

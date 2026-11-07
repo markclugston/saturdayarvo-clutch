@@ -58,6 +58,27 @@ export const ImportReviewSchema = z.object({
 export const ConfirmImportResponseSchema = z.object({
   importedCount: z.number().int().positive(),
   completedAtUtc: z.iso.datetime({ offset: true }),
+  settingsSaved: z.boolean(),
+})
+
+export const ImportMappingSchema = z.object({
+  dateColumn: z.number().int().nonnegative(),
+  descriptionColumn: z.number().int().nonnegative(),
+  dateFormat: z.string().min(1),
+  amountMode: z.enum(['Signed', 'SeparateIncomingOutgoing', 'AmountWithDirection']),
+  signedAmountColumn: z.number().int().nonnegative().nullable().optional(),
+  incomingAmountColumn: z.number().int().nonnegative().nullable().optional(),
+  outgoingAmountColumn: z.number().int().nonnegative().nullable().optional(),
+  amountColumn: z.number().int().nonnegative().nullable().optional(),
+  directionColumn: z.number().int().nonnegative().nullable().optional(),
+  incomingSign: z.enum(['Positive', 'Negative']).nullable().optional(),
+  incomingDirectionValue: z.string().nullable().optional(),
+  outgoingDirectionValue: z.string().nullable().optional(),
+  numberFormat: z.string().min(1),
+}).strict()
+
+export const AccountImportSettingsSchema = z.object({
+  mapping: ImportMappingSchema.nullable(),
 })
 
 export const TransactionSchema = z.object({
@@ -95,6 +116,7 @@ export type CurrencyAmountFormat = z.infer<typeof CurrencyAmountFormatSchema>
 export type Account = z.infer<typeof AccountSchema>
 export type ImportReview = z.infer<typeof ImportReviewSchema>
 export type ImportReviewRow = z.infer<typeof ImportReviewRowSchema>
+export type AccountImportSettings = z.infer<typeof AccountImportSettingsSchema>
 export type TransactionItem = z.infer<typeof TransactionSchema>
 export type TransactionPage = z.infer<typeof TransactionPageSchema>
 export type UserSession = z.infer<typeof SessionSchema>

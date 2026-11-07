@@ -48,6 +48,9 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("LastSuccessfulImportAtUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<Guid?>("LastSuccessfulImportReviewId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ActiveImportId")
@@ -309,6 +312,32 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("Clutch.API.Infrastructure.Persistence.Entities.AccountImportSettings", b =>
+                {
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("SavedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SettingsJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("SourceImportReviewId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("AccountId");
+
+                    b.ToTable("AccountImportSettings", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_AccountImportSettings_SchemaVersion", "[SchemaVersion] > 0");
+                        });
+                });
+
             modelBuilder.Entity("Clutch.API.Infrastructure.Persistence.Entities.ImportLimitSettings", b =>
                 {
                     b.Property<int>("Id")
@@ -360,6 +389,26 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                     b.ToTable("ImportRateWindows", t =>
                         {
                             t.HasCheckConstraint("CK_ImportRateWindows_PositiveAttemptCount", "[AttemptCount] > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Clutch.API.Infrastructure.Persistence.Entities.ImportReviewMappingSnapshot", b =>
+                {
+                    b.Property<Guid>("ReviewId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("MappingJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("int");
+
+                    b.HasKey("ReviewId");
+
+                    b.ToTable("ImportReviewMappingSnapshots", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ImportReviewMappingSnapshots_SchemaVersion", "[SchemaVersion] > 0");
                         });
                 });
 
@@ -555,11 +604,29 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Clutch.API.Infrastructure.Persistence.Entities.AccountImportSettings", b =>
+                {
+                    b.HasOne("Clutch.API.Domain.Accounts.Account", null)
+                        .WithOne()
+                        .HasForeignKey("Clutch.API.Infrastructure.Persistence.Entities.AccountImportSettings", "AccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Clutch.API.Infrastructure.Persistence.Entities.ImportRateWindow", b =>
                 {
                     b.HasOne("Clutch.API.Infrastructure.Identity.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Clutch.API.Infrastructure.Persistence.Entities.ImportReviewMappingSnapshot", b =>
+                {
+                    b.HasOne("Clutch.API.Domain.Imports.ImportReview", null)
+                        .WithOne()
+                        .HasForeignKey("Clutch.API.Infrastructure.Persistence.Entities.ImportReviewMappingSnapshot", "ReviewId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

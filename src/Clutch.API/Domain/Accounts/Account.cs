@@ -26,6 +26,8 @@ public sealed class Account
 
     public DateTimeOffset? LastSuccessfulImportAtUtc { get; private set; }
 
+    public Guid? LastSuccessfulImportReviewId { get; private set; }
+
     public Guid? ActiveImportId { get; private set; }
 
     public static bool TryCreate(
@@ -79,6 +81,9 @@ public sealed class Account
         return true;
     }
 
-    public void MarkSuccessfulImport(DateTimeOffset completedAtUtc) =>
+    public void MarkSuccessfulImport(DateTimeOffset completedAtUtc, Guid reviewId)
+    {
         LastSuccessfulImportAtUtc = completedAtUtc;
+        LastSuccessfulImportReviewId = reviewId;
+    }
 }

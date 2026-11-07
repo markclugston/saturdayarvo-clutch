@@ -45,6 +45,14 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
         Assert.Equal("Incoming", review.Rows[0].Direction);
         Assert.Equal("Outgoing", review.Rows[1].Direction);
 
+        using var settingsBeforeConfirmation = await client.GetAsync(
+            $"/api/accounts/{account.Id}/import-settings");
+        Assert.Equal(HttpStatusCode.OK, settingsBeforeConfirmation.StatusCode);
+        var emptySettings = await settingsBeforeConfirmation.Content
+            .ReadFromJsonAsync<ImportSettingsResponse>();
+        Assert.NotNull(emptySettings);
+        Assert.Null(emptySettings.Mapping);
+
         using var confirmResponse = await SendJsonAsync(
             client,
             HttpMethod.Post,
@@ -57,6 +65,21 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
         var confirmation = await confirmResponse.Content.ReadFromJsonAsync<ConfirmResponse>();
         Assert.NotNull(confirmation);
         Assert.Equal(2, confirmation.ImportedCount);
+        Assert.True(confirmation.SettingsSaved);
+        await using (var snapshotScope = fixture.Factory.Services.CreateAsyncScope())
+        {
+            var snapshotDb = snapshotScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert.Equal(0, await snapshotDb.ImportReviewMappingSnapshots.CountAsync(
+                snapshot => snapshot.ReviewId == review.Id));
+        }
+
+        using var savedSettingsResponse = await client.GetAsync(
+            $"/api/accounts/{account.Id}/import-settings");
+        Assert.Equal(HttpStatusCode.OK, savedSettingsResponse.StatusCode);
+        var savedSettings = await savedSettingsResponse.Content
+            .ReadFromJsonAsync<ImportSettingsResponse>();
+        Assert.NotNull(savedSettings);
+        Assert.Equal(SignedMapping(), savedSettings.Mapping);
 
         using var transactionsResponse = await client.GetAsync(
             $"/api/accounts/{account.Id}/transactions");
@@ -607,6 +630,8 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
         Assert.Equal(ImportReviewState.Expired, expiredReview.State);
         Assert.Equal(0, await verifyDbContext.ImportReviewRows
             .CountAsync(row => row.ReviewId == review.Id));
+        Assert.Equal(0, await verifyDbContext.ImportReviewMappingSnapshots
+            .CountAsync(snapshot => snapshot.ReviewId == review.Id));
         var accountEntity = await verifyDbContext.Accounts
             .SingleAsync(candidate => candidate.Id == account.Id);
         Assert.Null(accountEntity.ActiveImportId);
@@ -779,7 +804,12 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
         string Direction,
         bool IsPossibleDuplicate);
 
-    private sealed record ConfirmResponse(int ImportedCount, DateTimeOffset CompletedAtUtc);
+    private sealed record ConfirmResponse(
+        int ImportedCount,
+        DateTimeOffset CompletedAtUtc,
+        bool SettingsSaved);
+
+    private sealed record ImportSettingsResponse(ImportMapping? Mapping);
 
     private sealed record TransactionPage(TransactionResponse[] Items, string? NextCursor);
 

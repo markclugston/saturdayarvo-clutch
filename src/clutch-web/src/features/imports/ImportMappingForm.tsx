@@ -6,6 +6,7 @@ type ImportMappingFormProps = {
   headers: string[]
   amountFormats: CurrencyAmountFormat[]
   onSubmit: (mapping: ImportMapping) => void
+  initialMapping?: ImportMapping | null
   disabled?: boolean
 }
 
@@ -23,21 +24,40 @@ export function ImportMappingForm({
   headers,
   amountFormats,
   onSubmit,
+  initialMapping = null,
   disabled = false,
 }: ImportMappingFormProps) {
-  const [dateColumn, setDateColumn] = useState('')
-  const [descriptionColumn, setDescriptionColumn] = useState('')
-  const [dateFormat, setDateFormat] = useState('')
-  const [amountMode, setAmountMode] = useState<ImportMapping['amountMode']>('Signed')
-  const [signedAmountColumn, setSignedAmountColumn] = useState('')
-  const [incomingSign, setIncomingSign] = useState<'' | 'Positive' | 'Negative'>('')
-  const [incomingAmountColumn, setIncomingAmountColumn] = useState('')
-  const [outgoingAmountColumn, setOutgoingAmountColumn] = useState('')
-  const [amountColumn, setAmountColumn] = useState('')
-  const [directionColumn, setDirectionColumn] = useState('')
-  const [incomingDirectionValue, setIncomingDirectionValue] = useState('')
-  const [outgoingDirectionValue, setOutgoingDirectionValue] = useState('')
-  const [numberFormat, setNumberFormat] = useState('')
+  const [dateColumn, setDateColumn] = useState(initialMapping?.dateColumn.toString() ?? '')
+  const [descriptionColumn, setDescriptionColumn] = useState(
+    initialMapping?.descriptionColumn.toString() ?? '',
+  )
+  const [dateFormat, setDateFormat] = useState(initialMapping?.dateFormat ?? '')
+  const [amountMode, setAmountMode] = useState<ImportMapping['amountMode']>(
+    initialMapping?.amountMode ?? 'Signed',
+  )
+  const [signedAmountColumn, setSignedAmountColumn] = useState(
+    initialMapping?.signedAmountColumn?.toString() ?? '',
+  )
+  const [incomingSign, setIncomingSign] = useState<'' | 'Positive' | 'Negative'>(
+    initialMapping?.incomingSign ?? '',
+  )
+  const [incomingAmountColumn, setIncomingAmountColumn] = useState(
+    initialMapping?.incomingAmountColumn?.toString() ?? '',
+  )
+  const [outgoingAmountColumn, setOutgoingAmountColumn] = useState(
+    initialMapping?.outgoingAmountColumn?.toString() ?? '',
+  )
+  const [amountColumn, setAmountColumn] = useState(initialMapping?.amountColumn?.toString() ?? '')
+  const [directionColumn, setDirectionColumn] = useState(
+    initialMapping?.directionColumn?.toString() ?? '',
+  )
+  const [incomingDirectionValue, setIncomingDirectionValue] = useState(
+    initialMapping?.incomingDirectionValue ?? '',
+  )
+  const [outgoingDirectionValue, setOutgoingDirectionValue] = useState(
+    initialMapping?.outgoingDirectionValue ?? '',
+  )
+  const [numberFormat, setNumberFormat] = useState(initialMapping?.numberFormat ?? '')
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

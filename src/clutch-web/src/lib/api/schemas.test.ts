@@ -70,6 +70,7 @@ describe('API schemas', () => {
       expect(ConfirmImportResponseSchema.safeParse({
         importedCount: 1,
         completedAtUtc: timestamp,
+        settingsSaved: true,
       }).success).toBe(true)
     },
   )
