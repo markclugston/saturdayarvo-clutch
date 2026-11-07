@@ -1,4 +1,5 @@
 [] complete ui redesign including styles for themes.
+[] support creating a budget via categories.
 [] support proper identity provider such as entraid, google and facebook.
 [] on transaction import support selecting/deselecting so not all transactions are imported.
 [] on transaction import turn in to a wizard so that category view can be reviewed on a different screen.
