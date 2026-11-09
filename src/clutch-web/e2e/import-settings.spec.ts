@@ -71,9 +71,15 @@ test.describe('account import settings', () => {
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
       .analyze()
     expect(accessibility.violations).toEqual([])
+    const themeResponse = await context.request.get(
+      new URL('/api/preferences/theme', baseUrl).toString(),
+    )
+    expect(themeResponse.ok()).toBeTruthy()
+    const themePreference = await themeResponse.json() as { mode: 'Light' | 'Dark' | 'System' }
+    await expect(page.getByRole('combobox', { name: 'Theme' })).toHaveValue(themePreference.mode)
     await page.emulateMedia({ colorScheme: 'light' })
     await expect.poll(() => page.locator('html').evaluate((element) =>
-      element.classList.contains('dark'))).toBe(false)
+      element.classList.contains('dark'))).toBe(themePreference.mode === 'Dark')
 
     const reviewWithSettingsButton = page.getByRole('button', {
       name: 'Review import with saved settings',
@@ -130,12 +136,14 @@ test.describe('account import settings', () => {
       const otherPage = await browserContext.newPage()
       await otherPage.goto(baseUrl)
       await otherPage.setViewportSize({ width: 375, height: 812 })
+      await expect(otherPage.getByRole('combobox', { name: 'Theme' }))
+        .toHaveValue(themePreference.mode)
       await otherPage.emulateMedia({ colorScheme: 'dark' })
       await expect.poll(() => otherPage.locator('html').evaluate((element) =>
-        element.classList.contains('dark'))).toBe(true)
+        element.classList.contains('dark'))).toBe(themePreference.mode !== 'Light')
       await otherPage.emulateMedia({ colorScheme: 'light' })
       await expect.poll(() => otherPage.locator('html').evaluate((element) =>
-        element.classList.contains('dark'))).toBe(false)
+        element.classList.contains('dark'))).toBe(themePreference.mode === 'Dark')
     } finally {
       await browserContext.close()
     }

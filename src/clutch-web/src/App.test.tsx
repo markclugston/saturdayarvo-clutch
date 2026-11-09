@@ -1,7 +1,7 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getSession } from '@/features/auth/api'
+import { getSession, signOut } from '@/features/auth/api'
 import { ApiError } from '@/lib/api/client'
 import { renderWithQueryClient } from '@/test/renderWithQueryClient'
 import App from './App'
@@ -11,6 +11,22 @@ vi.mock('@/features/auth/api', () => ({
   register: vi.fn(),
   signIn: vi.fn(),
   signOut: vi.fn(),
+}))
+
+vi.mock('@/features/preferences/api', () => ({
+  useThemePreference: () => ({
+    data: { mode: 'Light' },
+    isError: false,
+    isSuccess: true,
+  }),
+  useSaveThemePreference: () => ({
+    isError: false,
+    mutate: vi.fn(),
+  }),
+}))
+
+vi.mock('@/features/families/FamilyPage', () => ({
+  FamilyPage: () => <section />,
 }))
 
 describe('session loading', () => {
@@ -44,5 +60,37 @@ describe('session loading', () => {
     expect(getSession).toHaveBeenCalledTimes(1)
     await user.click(screen.getByRole('button', { name: 'Try again' }))
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+  })
+
+  it('shows the theme selector in the authenticated top banner', async () => {
+    vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
+
+    renderWithQueryClient(<App />)
+
+    expect(await screen.findByRole('combobox', { name: 'Theme' })).toBeInTheDocument()
+  })
+
+  it('does not show the theme selector in the signed-out view', async () => {
+    vi.mocked(getSession).mockRejectedValue(new ApiError(401, { title: 'Authentication required' }))
+
+    renderWithQueryClient(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Theme' })).not.toBeInTheDocument()
+  })
+
+  it('resets the applied theme on sign-out', async () => {
+    vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
+    vi.mocked(signOut).mockResolvedValue()
+    const user = userEvent.setup()
+
+    renderWithQueryClient(<App />)
+    const selector = await screen.findByRole<HTMLSelectElement>('combobox', { name: 'Theme' })
+    await user.selectOptions(selector, 'Dark')
+    await waitFor(() => expect(document.documentElement).toHaveClass('dark'))
+
+    await user.click(screen.getByRole('button', { name: 'Sign out' }))
+
+    await waitFor(() => expect(document.documentElement).not.toHaveClass('dark'))
   })
 })

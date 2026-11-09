@@ -109,6 +109,12 @@ export const CsrfTokenSchema = z.object({
   requestToken: z.string().min(1),
 })
 
+export const ThemeModeSchema = z.enum(['Light', 'Dark', 'System'])
+
+export const ThemePreferenceSchema = z.object({
+  mode: ThemeModeSchema,
+}).strict()
+
 export type ProblemDetails = z.infer<typeof ProblemDetailsSchema>
 export type Family = z.infer<typeof FamilySchema>
 export type Currency = z.infer<typeof CurrencySchema>
@@ -121,3 +127,5 @@ export type TransactionItem = z.infer<typeof TransactionSchema>
 export type TransactionPage = z.infer<typeof TransactionPageSchema>
 export type UserSession = z.infer<typeof SessionSchema>
 export type ImportLimits = z.infer<typeof ImportLimitsSchema>
+export type ThemeMode = z.infer<typeof ThemeModeSchema>
+export type ThemePreference = z.infer<typeof ThemePreferenceSchema>

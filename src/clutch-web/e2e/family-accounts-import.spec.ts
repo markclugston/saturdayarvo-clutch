@@ -18,7 +18,7 @@ test('waits for the API to become available before showing sign-in', async ({ pa
   expect(requests).toBe(2)
 })
 
-test('sign-in journey supports keyboard navigation and system color changes', async ({ page }) => {
+test('sign-in journey supports keyboard navigation and keeps the Light default', async ({ page }) => {
   const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:5173'
   await page.route('**/api/security/session', (route) =>
     route.fulfill({
@@ -37,9 +37,11 @@ test('sign-in journey supports keyboard navigation and system color changes', as
     .analyze()
   expect(accessibility.violations).toEqual([])
 
+  expect(await page.locator('html').evaluate((element) =>
+    element.classList.contains('dark'))).toBe(false)
   await page.emulateMedia({ colorScheme: 'dark' })
   await expect.poll(() => page.locator('html').evaluate((element) =>
-    element.classList.contains('dark'))).toBe(true)
+    element.classList.contains('dark'))).toBe(false)
   await page.emulateMedia({ colorScheme: 'light' })
   await expect.poll(() => page.locator('html').evaluate((element) =>
     element.classList.contains('dark'))).toBe(false)

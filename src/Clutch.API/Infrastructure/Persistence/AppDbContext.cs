@@ -1,6 +1,7 @@
 using Clutch.API.Domain.Accounts;
 using Clutch.API.Domain.Families;
 using Clutch.API.Domain.Imports;
+using Clutch.API.Domain.Preferences;
 using Clutch.API.Domain.Transactions;
 using Clutch.API.Infrastructure.Identity;
 using Clutch.API.Infrastructure.Persistence.Entities;
@@ -32,6 +33,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<ImportReviewRow> ImportReviewRows => Set<ImportReviewRow>();
 
     public DbSet<ImportAuditEvent> ImportAuditEvents => Set<ImportAuditEvent>();
+
+    public DbSet<UserThemePreference> UserThemePreferences => Set<UserThemePreference>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -152,6 +155,29 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasOne<ApplicationUser>()
                 .WithMany()
                 .HasForeignKey(window => window.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<UserThemePreference>(entity =>
+        {
+            entity.ToTable("UserThemePreferences", table => table.HasCheckConstraint(
+                "CK_UserThemePreferences_Mode",
+                "[Mode] IN ('Light', 'Dark', 'System')"));
+            entity.HasKey(preference => preference.UserId);
+            entity.Property(preference => preference.UserId)
+                .HasMaxLength(450)
+                .IsRequired();
+            entity.Property(preference => preference.Mode)
+                .HasConversion<string>()
+                .HasMaxLength(16)
+                .IsUnicode(false)
+                .IsRequired();
+            entity.Property(preference => preference.UpdatedAtUtc)
+                .HasColumnType("datetimeoffset")
+                .IsRequired();
+            entity.HasOne<ApplicationUser>()
+                .WithMany()
+                .HasForeignKey(preference => preference.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

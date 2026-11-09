@@ -97,8 +97,7 @@ As a user who chooses System, I want the application to follow changes to my ope
 - **SC-002**: 100% of Light and Dark selections update the application appearance within 500 milliseconds, without a reload.
 - **SC-003**: 100% of selections remain selected after the user reloads or revisits the application, including on another device signed in to the same account.
 - **SC-004**: With System selected, the application reflects both light-to-dark and dark-to-light operating system preference changes within one second.
-- **SC-005**: At least 9 of 10 participants in a usability check can select each of the three requested modes and identify the selected mode without assistance.
-- **SC-006**: The dropdown and its choices pass WCAG 2.2 Level AA accessibility checks at desktop and narrow viewport sizes.
+- **SC-005**: The dropdown and its choices pass WCAG 2.2 Level AA accessibility checks at desktop and narrow viewport sizes.
 
 ## Assumptions
 

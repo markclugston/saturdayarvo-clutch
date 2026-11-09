@@ -44,6 +44,8 @@ build/
 .nuxt/
 .output/
 coverage/
+src/clutch-web/test-results/
+src/clutch-web/playwright-report/
 *.tsbuildinfo
 
 # Package manager and tooling logs

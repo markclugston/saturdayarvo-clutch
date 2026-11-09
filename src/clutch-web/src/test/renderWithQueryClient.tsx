@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render } from '@testing-library/react'
+import { ThemeProvider } from '@/components/theme/ThemeProvider'
 
 export function renderWithQueryClient(ui: ReactElement) {
   const queryClient = new QueryClient({
@@ -12,6 +13,10 @@ export function renderWithQueryClient(ui: ReactElement) {
 
   return {
     queryClient,
-    ...render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>),
+    ...render(
+      <ThemeProvider>
+        <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+      </ThemeProvider>,
+    ),
   }
 }

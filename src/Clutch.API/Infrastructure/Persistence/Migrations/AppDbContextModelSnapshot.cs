@@ -412,6 +412,29 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Clutch.API.Infrastructure.Persistence.Entities.UserThemePreference", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(16)");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("UserThemePreferences", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_UserThemePreferences_Mode", "[Mode] IN ('Light', 'Dark', 'System')");
+                        });
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
                 {
                     b.Property<string>("Id")
@@ -627,6 +650,15 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                     b.HasOne("Clutch.API.Domain.Imports.ImportReview", null)
                         .WithOne()
                         .HasForeignKey("Clutch.API.Infrastructure.Persistence.Entities.ImportReviewMappingSnapshot", "ReviewId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Clutch.API.Infrastructure.Persistence.Entities.UserThemePreference", b =>
+                {
+                    b.HasOne("Clutch.API.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

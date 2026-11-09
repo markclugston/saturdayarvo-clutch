@@ -8,9 +8,12 @@ import { signOut, getSession } from '@/features/auth/api'
 import { FamilyPage } from '@/features/families/FamilyPage'
 import { ImportPage } from '@/features/imports/ImportPage'
 import { ApiError } from '@/lib/api/client'
+import { ThemeSelector } from '@/components/theme/ThemeSelector'
+import { useTheme } from '@/components/theme/ThemeProvider'
 
 export default function App() {
   const queryClient = useQueryClient()
+  const { setMode } = useTheme()
   const [showAccounts, setShowAccounts] = useState(false)
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
   const [isImporting, setIsImporting] = useState(false)
@@ -31,6 +34,8 @@ export default function App() {
       setShowAccounts(false)
       setIsImporting(false)
       setShowAdminSettings(false)
+      setMode('Light')
+      queryClient.removeQueries({ queryKey: ['themePreference'] })
       await queryClient.invalidateQueries({ queryKey: ['session'] })
     },
   })
@@ -61,9 +66,10 @@ export default function App() {
   return (
     <div className="min-h-svh">
       <header className="border-b border-border">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-5 py-4">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-5 py-4">
           <p className="font-semibold">SaturdayArvo Clutch</p>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {sessionQuery.data.id && <ThemeSelector userId={sessionQuery.data.id} />}
             {sessionQuery.data.roles?.includes('Administrator') && (
               <button
                 className="rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"

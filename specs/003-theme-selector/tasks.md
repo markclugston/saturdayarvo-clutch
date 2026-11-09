@@ -5,7 +5,7 @@ description: "Implementation tasks for the top-banner theme selector"
 
 # Tasks: Top-Banner Theme Selector
 
-**Input**: Design documents from `specs/004-theme-selector/`
+**Input**: Design documents from `specs/003-theme-selector/`
 
 **Prerequisites**: `plan.md`, `spec.md`, `research.md`, `data-model.md`, `contracts/theme-preferences.md`, `quickstart.md`
 
@@ -29,7 +29,7 @@ description: "Implementation tasks for the top-banner theme selector"
 
 ### Tests for User Story 1
 
-- [X] T001 [P] [US1] Add `ThemeProvider` behavior tests in `src/clutch-web/src/components/theme/ThemeProvider.test.tsx` for the Light default, Light/Dark class changes within 500 milliseconds, and explicit System mode using the current OS preference; verify the root `.dark` class matches the effective appearance (ENG-001).
+- [X] T001 [P] [US1] Add `ThemeProvider` behavior tests in `src/clutch-web/src/components/theme/ThemeProvider.test.tsx` for Light default, Light/Dark class changes within 500 milliseconds, and explicit System mode using the current OS preference; verify the root `.dark` class matches the effective appearance (ENG-001).
 - [X] T002 [P] [US1] Add accessible selector tests in `src/clutch-web/src/components/theme/ThemeSelector.test.tsx` for the labeled native select, exactly Light/Dark/System options, selected value, and keyboard selection (ENG-001, WEB-001).
 - [X] T003 [P] [US1] Add an authenticated-header test in `src/clutch-web/src/App.test.tsx` that verifies signed-in users find the theme selector in the top banner and that it is absent from the signed-out view (ENG-001, WEB-001).
 
@@ -60,7 +60,7 @@ description: "Implementation tasks for the top-banner theme selector"
 - [X] T012 [US2] Configure the `UserThemePreferences` set and Identity-user cascade relationship in `src/Clutch.API/Infrastructure/Persistence/AppDbContext.cs` (DOT-002; the database enforces one optional preference per user).
 - [X] T013 [US2] Generate the SQL Server migration under `src/Clutch.API/Infrastructure/Persistence/Migrations/` and update `src/Clutch.API/Infrastructure/Persistence/Migrations/AppDbContextModelSnapshot.cs` for the user-keyed preference table and cascade; review the migration for data loss (OPS-001, DOT-002; existing users require no backfill and read as Light).
 - [X] T014 [US2] Implement asynchronous read/upsert operations in `src/Clutch.API/Application/Preferences/ThemePreferenceService.cs`, using only the authenticated user ID, `AsNoTracking()` for reads, server-generated UTC timestamps, and a single replacement row per user (DOT-001, DOT-002, SEC-001; absent rows read as Light and the latest committed save wins).
-- [X] T015 [US2] Add authenticated GET/PUT `/api/preferences/theme` routes in `src/Clutch.API/Api/Endpoints/ThemePreferenceEndpoints.cs`; validate exact mode values, derive ownership from the authenticated principal, and preserve standard ProblemDetails and antiforgery behavior (ARC-001, SEC-001; implement the response and error contract in `specs/004-theme-selector/contracts/theme-preferences.md`).
+- [X] T015 [US2] Add authenticated GET/PUT `/api/preferences/theme` routes in `src/Clutch.API/Api/Endpoints/ThemePreferenceEndpoints.cs`; validate exact mode values, derive ownership from the authenticated principal, and preserve standard ProblemDetails and antiforgery behavior (ARC-001, SEC-001; implement `specs/003-theme-selector/contracts/theme-preferences.md`).
 - [X] T016 [US2] Register `ThemePreferenceService` and map its endpoint group in `src/Clutch.API/Program.cs` (ARC-001, DOT-001; authenticated preference routes are reachable through the existing API pipeline).
 - [X] T017 [P] [US2] Add a strict `ThemePreferenceSchema` and inferred type in `src/clutch-web/src/lib/api/schemas.ts` for exactly the canonical Light/Dark/System values (WEB-001, SEC-001; malformed server responses are rejected at runtime).
 - [X] T018 [US2] Implement typed GET/PUT preference functions and React Query hooks in `src/clutch-web/src/features/preferences/api.ts` using the shared API client and preference schema (WEB-001; PUT uses existing antiforgery handling and API failures remain typed).
@@ -90,7 +90,7 @@ description: "Implementation tasks for the top-banner theme selector"
 
 - [X] T022 Obtain an independent review of the EF Core query and generated SQL Server migration for query shape, indexing, round trips, and data loss in `src/Clutch.API/Infrastructure/Persistence/AppDbContext.cs` and `src/Clutch.API/Infrastructure/Persistence/Migrations/` (DOT-002, OPS-001; resolve any material findings before acceptance).
 - [X] T023 Obtain an independent OWASP Top 10 review of the authenticated preference API and frontend persistence flow in `src/Clutch.API/Api/Endpoints/ThemePreferenceEndpoints.cs` and `src/clutch-web/src/features/preferences/api.ts` (SEC-001; remediate and retest every vulnerability found).
-- [ ] T024 Run the commands and manual scenarios in `specs/004-theme-selector/quickstart.md`, including API integration, frontend typecheck/lint/tests/build, authenticated Playwright/axe at desktop and narrow widths, manual visible-focus and 200% zoom/320 CSS px reflow checks, and the SC-005 usability check; record any required result or scenario updates in `specs/004-theme-selector/quickstart.md` (ENG-001, WEB-001; all listed checks pass and at least 9 of 10 participants complete all three requested mode-selection and identification tasks without assistance).
+- [X] T024 Run the commands and scenarios in `specs/003-theme-selector/quickstart.md`, including API integration, frontend typecheck/lint/tests/build, authenticated Playwright/axe at desktop and narrow widths, and visible-focus and 200% zoom/320 CSS px reflow checks; record results in `specs/003-theme-selector/quickstart.md` (ENG-001, WEB-001; all listed checks pass and SC-005 accessibility requirements are verified).
 
 ## Dependencies & Execution Order
 
@@ -143,4 +143,4 @@ Task: T009 authenticated browser tests in src/clutch-web/e2e/theme-selector.spec
 1. Complete US1 and validate the selector and immediate appearance behavior.
 2. Complete US2 and validate authenticated SQL Server persistence, user isolation, reload, and cross-client last-save-wins behavior.
 3. Complete US3 and validate live OS changes in System mode while Light/Dark remain fixed.
-4. Complete independent reviews and all checks in `specs/004-theme-selector/quickstart.md`.
+4. Complete independent reviews and all checks in `specs/003-theme-selector/quickstart.md`.

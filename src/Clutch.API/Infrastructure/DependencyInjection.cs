@@ -1,6 +1,7 @@
 using Clutch.API.Application.Accounts;
 using Clutch.API.Application.Families;
 using Clutch.API.Application.Imports;
+using Clutch.API.Application.Preferences;
 using Clutch.API.Application.Transactions;
 using Clutch.API.Infrastructure.Identity;
 using Clutch.API.Infrastructure.Imports;
@@ -84,6 +85,7 @@ public static class DependencyInjection
         services.AddScoped<ConfirmImportService>();
         services.AddScoped<AccountImportSettingsService>();
         services.AddScoped<ImportLimitSettingsService>();
+        services.AddScoped<ThemePreferenceService>();
         services.AddScoped<TransactionService>();
         services.AddScoped<IImportAttemptLimiter, ImportAttemptLimiter>();
         services.AddHostedService<ImportReviewCleanupService>();
