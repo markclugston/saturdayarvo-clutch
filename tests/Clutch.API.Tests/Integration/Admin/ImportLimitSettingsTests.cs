@@ -62,7 +62,6 @@ public sealed class ImportLimitSettingsTests(SqlServerFixture fixture)
 
         try
         {
-            await CreateFamilyAsync(client);
             var accountId = await CreateAccountAsync(client);
             using var reviewResponse = await CreateReviewAsync(client, accountId);
             Assert.Equal(HttpStatusCode.RequestEntityTooLarge, reviewResponse.StatusCode);
@@ -165,12 +164,6 @@ public sealed class ImportLimitSettingsTests(SqlServerFixture fixture)
             "/api/security/login",
             new { email, password = "Test-only!Password-123" });
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-    }
-
-    private static async Task CreateFamilyAsync(HttpClient client)
-    {
-        using var response = await SendJsonAsync(client, HttpMethod.Post, "/api/families", null);
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
     private static async Task<Guid> CreateAccountAsync(HttpClient client)

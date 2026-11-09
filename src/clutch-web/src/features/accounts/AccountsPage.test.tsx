@@ -34,7 +34,6 @@ describe('AccountsPage', () => {
     const onSelectAccount = vi.fn()
     vi.mocked(createAccount).mockResolvedValue({
       id: '550e8400-e29b-41d4-a716-446655440000',
-      familyId: '550e8400-e29b-41d4-a716-446655440001',
       description: 'Everyday spending',
       currencyCode: 'AUD',
       lastSuccessfulImportAtUtc: null,
@@ -42,7 +41,6 @@ describe('AccountsPage', () => {
     vi.mocked(getAccounts).mockResolvedValue([
       {
         id: '550e8400-e29b-41d4-a716-446655440000',
-        familyId: '550e8400-e29b-41d4-a716-446655440001',
         description: 'Everyday spending',
         currencyCode: 'AUD',
         lastSuccessfulImportAtUtc: null,
@@ -65,6 +63,47 @@ describe('AccountsPage', () => {
     expect(
       within(screen.getByRole('list')).getByText('Australian dollar (AUD)'),
     ).toBeInTheDocument()
+  })
+
+  it('moves focus to the accounts heading after loading', async () => {
+    renderWithQueryClient(<AccountsPage onSelectAccount={vi.fn()} />)
+
+    const heading = await screen.findByRole('heading', { name: 'Your accounts' })
+
+    expect(heading).toHaveAttribute('tabindex', '-1')
+    expect(heading).toHaveFocus()
+    expect(screen.queryByRole('heading', { name: 'Your Family' })).not.toBeInTheDocument()
+  })
+
+  it('lists and selects each of multiple owned accounts', async () => {
+    const user = userEvent.setup()
+    const onSelectAccount = vi.fn()
+    vi.mocked(getAccounts).mockResolvedValue([
+      {
+        id: '550e8400-e29b-41d4-a716-446655440000',
+        description: 'Everyday spending',
+        currencyCode: 'AUD',
+        lastSuccessfulImportAtUtc: null,
+      },
+      {
+        id: '550e8400-e29b-41d4-a716-446655440001',
+        description: 'Travel savings',
+        currencyCode: 'AUD',
+        lastSuccessfulImportAtUtc: null,
+      },
+    ])
+
+    renderWithQueryClient(<AccountsPage onSelectAccount={onSelectAccount} />)
+
+    const everydayAccount = await screen.findByRole('button', { name: /Everyday spending/ })
+    const travelAccount = screen.getByRole('button', { name: /Travel savings/ })
+    expect(within(screen.getByRole('list')).getAllByRole('button')).toHaveLength(2)
+
+    await user.click(everydayAccount)
+    await user.click(travelAccount)
+
+    expect(onSelectAccount).toHaveBeenNthCalledWith(1, '550e8400-e29b-41d4-a716-446655440000')
+    expect(onSelectAccount).toHaveBeenNthCalledWith(2, '550e8400-e29b-41d4-a716-446655440001')
   })
 
   it('clears and does not echo a rejected description', async () => {

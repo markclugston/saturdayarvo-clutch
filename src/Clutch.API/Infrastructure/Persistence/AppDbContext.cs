@@ -1,5 +1,4 @@
 using Clutch.API.Domain.Accounts;
-using Clutch.API.Domain.Families;
 using Clutch.API.Domain.Imports;
 using Clutch.API.Domain.Preferences;
 using Clutch.API.Domain.Transactions;
@@ -13,8 +12,6 @@ namespace Clutch.API.Infrastructure.Persistence;
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     : IdentityDbContext<ApplicationUser>(options)
 {
-    public DbSet<Family> Families => Set<Family>();
-
     public DbSet<Account> Accounts => Set<Account>();
 
     public DbSet<ImportLimitSettings> ImportLimitSettings => Set<ImportLimitSettings>();
@@ -40,21 +37,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     {
         base.OnModelCreating(builder);
 
-        builder.Entity<Family>(entity =>
-        {
-            entity.ToTable("Families");
-            entity.HasKey(family => family.Id);
-            entity.Property(family => family.OwnerUserId)
-                .HasMaxLength(450)
-                .IsRequired();
-            entity.HasIndex(family => family.OwnerUserId)
-                .IsUnique();
-            entity.HasOne<ApplicationUser>()
-                .WithMany()
-                .HasForeignKey(family => family.OwnerUserId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
-
         builder.Entity<Account>(entity =>
         {
             entity.ToTable("Accounts", table =>
@@ -78,13 +60,15 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .HasColumnType("datetimeoffset");
             entity.Property(account => account.ActiveImportId);
             entity.Property(account => account.LastSuccessfulImportReviewId);
-            entity.HasIndex(account => account.FamilyId);
+            entity.Property(account => account.OwnerUserId)
+                .HasMaxLength(450);
+            entity.HasIndex(account => account.OwnerUserId);
             entity.HasIndex(account => account.ActiveImportId)
                 .IsUnique()
                 .HasFilter("[ActiveImportId] IS NOT NULL");
-            entity.HasOne<Family>()
+            entity.HasOne<ApplicationUser>()
                 .WithMany()
-                .HasForeignKey(account => account.FamilyId)
+                .HasForeignKey(account => account.OwnerUserId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

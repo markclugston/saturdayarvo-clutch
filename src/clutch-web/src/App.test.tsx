@@ -1,7 +1,8 @@
 import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useQuery } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getSession, signOut } from '@/features/auth/api'
+import { getSession, signIn, signOut } from '@/features/auth/api'
 import { ApiError } from '@/lib/api/client'
 import { renderWithQueryClient } from '@/test/renderWithQueryClient'
 import App from './App'
@@ -25,8 +26,25 @@ vi.mock('@/features/preferences/api', () => ({
   }),
 }))
 
-vi.mock('@/features/families/FamilyPage', () => ({
-  FamilyPage: () => <section />,
+vi.mock('@/features/accounts/AccountsPage', () => ({
+  AccountsPage: () => {
+    const accountsQuery = useQuery({
+      queryKey: ['accounts'],
+      queryFn: async (): Promise<Array<{ description: string }>> => [],
+    })
+    const importSettingsQuery = useQuery({
+      queryKey: ['accountImportSettings', 'account-1'],
+      queryFn: async (): Promise<{ marker: string } | null> => null,
+    })
+    return (
+      <>
+        <h1>Your accounts</h1>
+        {accountsQuery.data?.map((account) =>
+          <p key={account.description}>{account.description}</p>)}
+        {importSettingsQuery.data && <p>{importSettingsQuery.data.marker}</p>}
+      </>
+    )
+  },
 }))
 
 describe('session loading', () => {
@@ -151,6 +169,7 @@ describe('session loading', () => {
     renderWithQueryClient(<App />)
 
     expect(await screen.findByRole('combobox', { name: 'Theme' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Your accounts' })).toBeInTheDocument()
   })
 
   it('does not show the theme selector in the signed-out view', async () => {
@@ -175,5 +194,44 @@ describe('session loading', () => {
     await user.click(screen.getByRole('button', { name: 'Sign out' }))
 
     await waitFor(() => expect(document.documentElement).not.toHaveClass('dark'))
+  })
+
+  it('does not expose cached account or import data after another user signs in', async () => {
+    vi.mocked(getSession)
+      .mockResolvedValueOnce({ id: 'owner', roles: [] })
+      .mockRejectedValueOnce(new ApiError(401, { title: 'Authentication required' }))
+      .mockResolvedValueOnce({ id: 'other-user', roles: [] })
+    vi.mocked(signOut).mockResolvedValue()
+    vi.mocked(signIn).mockResolvedValue()
+    const user = userEvent.setup()
+
+    const { queryClient } = renderWithQueryClient(<App />)
+    queryClient.setQueryData(['accounts'], [{ description: 'Owner private account' }])
+    queryClient.setQueryData(['account', 'account-1'], { description: 'Owner private account' })
+    queryClient.setQueryData(['transactions', 'account-1'], [{ description: 'Owner private transaction' }])
+    queryClient.setQueryData(['accountImportSettings', 'account-1'], {
+      marker: 'Owner private import settings',
+    })
+    queryClient.setQueryData(['admin', 'import-limits'], { maxRowsPerImport: 10 })
+
+    expect(await screen.findByText('Owner private account')).toBeInTheDocument()
+    expect(screen.getByText('Owner private import settings')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Sign out' }))
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.queryByText('Owner private account')).not.toBeInTheDocument()
+    expect(screen.queryByText('Owner private import settings')).not.toBeInTheDocument()
+    expect(queryClient.getQueryData(['account', 'account-1'])).toBeUndefined()
+    expect(queryClient.getQueryData(['transactions', 'account-1'])).toBeUndefined()
+    expect(queryClient.getQueryData(['accountImportSettings', 'account-1'])).toBeUndefined()
+    expect(queryClient.getQueryData(['admin', 'import-limits'])).toBeUndefined()
+
+    await user.type(screen.getByLabelText('Email'), 'other@example.test')
+    await user.type(screen.getByLabelText('Password'), 'Other-user!Password-123')
+    await user.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    expect(await screen.findByRole('heading', { name: 'Your accounts' })).toBeInTheDocument()
+    expect(screen.queryByText('Owner private account')).not.toBeInTheDocument()
+    expect(screen.queryByText('Owner private import settings')).not.toBeInTheDocument()
   })
 })

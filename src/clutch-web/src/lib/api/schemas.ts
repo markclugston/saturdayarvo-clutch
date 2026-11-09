@@ -9,11 +9,6 @@ export const ProblemDetailsSchema = z.object({
   errors: z.record(z.string(), z.array(z.string())).optional(),
 }).passthrough()
 
-export const FamilySchema = z.object({
-  id: z.uuid(),
-  ownerUserId: z.string().min(1),
-})
-
 export const CurrencyAmountFormatSchema = z.object({
   id: z.string().min(1),
   decimalSeparator: z.string().min(1),
@@ -30,7 +25,6 @@ export const CurrencySchema = z.object({
 
 export const AccountSchema = z.object({
   id: z.uuid(),
-  familyId: z.uuid(),
   description: z.string().min(1).max(200),
   currencyCode: z.string().regex(/^[A-Z]{3}$/),
   lastSuccessfulImportAtUtc: z.iso.datetime({ offset: true }).nullable().optional(),
@@ -116,7 +110,6 @@ export const ThemePreferenceSchema = z.object({
 }).strict()
 
 export type ProblemDetails = z.infer<typeof ProblemDetailsSchema>
-export type Family = z.infer<typeof FamilySchema>
 export type Currency = z.infer<typeof CurrencySchema>
 export type CurrencyAmountFormat = z.infer<typeof CurrencyAmountFormatSchema>
 export type Account = z.infer<typeof AccountSchema>

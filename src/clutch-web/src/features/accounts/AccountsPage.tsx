@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ApiError } from '@/lib/api/client'
 import { createAccount, getAccounts, getCurrencies } from './api'
 
@@ -11,6 +11,7 @@ export function AccountsPage({ onSelectAccount }: AccountsPageProps) {
   const queryClient = useQueryClient()
   const [description, setDescription] = useState('')
   const [currencyCode, setCurrencyCode] = useState('')
+  const headingRef = useRef<HTMLHeadingElement>(null)
   const accountsQuery = useQuery({
     queryKey: ['accounts'],
     queryFn: getAccounts,
@@ -19,6 +20,14 @@ export function AccountsPage({ onSelectAccount }: AccountsPageProps) {
     queryKey: ['currencies'],
     queryFn: getCurrencies,
   })
+  const isLoading = accountsQuery.isPending || currenciesQuery.isPending
+
+  useEffect(() => {
+    if (!isLoading) {
+      headingRef.current?.focus()
+    }
+  }, [isLoading])
+
   const createMutation = useMutation({
     mutationFn: () => createAccount(description, currencyCode),
     onError: (error) => {
@@ -38,7 +47,7 @@ export function AccountsPage({ onSelectAccount }: AccountsPageProps) {
     createMutation.mutate()
   }
 
-  if (accountsQuery.isPending || currenciesQuery.isPending) {
+  if (isLoading) {
     return <p role="status">Loading accounts…</p>
   }
 
@@ -64,7 +73,14 @@ export function AccountsPage({ onSelectAccount }: AccountsPageProps) {
   return (
     <section aria-labelledby="accounts-heading" className="space-y-8">
       <div>
-        <h1 id="accounts-heading" className="text-2xl font-semibold">Your accounts</h1>
+        <h1
+          ref={headingRef}
+          id="accounts-heading"
+          className="text-2xl font-semibold"
+          tabIndex={-1}
+        >
+          Your accounts
+        </h1>
         <p className="mt-2 text-muted-foreground">Each account keeps its own currency and transactions.</p>
       </div>
 

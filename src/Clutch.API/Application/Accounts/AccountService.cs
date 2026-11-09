@@ -22,19 +22,6 @@ public sealed class AccountService(AppDbContext dbContext)
         string? currencyCode,
         CancellationToken cancellationToken)
     {
-        var familyId = await dbContext.Families
-            .AsNoTracking()
-            .Where(family => family.OwnerUserId == ownerUserId)
-            .Select(family => (Guid?)family.Id)
-            .SingleOrDefaultAsync(cancellationToken);
-        if (familyId is null)
-        {
-            throw new ApiProblemException(
-                StatusCodes.Status409Conflict,
-                "A Family is required.",
-                "Create a Family before adding accounts.");
-        }
-
         var validationErrors = new Dictionary<string, string[]>();
         if (!AccountDescriptionValidator.IsValid(description))
         {
@@ -53,7 +40,7 @@ public sealed class AccountService(AppDbContext dbContext)
             throw InvalidAccountDetails(validationErrors);
         }
 
-        if (!Account.TryCreate(familyId.Value, description, currencyCode, out var account)
+        if (!Account.TryCreate(ownerUserId, description, currencyCode, out var account)
             || account is null)
         {
             throw InvalidAccountDetails(validationErrors);
@@ -97,9 +84,7 @@ public sealed class AccountService(AppDbContext dbContext)
     public static IReadOnlyList<Currency> GetCurrencies() => Currency.All;
 
     private IQueryable<Account> OwnedAccounts(string ownerUserId) =>
-        dbContext.Accounts.Where(account =>
-            dbContext.Families.Any(family =>
-                family.Id == account.FamilyId && family.OwnerUserId == ownerUserId));
+        dbContext.Accounts.Where(account => account.OwnerUserId == ownerUserId);
 
     private static ApiProblemException InvalidAccountDetails(
         IReadOnlyDictionary<string, string[]> errors) =>

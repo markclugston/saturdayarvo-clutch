@@ -82,7 +82,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapSecurityEndpoints();
-app.MapFamilyEndpoints();
 app.MapAccountEndpoints();
 app.MapImportEndpoints();
 app.MapTransactionEndpoints();

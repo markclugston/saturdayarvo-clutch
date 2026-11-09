@@ -18,7 +18,6 @@ vi.mock('@/features/imports/api', () => ({
 
 const existingAccount = {
   id: '550e8400-e29b-41d4-a716-446655440000',
-  familyId: '550e8400-e29b-41d4-a716-446655440001',
   description: 'Everyday spending',
   currencyCode: 'AUD',
   lastSuccessfulImportAtUtc: '2025-01-15T13:45:00.000Z',

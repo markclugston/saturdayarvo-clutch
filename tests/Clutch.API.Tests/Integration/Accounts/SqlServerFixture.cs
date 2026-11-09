@@ -16,10 +16,12 @@ public sealed class SqlServerFixture : IAsyncLifetime
 
     public TestApiFactory Factory { get; private set; } = null!;
 
+    public string ConnectionString => _container.GetConnectionString();
+
     public async Task InitializeAsync()
     {
         await _container.StartAsync();
-        Factory = new TestApiFactory(_container.GetConnectionString());
+        Factory = new TestApiFactory(ConnectionString);
 
         await using var scope = Factory.Services.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();

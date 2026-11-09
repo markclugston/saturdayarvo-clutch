@@ -42,14 +42,15 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
-                    b.Property<Guid>("FamilyId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<DateTimeOffset?>("LastSuccessfulImportAtUtc")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<Guid?>("LastSuccessfulImportReviewId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("OwnerUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
 
                     b.HasKey("Id");
 
@@ -57,7 +58,7 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasFilter("[ActiveImportId] IS NOT NULL");
 
-                    b.HasIndex("FamilyId");
+                    b.HasIndex("OwnerUserId");
 
                     b.ToTable("Accounts", null, t =>
                         {
@@ -65,25 +66,6 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("CK_Accounts_SupportedCurrency", "[CurrencyCode] IN ('AUD', 'CAD', 'EUR', 'GBP', 'HKD', 'INR', 'JPY', 'NZD', 'SGD', 'USD')");
                         });
-                });
-
-            modelBuilder.Entity("Clutch.API.Domain.Families.Family", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("OwnerUserId")
-                        .IsRequired()
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("OwnerUserId")
-                        .IsUnique();
-
-                    b.ToTable("Families", (string)null);
                 });
 
             modelBuilder.Entity("Clutch.API.Domain.Imports.ImportAuditEvent", b =>
@@ -570,20 +552,10 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Clutch.API.Domain.Accounts.Account", b =>
                 {
-                    b.HasOne("Clutch.API.Domain.Families.Family", null)
-                        .WithMany()
-                        .HasForeignKey("FamilyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Clutch.API.Domain.Families.Family", b =>
-                {
                     b.HasOne("Clutch.API.Infrastructure.Identity.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("OwnerUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Clutch.API.Domain.Imports.ImportAuditEvent", b =>
