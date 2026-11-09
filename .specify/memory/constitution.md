@@ -1,3 +1,14 @@
+<!--
+Sync Impact Report
+Version change: 4.1.0 -> 4.2.0
+Modified principles: IV. Testing and Quality Gates (require agent-executable validation and
+  prohibit human manual testing as a completion gate)
+Added sections: None
+Removed sections: None
+Follow-up TODOs: Review existing feature artifacts for requirements that conflict with this
+  amendment or the existing prohibition on participant usability studies.
+-->
+
 # SaturdayArvo Clutch Constitution
 
 ## Core Principles
@@ -52,6 +63,22 @@ A task MUST NOT be declared complete until its relevant tests and checks pass. R
 MUST be addressed, and relevant tests and checks MUST be rerun before completion. Reviewers MUST
 report material unresolved risks. A task MUST NOT pass its quality gates while a blocking issue
 remains unresolved.
+
+Feature, story, task, and test completion MUST NOT require human manual testing or human
+confirmation of manual test results. Specifications, plans, tasks, acceptance criteria, and
+release gates MUST require only tests and checks that a Copilot agent can execute and evaluate
+using available tools. Where appropriate, automated browser, accessibility, integration, or
+other executable checks MUST replace manual testing requirements without removing the underlying
+behavior or accessibility requirements. Human testing MAY provide optional feedback but MUST NOT
+be a completion gate.
+
+If a required agent-executable check cannot run or fails, the agent MUST report the blocker or
+failure and MUST NOT claim that the check passed. The agent MUST resolve the blocker or use an
+equivalent agent-executable check that verifies the requirement before declaring completion;
+inability to run a check MUST NOT silently waive the underlying requirement.
+
+The project MUST NOT conduct participant usability studies. Participant usability studies MUST
+NOT be required as acceptance criteria, implementation tasks, or release gates.
 
 ### V. Security and Error Handling
 Security MUST be enforced at system boundaries; protected operations MUST enforce authorization,
@@ -259,4 +286,4 @@ Exceptions require an explicit amendment; review findings MUST NOT be waived sil
 4. Commit with message format: `docs: amend constitution to vX.Y.Z (description)`.
 5. Tag commit with `constitution-vX.Y.Z`.
 
-**Version**: 4.0.0 | **Ratified**: 2026-11-01 | **Last Amended**: 2026-11-08
+**Version**: 4.2.0 | **Ratified**: 2026-11-01 | **Last Amended**: 2026-11-09
