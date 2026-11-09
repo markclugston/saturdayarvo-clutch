@@ -28,6 +28,15 @@ Expected outcomes:
 - Frontend tests verify the unsaved default is Light, select Light/Dark/System by accessible label, and verify applied appearance, OS change handling, and visible save-failure feedback.
 - Type checking, linting, tests, and production build complete without errors or warnings.
 
+## Implementation Validation Results
+
+Validation run on 2026-11-09:
+
+- `dotnet test .\tests\Clutch.API.Tests\Clutch.API.Tests.csproj`: passed (99 tests).
+- Frontend typecheck, lint, test, and production build: passed (60 tests).
+- `npm run test:e2e -- theme-selector.spec.ts --project=chromium`: both authenticated browser tests were skipped because `PLAYWRIGHT_STORAGE_STATE` was not configured.
+- The manual visible-focus, 200% zoom, 320 CSS px, and 10-participant usability checks have not been performed.
+
 ## Browser and Accessibility Scenarios
 
 With the API running and `PLAYWRIGHT_STORAGE_STATE` set to a secured authenticated state file, run from `src/clutch-web`:
