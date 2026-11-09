@@ -1,3 +1,32 @@
 {
-  "chat.agentHost.cloudSandbox": true
+  "chat.agentHost.cloudSandbox": true,
+  "chat.tools.terminal.autoApprove": {
+        "dotnet new": true,
+        "dotnet sln": true,
+        "dotnet add": true,
+        "dotnet restore": true,
+        "dotnet build": true,
+        "dotnet test": true,
+        "npm audit": true,
+        "npm --prefix 'src\\clutch-web'": true,
+        "dotnet ef": true,
+        "dotnet list": true,
+        "Remove-Item": true,
+        "npm --prefix .\\src\\clutch-web": true,
+        "dotnet run": true,
+        "npm run test": true,
+        ".\\.specify\\scripts\\powershell\\check-prerequisites.ps1": true,
+        ".\\.specify\\scripts\\powershell\\setup-plan.ps1": true,
+        ".\\.specify\\scripts\\powershell\\create-new-feature.ps1": true,
+        ".\\.specify\\scripts\\powershell\\setup-tasks.ps1": true,
+        "npm run lint": true,
+        "npm run build": true,
+        "npm test": true,
+        "npm --prefix src/clutch-web": true,
+        "npm run typecheck": true,
+        "/^Test-Path 'node_modules'$/": true,
+        "npm run test:e2e": true,
+        "npm run test:e2e:ownership": true,
+        "npx eslint": true
+  },
 }
