@@ -1,11 +1,48 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { createFamily } from '@/features/families/api'
 import { clearCsrfToken } from '@/lib/api/client'
-import { register, signIn, signOut } from './api'
+import { getSession, register, signIn, signOut } from './api'
 
 afterEach(() => {
   clearCsrfToken()
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+})
+
+it('forwards query cancellation to the session request', async () => {
+  const controller = new AbortController()
+  const fetchMock = vi.fn((_input: RequestInfo | URL, init?: RequestInit) =>
+    new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true })
+    }),
+  )
+  vi.stubGlobal('fetch', fetchMock)
+
+  const request = getSession(controller.signal)
+  expect(fetchMock).toHaveBeenCalledWith(
+    '/api/security/session',
+    expect.objectContaining({ signal: expect.any(AbortSignal) }),
+  )
+  controller.abort()
+
+  await expect(request).rejects.toMatchObject({ name: 'AbortError' })
+})
+
+it('uses an eight-second timeout for the session request', async () => {
+  const timeoutSignal = AbortSignal.abort(new DOMException('Timed out', 'TimeoutError'))
+  const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeoutSignal)
+  const fetchMock = vi.fn((_input: RequestInfo | URL, init?: RequestInit) =>
+    Promise.reject(init?.signal?.reason),
+  )
+  vi.stubGlobal('fetch', fetchMock)
+
+  await expect(getSession()).rejects.toMatchObject({ name: 'TimeoutError' })
+
+  expect(timeout).toHaveBeenCalledWith(8000)
+  expect(fetchMock).toHaveBeenCalledWith(
+    '/api/security/session',
+    expect.objectContaining({ signal: expect.any(AbortSignal) }),
+  )
 })
 
 it.each([false, true])(

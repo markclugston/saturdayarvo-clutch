@@ -4,8 +4,13 @@ import { SessionSchema, type UserSession } from '@/lib/api/schemas'
 
 const EmptyResponseSchema = z.undefined()
 
-export function getSession(): Promise<UserSession> {
-  return apiRequest('/api/security/session', SessionSchema)
+export function getSession(signal?: AbortSignal): Promise<UserSession> {
+  const timeoutSignal = AbortSignal.timeout(8000)
+  const requestSignal = signal
+    ? AbortSignal.any([signal, timeoutSignal])
+    : timeoutSignal
+
+  return apiRequest('/api/security/session', SessionSchema, { signal: requestSignal })
 }
 
 export function register(email: string, password: string): Promise<UserSession> {

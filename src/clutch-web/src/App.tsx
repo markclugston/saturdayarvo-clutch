@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { AccountDetails } from '@/features/accounts/AccountDetails'
 import { AccountsPage } from '@/features/accounts/AccountsPage'
 import { ImportLimitsPage } from '@/features/admin/ImportLimitsPage'
 import { AuthPage } from '@/features/auth/AuthPage'
+import { StartupLoadingDialog } from '@/features/auth/StartupLoadingDialog'
 import { signOut, getSession } from '@/features/auth/api'
 import { FamilyPage } from '@/features/families/FamilyPage'
 import { ImportPage } from '@/features/imports/ImportPage'
@@ -14,17 +15,40 @@ import { useTheme } from '@/components/theme/ThemeProvider'
 export default function App() {
   const queryClient = useQueryClient()
   const { setMode } = useTheme()
+  const sessionAttemptActive = useRef(false)
+  const sessionAttemptStartedAt = useRef(performance.now())
   const [showAccounts, setShowAccounts] = useState(false)
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
   const [isImporting, setIsImporting] = useState(false)
   const [showAdminSettings, setShowAdminSettings] = useState(false)
   const sessionQuery = useQuery({
     queryKey: ['session'],
-    queryFn: getSession,
-    retry: (failureCount, error) =>
-      failureCount < 5
-      && (error instanceof TypeError
-        || error instanceof ApiError && [502, 503, 504].includes(error.status)),
+    queryFn: async ({ signal }) => {
+      if (!sessionAttemptActive.current) {
+        sessionAttemptStartedAt.current = performance.now()
+        sessionAttemptActive.current = true
+      }
+
+      try {
+        const session = await getSession(signal)
+        sessionAttemptActive.current = false
+        return session
+      } catch (error) {
+        if (signal.aborted) {
+          sessionAttemptActive.current = false
+        }
+        throw error
+      }
+    },
+    retry: (_failureCount, error) => {
+      const shouldRetry =
+        performance.now() - sessionAttemptStartedAt.current < 30_000
+        && isTransientSessionError(error)
+      if (!shouldRetry) {
+        sessionAttemptActive.current = false
+      }
+      return shouldRetry
+    },
     retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 2000),
   })
   const signOutMutation = useMutation({
@@ -40,8 +64,13 @@ export default function App() {
     },
   })
 
-  if (sessionQuery.isPending || sessionQuery.isError && sessionQuery.isFetching) {
-    return <main className="mx-auto max-w-4xl px-5 py-10"><p role="status">Loading…</p></main>
+  if (sessionQuery.isPending || sessionQuery.isFetching) {
+    return (
+      <>
+        <AuthPage />
+        <StartupLoadingDialog open />
+      </>
+    )
   }
 
   if (sessionQuery.isError) {
@@ -50,16 +79,23 @@ export default function App() {
     }
 
     return (
-      <main className="mx-auto max-w-4xl px-5 py-10">
-        <p role="alert">Unable to load your session. Please try again.</p>
-        <button
-          className="mt-4 rounded-md border border-border px-4 py-2"
-          onClick={() => void sessionQuery.refetch()}
-          type="button"
-        >
-          Try again
-        </button>
-      </main>
+      <>
+        <AuthPage />
+        <section className="mx-auto max-w-4xl px-5 py-6">
+          <p role="alert">Unable to load your session. Please try again.</p>
+          <button
+            className="mt-4 rounded-md border border-border px-4 py-2"
+            onClick={() => {
+              sessionAttemptActive.current = false
+              sessionAttemptStartedAt.current = performance.now()
+              void sessionQuery.refetch()
+            }}
+            type="button"
+          >
+            Try again
+          </button>
+        </section>
+      </>
     )
   }
 
@@ -115,4 +151,10 @@ export default function App() {
       </main>
     </div>
   )
+}
+
+function isTransientSessionError(error: unknown): boolean {
+  return error instanceof TypeError
+    || error instanceof DOMException && error.name === 'TimeoutError'
+    || error instanceof ApiError && [502, 503, 504].includes(error.status)
 }
