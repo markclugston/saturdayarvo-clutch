@@ -1,12 +1,11 @@
 <!--
 Sync Impact Report
-Version change: 4.1.0 -> 4.2.0
-Modified principles: IV. Testing and Quality Gates (require agent-executable validation and
-  prohibit human manual testing as a completion gate)
+Version change: 4.2.0 -> 4.3.0
+Modified principles: VI. Frontend Engineering (clutch-web) (require button-style presentation
+  for in-app navigation instead of bare text hyperlinks)
 Added sections: None
 Removed sections: None
-Follow-up TODOs: Review existing feature artifacts for requirements that conflict with this
-  amendment or the existing prohibition on participant usability studies.
+Follow-up TODOs: None
 -->
 
 # SaturdayArvo Clutch Constitution
@@ -134,6 +133,10 @@ CSS variables); one-off arbitrary values require a clear design or technical rat
 names MUST NOT be constructed by string concatenation. Conditional and merged classes MUST use the
 shared `cn()` helper (`clsx` and `tailwind-merge`). Layouts MUST be mobile-first. Inline `style` is
 permitted only for values computed at runtime.
+
+In-app navigation MUST use button-style controls consistent with the application's action buttons,
+not bare text hyperlinks. Navigation controls MUST retain link semantics, and buttons MUST be used
+only for actions that do not navigate.
 
 shadcn/ui MUST be the default source for UI primitives. Components MUST be added through the
 shadcn CLI into the repository and then reviewed, typed, and tested as project-owned source.
@@ -286,4 +289,4 @@ Exceptions require an explicit amendment; review findings MUST NOT be waived sil
 4. Commit with message format: `docs: amend constitution to vX.Y.Z (description)`.
 5. Tag commit with `constitution-vX.Y.Z`.
 
-**Version**: 4.2.0 | **Ratified**: 2026-11-01 | **Last Amended**: 2026-11-09
+**Version**: 4.3.0 | **Ratified**: 2026-11-01 | **Last Amended**: 2026-11-09
