@@ -1,8 +1,8 @@
 <!--
 Sync Impact Report
-Version change: 4.2.0 -> 4.3.0
-Modified principles: VI. Frontend Engineering (clutch-web) (require button-style presentation
-  for in-app navigation instead of bare text hyperlinks)
+Version change: 4.3.0 -> 4.4.0
+Modified principles: VI. Frontend Engineering (clutch-web) (prohibit hyperlinks and require
+  button controls with pointer cursors)
 Added sections: None
 Removed sections: None
 Follow-up TODOs: None
@@ -134,9 +134,11 @@ names MUST NOT be constructed by string concatenation. Conditional and merged cl
 shared `cn()` helper (`clsx` and `tailwind-merge`). Layouts MUST be mobile-first. Inline `style` is
 permitted only for values computed at runtime.
 
-In-app navigation MUST use button-style controls consistent with the application's action buttons,
-not bare text hyperlinks. Navigation controls MUST retain link semantics, and buttons MUST be used
-only for actions that do not navigate.
+The application MUST NOT use hyperlinks, including anchor elements, for navigation or actions.
+Navigation MUST use button controls that perform the requested navigation. All buttons MUST use a
+hand pointer cursor when hovered. File selection MUST be presented as an accessible button-style
+control backed by a file input. These requirements keep controls visually and behaviorally
+consistent with the application's action buttons.
 
 shadcn/ui MUST be the default source for UI primitives. Components MUST be added through the
 shadcn CLI into the repository and then reviewed, typed, and tested as project-owned source.
@@ -289,4 +291,4 @@ Exceptions require an explicit amendment; review findings MUST NOT be waived sil
 4. Commit with message format: `docs: amend constitution to vX.Y.Z (description)`.
 5. Tag commit with `constitution-vX.Y.Z`.
 
-**Version**: 4.3.0 | **Ratified**: 2026-11-01 | **Last Amended**: 2026-11-09
+**Version**: 4.4.0 | **Ratified**: 2026-11-01 | **Last Amended**: 2026-11-10
