@@ -91,4 +91,25 @@ describe('AccountsPage', () => {
     expect(descriptionInput).toHaveValue('')
     expect(screen.queryByText('BSB 123456')).not.toBeInTheDocument()
   })
+
+  it('opens the selected account with its existing identifier', async () => {
+    const user = userEvent.setup()
+    const onSelectAccount = vi.fn()
+    vi.mocked(getAccounts).mockResolvedValue([{
+      id: '550e8400-e29b-41d4-a716-446655440000',
+      familyId: '550e8400-e29b-41d4-a716-446655440001',
+      description: 'Everyday spending',
+      currencyCode: 'AUD',
+      lastSuccessfulImportAtUtc: null,
+    }])
+
+    renderWithQueryClient(<AccountsPage onSelectAccount={onSelectAccount} />)
+
+    const accountButton = await screen.findByRole('button', { name: /Everyday spending/ })
+    expect(screen.getByRole('heading', { name: 'Your accounts' })).toHaveFocus()
+    expect(accountButton.tagName).toBe('BUTTON')
+    await user.click(accountButton)
+
+    expect(onSelectAccount).toHaveBeenCalledWith('550e8400-e29b-41d4-a716-446655440000')
+  })
 })

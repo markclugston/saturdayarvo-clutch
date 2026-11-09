@@ -157,6 +157,8 @@ describe('ImportPage', () => {
     const user = userEvent.setup()
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
 
+    expect(await screen.findByRole('heading', { name: 'Import transactions' })).toHaveFocus()
+    expect(await screen.findByRole('button', { name: 'Choose CSV file' })).toBeInTheDocument()
     await user.upload(
       await screen.findByLabelText('CSV file'),
       new File(

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AccountDetails } from '@/features/accounts/AccountDetails'
 import { AccountsPage } from '@/features/accounts/AccountsPage'
 import { ImportLimitsPage } from '@/features/admin/ImportLimitsPage'
@@ -17,6 +17,7 @@ export default function App() {
   const { setMode } = useTheme()
   const sessionAttemptActive = useRef(false)
   const sessionAttemptStartedAt = useRef(performance.now())
+  const mainRef = useRef<HTMLElement>(null)
   const [showAccounts, setShowAccounts] = useState(false)
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
   const [isImporting, setIsImporting] = useState(false)
@@ -64,6 +65,16 @@ export default function App() {
     },
   })
 
+  useEffect(() => {
+    mainRef.current?.querySelector<HTMLElement>('h1[tabindex="-1"]')?.focus()
+  }, [isImporting, selectedAccountId, showAccounts, showAdminSettings])
+
+  useEffect(() => {
+    if (sessionQuery.error instanceof ApiError && sessionQuery.error.status === 401) {
+      document.getElementById('auth-heading')?.focus()
+    }
+  }, [sessionQuery.error])
+
   if (sessionQuery.isPending || sessionQuery.isFetching) {
     return (
       <>
@@ -110,6 +121,7 @@ export default function App() {
               <button
                 className="rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
                 onClick={() => setShowAdminSettings(true)}
+                type="button"
               >
                 Import limits
               </button>
@@ -118,13 +130,14 @@ export default function App() {
               className="rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
               disabled={signOutMutation.isPending}
               onClick={() => signOutMutation.mutate()}
+              type="button"
             >
               {signOutMutation.isPending ? 'Signing out…' : 'Sign out'}
             </button>
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-5 py-8">
+      <main className="mx-auto max-w-5xl px-5 py-8" ref={mainRef}>
         {signOutMutation.isError && (
           <p className="mb-5" role="alert">Unable to sign out. Please try again.</p>
         )}

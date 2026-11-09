@@ -30,7 +30,11 @@ export function AuthPage() {
     <main className="mx-auto flex min-h-svh w-full max-w-md items-center px-5 py-10">
       <section aria-labelledby="auth-heading" className="w-full space-y-6 rounded-xl border border-border bg-card p-6">
         <div>
-          <h1 id="auth-heading" className="text-2xl font-semibold">
+          <h1
+            className="text-2xl font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            id="auth-heading"
+            tabIndex={-1}
+          >
             {isRegistering ? 'Create your account' : 'Sign in'}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -85,7 +89,7 @@ export function AuthPage() {
           {authMutation.isError && <p role="alert">{getErrorMessage(authMutation.error)}</p>}
         </form>
         <button
-          className="text-sm underline underline-offset-4"
+          className="rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
           onClick={() => {
             authMutation.reset()
             setIsRegistering(!isRegistering)

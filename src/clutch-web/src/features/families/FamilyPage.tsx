@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { PageHeading } from '@/components/ui/page-heading'
 import { ApiError } from '@/lib/api/client'
 import { createFamily, getFamilies } from './api'
 
@@ -31,9 +32,13 @@ export function FamilyPage({ onReady }: FamilyPageProps) {
   if (familiesQuery.data.length > 0) {
     return (
       <section aria-labelledby="family-heading" className="space-y-4">
-        <h1 id="family-heading" className="text-2xl font-semibold">Your Family</h1>
+        <PageHeading id="family-heading" className="text-2xl font-semibold">Your Family</PageHeading>
         <p>Your accounts are private to you.</p>
-        <button className="rounded-md bg-primary px-4 py-2 text-primary-foreground" onClick={onReady}>
+        <button
+          className="rounded-md bg-primary px-4 py-2 text-primary-foreground"
+          onClick={onReady}
+          type="button"
+        >
           View accounts
         </button>
       </section>
@@ -42,12 +47,15 @@ export function FamilyPage({ onReady }: FamilyPageProps) {
 
   return (
     <section aria-labelledby="family-heading" className="space-y-4">
-      <h1 id="family-heading" className="text-2xl font-semibold">Create your Family</h1>
+      <PageHeading id="family-heading" className="text-2xl font-semibold">
+        Create your Family
+      </PageHeading>
       <p>Your Family holds your accounts. Only you can access them.</p>
       <button
         className="rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
         disabled={createMutation.isPending}
         onClick={() => createMutation.mutate()}
+        type="button"
       >
         {createMutation.isPending ? 'Creating…' : 'Create Family'}
       </button>

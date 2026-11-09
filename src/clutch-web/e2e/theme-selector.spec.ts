@@ -102,4 +102,40 @@ test.describe('theme selector', () => {
     await expect.poll(() => authenticatedPage.locator('html').evaluate((element) =>
       element.classList.contains('dark'))).toBe(selectedMode === 'Dark')
   })
+
+  test('follows the operating system in System mode across supported viewports', async ({
+    authenticatedPage,
+  }) => {
+    await authenticatedPage.goto('/')
+    const selector = authenticatedPage.getByRole('combobox', { name: 'Theme' })
+    await expect(selector).toBeVisible()
+    const originalMode = await selector.inputValue()
+    try {
+      const saveResponse = authenticatedPage.waitForResponse((response) =>
+        response.url().endsWith('/api/preferences/theme')
+        && response.request().method() === 'PUT')
+      await selector.selectOption('System')
+      await expect(selector).toHaveValue('System')
+      expect((await saveResponse).ok()).toBeTruthy()
+
+      for (const viewport of [{ width: 320, height: 812 }, { width: 1280, height: 720 }]) {
+        await authenticatedPage.setViewportSize(viewport)
+        for (const colorScheme of ['light', 'dark'] as const) {
+          await authenticatedPage.emulateMedia({ colorScheme })
+          await expect.poll(() => authenticatedPage.locator('html').evaluate((element) =>
+            element.classList.contains('dark'))).toBe(colorScheme === 'dark')
+          await expect.poll(() => authenticatedPage.locator('html').evaluate((element) =>
+            element.ownerDocument.documentElement.scrollWidth
+            <= element.ownerDocument.documentElement.clientWidth))
+            .toBe(true)
+          const accessibility = await new AxeBuilder({ page: authenticatedPage })
+            .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+            .analyze()
+          expect(accessibility.violations).toEqual([])
+        }
+      }
+    } finally {
+      await selector.selectOption(originalMode)
+    }
+  })
 })

@@ -59,4 +59,17 @@ describe('ImportLimitsPage', () => {
     expect(rowLimit).toBeInvalid()
     expect(updateImportLimits).not.toHaveBeenCalled()
   })
+
+  it('returns to the application with its named button', async () => {
+    const user = userEvent.setup()
+    const onBack = vi.fn()
+    renderWithQueryClient(<ImportLimitsPage onBack={onBack} />)
+
+    expect(await screen.findByRole('heading', { name: 'Import limits' })).toHaveFocus()
+    const backButton = screen.getByRole('button', { name: 'Back to the application' })
+    expect(backButton.tagName).toBe('BUTTON')
+    await user.click(backButton)
+
+    expect(onBack).toHaveBeenCalledOnce()
+  })
 })

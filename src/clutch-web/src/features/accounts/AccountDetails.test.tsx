@@ -72,4 +72,20 @@ describe('AccountDetails', () => {
     )
     expect(screen.getByText('Currency: Australian dollar (AUD)')).toBeInTheDocument()
   })
+
+  it('uses named buttons to return to accounts or open import for this account', async () => {
+    const user = userEvent.setup()
+    const onBack = vi.fn()
+    const onImport = vi.fn()
+    renderWithQueryClient(
+      <AccountDetails accountId={existingAccount.id} onBack={onBack} onImport={onImport} />,
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Account details' })).toHaveFocus()
+    await user.click(screen.getByRole('button', { name: 'Back to accounts' }))
+    await user.click(screen.getByRole('button', { name: 'Import transactions' }))
+
+    expect(onBack).toHaveBeenCalledOnce()
+    expect(onImport).toHaveBeenCalledOnce()
+  })
 })

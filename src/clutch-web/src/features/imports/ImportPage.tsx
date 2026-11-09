@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
+import { PageHeading } from '@/components/ui/page-heading'
 import { getAccount, getCurrencies } from '@/features/accounts/api'
 import { ApiError } from '@/lib/api/client'
 import type { ImportReview } from '@/lib/api/schemas'
@@ -195,14 +196,17 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
   return (
     <section aria-labelledby="import-heading" className="space-y-6">
       <button
-        className="text-sm underline underline-offset-4"
+        className="rounded-md border border-border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50"
         disabled={cancelMutation.isPending || confirmMutation.isPending}
         onClick={() => review ? cancelMutation.mutate() : onBack()}
+        type="button"
       >
         {review ? 'Cancel import review' : 'Back to account'}
       </button>
       <div>
-        <h1 id="import-heading" className="text-2xl font-semibold">Import transactions</h1>
+        <PageHeading id="import-heading" className="text-2xl font-semibold">
+          Import transactions
+        </PageHeading>
         <p className="mt-2 text-muted-foreground">
           Destination: {account.description} — {currency.name} ({account.currencyCode})
         </p>
@@ -220,6 +224,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
           <button
             className="rounded-md border border-border px-4 py-2"
             onClick={onBack}
+            type="button"
           >
             Return to account
           </button>
@@ -278,7 +283,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
             <div className="space-y-2">
               <p role="status">Using this account’s saved import settings.</p>
               <button
-                className="text-sm underline underline-offset-4"
+                className="rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
                 onClick={() => setShowSettings((current) => !current)}
                 type="button"
               >
@@ -292,15 +297,25 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
             <label className="block text-sm font-medium" htmlFor="csv-file">
               CSV file
             </label>
+            <button
+              className="rounded-md border border-border px-4 py-2 hover:bg-muted"
+              onClick={() => fileInput.current?.click()}
+              type="button"
+            >
+              Choose CSV file
+            </button>
             <input
               ref={fileInput}
               accept=".csv,text/csv"
-              className="block w-full text-sm"
+              aria-describedby="csv-file-description"
+              className="sr-only"
               id="csv-file"
               onChange={(event) => handleFileChange(event.currentTarget.files?.[0])}
+              tabIndex={-1}
               type="file"
             />
-            <p className="text-sm text-muted-foreground">
+            {file && <p aria-live="polite" className="text-sm">Selected file: {file.name}</p>}
+            <p className="text-sm text-muted-foreground" id="csv-file-description">
               Only the header row is read in your browser. The server validates the entire file.
             </p>
           </div>
@@ -359,6 +374,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
                   className="rounded-md border border-border px-4 py-2 disabled:opacity-50"
                   disabled={recoverMutation.isPending || createReviewMutation.isPending}
                   onClick={() => recoverMutation.mutate()}
+                  type="button"
                 >
                   {recoverMutation.isPending ? 'Discarding…' : 'Discard active review'}
                 </button>

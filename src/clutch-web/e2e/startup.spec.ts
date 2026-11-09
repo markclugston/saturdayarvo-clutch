@@ -57,6 +57,44 @@ test('recovers automatically from a temporary session failure', async ({ page })
   expect(attempts).toBe(2)
 })
 
+test('keeps sign-in buttons keyboard-accessible and responsive across themes and viewports', async ({
+  page,
+}) => {
+  await page.route('**/api/security/session', (route) => route.fulfill({
+    status: 401,
+    contentType: 'application/problem+json',
+    body: JSON.stringify({ title: 'Authentication required', status: 401 }),
+  }))
+  await page.goto('/')
+
+  const switchButton = page.getByRole('button', { name: 'New here? Create an account' })
+  await expect(switchButton).toBeVisible()
+  await expect(page.locator('a[href]')).toHaveCount(0)
+  await switchButton.hover()
+  await expect.poll(() => switchButton.evaluate((button) =>
+    button.ownerDocument.defaultView?.getComputedStyle(button).cursor))
+    .toBe('pointer')
+
+  await switchButton.focus()
+  await expect(switchButton).toBeFocused()
+  const startedAt = await page.evaluate(() => performance.now())
+  await page.keyboard.press('Space')
+  await expect(page.getByRole('heading', { name: 'Create your account' })).toBeVisible()
+  const responseTime = await page.evaluate((start) => performance.now() - start, startedAt)
+  expect(responseTime).toBeLessThan(500)
+
+  for (const viewport of [{ width: 320, height: 812 }, { width: 1280, height: 720 }]) {
+    await page.setViewportSize(viewport)
+    for (const colorScheme of ['light', 'dark'] as const) {
+      await page.emulateMedia({ colorScheme })
+      const results = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+        .analyze()
+      expect(results.violations).toEqual([])
+    }
+  }
+})
+
 test('allows retry after a non-transient startup error without reloading', async ({ page }) => {
   let attempts = 0
   let retrying = false

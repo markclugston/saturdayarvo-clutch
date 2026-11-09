@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
+import { PageHeading } from '@/components/ui/page-heading'
 import { ApiError } from '@/lib/api/client'
 import { getAccount, getCurrencies, updateAccountDescription } from './api'
 import { TransactionsTable } from './TransactionsTable'
@@ -68,15 +69,25 @@ export function AccountDetails({ accountId, onBack, onImport }: AccountDetailsPr
   return (
     <section aria-labelledby="account-details-heading" className="space-y-6">
       <div className="flex flex-wrap gap-4">
-        <button className="text-sm underline underline-offset-4" onClick={onBack}>
+        <button
+          className="rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
+          onClick={onBack}
+          type="button"
+        >
           Back to accounts
         </button>
-        <button className="text-sm underline underline-offset-4" onClick={onImport}>
+        <button
+          className="rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
+          onClick={onImport}
+          type="button"
+        >
           Import transactions
         </button>
       </div>
       <div>
-        <h1 id="account-details-heading" className="text-2xl font-semibold">Account details</h1>
+        <PageHeading id="account-details-heading" className="text-2xl font-semibold">
+          Account details
+        </PageHeading>
         <p className="mt-2 text-muted-foreground">
           Currency: {currency.name} ({account.currencyCode})
         </p>

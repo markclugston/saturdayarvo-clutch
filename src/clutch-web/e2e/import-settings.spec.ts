@@ -1,4 +1,5 @@
 import AxeBuilder from '@axe-core/playwright'
+import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures.js'
 
 test.describe('account import settings', () => {
@@ -50,8 +51,11 @@ test.describe('account import settings', () => {
     await page.getByLabel('Number format used in this file')
       .selectOption('dot-decimal-comma-grouping')
     await page.getByRole('button', { name: 'Review import' }).click()
+    await expect(page.getByRole('button', { name: 'Confirm import' })).toBeVisible()
+    await expectAccessibleAcrossThemeAndViewports(page)
     await page.getByRole('button', { name: 'Confirm import' }).click()
     await expect(page.getByRole('status')).toContainText('1 transactions imported successfully')
+    await expectAccessibleAcrossThemeAndViewports(page)
 
     await page.getByRole('button', { name: 'Return to account' }).click()
     await page.getByRole('button', { name: 'Import transactions' }).click()
@@ -149,9 +153,10 @@ test.describe('account import settings', () => {
     }
   })
 
-  test('first-import and saved-settings screens are accessible with mocked API responses', async ({
+  test('audits authenticated journeys across views, themes, and responsive sizes with mocked APIs', async ({
     page,
   }) => {
+    test.setTimeout(120_000)
     const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:5173'
     const familyId = '550e8400-e29b-41d4-a716-446655440010'
     const accountId = '550e8400-e29b-41d4-a716-446655440011'
@@ -188,12 +193,20 @@ test.describe('account import settings', () => {
     let savedMapping: typeof mapping | null = null
     let reviewNumber = 0
     let currentReviewId = ''
+    let themeMode: 'Light' | 'Dark' | 'System' = 'Light'
+    let importLimits = {
+      maxFileSizeBytes: 10 * 1024 * 1024,
+      maxRowsPerImport: 10_000,
+      maxImportAttemptsPerUserPerMinute: 5,
+    }
 
     await page.route((url) => url.pathname.startsWith('/api/'), async (route) => {
       const request = route.request()
       const path = new URL(request.url()).pathname
       if (path === '/api/security/session') {
-        await route.fulfill({ json: { id: 'browser-test-owner' } })
+        await route.fulfill({
+          json: { id: 'browser-test-owner', roles: ['Administrator'] },
+        })
       } else if (path === '/api/security/csrf-token') {
         await route.fulfill({ json: { requestToken: 'test-token' } })
       } else if (path === '/api/families') {
@@ -242,6 +255,17 @@ test.describe('account import settings', () => {
             settingsSaved: true,
           },
         })
+      } else if (path === '/api/preferences/theme' && request.method() === 'GET') {
+        await route.fulfill({ json: { mode: themeMode } })
+      } else if (path === '/api/preferences/theme' && request.method() === 'PUT') {
+        const preference = request.postDataJSON() as { mode: typeof themeMode }
+        themeMode = preference.mode
+        await route.fulfill({ json: { mode: themeMode } })
+      } else if (path === '/api/admin/import-limits') {
+        if (request.method() === 'PUT') {
+          importLimits = request.postDataJSON() as typeof importLimits
+        }
+        await route.fulfill({ json: importLimits })
       } else {
         await route.fulfill({
           status: 404,
@@ -252,16 +276,33 @@ test.describe('account import settings', () => {
     })
 
     await page.goto(baseUrl)
-    await page.getByRole('button', { name: 'View accounts' }).click()
+    await expect(page.getByRole('heading', { name: 'Your Family' })).toBeVisible()
+    await expect(page.locator('a[href]')).toHaveCount(0)
+    await expectAccessibleAcrossThemeAndViewports(page)
+    const viewAccountsButton = page.getByRole('button', { name: 'View accounts' })
+    await viewAccountsButton.hover()
+    await expect.poll(() => viewAccountsButton.evaluate((button) =>
+      button.ownerDocument.defaultView?.getComputedStyle(button).cursor)).toBe('pointer')
+    await viewAccountsButton.focus()
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeFocused()
+    await expectAccessibleAcrossThemeAndViewports(page)
     await page.getByLabel('Account description').fill(account.description)
     await page.getByLabel('Currency').selectOption('AUD')
     await page.getByRole('button', { name: 'Add account' }).click()
+    await expect(page.getByRole('heading', { name: 'Account details' })).toBeFocused()
+    await expectAccessibleAcrossThemeAndViewports(page)
     await page.getByRole('button', { name: 'Import transactions' }).click()
-    await page.locator('#csv-file').setInputFiles({
+    await expect(page.getByRole('heading', { name: 'Import transactions' })).toBeFocused()
+    await expectAccessibleAcrossThemeAndViewports(page)
+    const firstFileChooser = page.waitForEvent('filechooser')
+    await page.getByRole('button', { name: 'Choose CSV file' }).click()
+    await (await firstFileChooser).setFiles({
       name: 'first-import.csv',
       mimeType: 'text/csv',
       buffer: Buffer.from('Date,Description,Amount\n2025-01-15,Market,10.00'),
     })
+    await expectAccessibleAcrossThemeAndViewports(page)
     await page.getByLabel('Transaction date column').selectOption('0')
     await page.getByLabel('Description column').selectOption('1')
     await page.getByLabel('Date format').selectOption('yyyy-MM-dd')
@@ -274,7 +315,9 @@ test.describe('account import settings', () => {
     await expect(page.getByRole('status')).toContainText('1 transactions imported successfully')
 
     await page.getByRole('button', { name: 'Return to account' }).click()
+    await expect(page.getByRole('heading', { name: 'Account details' })).toBeFocused()
     await page.getByRole('button', { name: 'Import transactions' }).click()
+    await expect(page.getByRole('heading', { name: 'Import transactions' })).toBeFocused()
     await page.locator('#csv-file').setInputFiles({
       name: 'second-import.csv',
       mimeType: 'text/csv',
@@ -284,14 +327,44 @@ test.describe('account import settings', () => {
       'Using this account’s saved import settings.',
     )
     await expect(page.getByRole('heading', { name: 'Map CSV columns' })).toHaveCount(0)
-    await page.setViewportSize({ width: 375, height: 812 })
-    await page.emulateMedia({ colorScheme: 'dark' })
-    const accessibility = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
-      .analyze()
-    expect(accessibility.violations).toEqual([])
-    await page.emulateMedia({ colorScheme: 'light' })
-    await expect.poll(() => page.locator('html').evaluate((element) =>
-      element.classList.contains('dark'))).toBe(false)
+    await expect(page.getByText('Selected file: second-import.csv')).toBeVisible()
+    await expectAccessibleAcrossThemeAndViewports(page)
+
+    await page.getByRole('button', { name: 'Import limits' }).click()
+    await expect(page.getByRole('heading', { name: 'Import limits' })).toBeFocused()
+    await expectAccessibleAcrossThemeAndViewports(page)
+    await page.getByLabel('Maximum rows per import').fill('12000')
+    await page.getByRole('button', { name: 'Save limits' }).click()
+    await expect(page.getByLabel('Maximum rows per import')).toHaveValue('12000')
+    await page.getByRole('button', { name: 'Back to the application' }).click()
+    await expect(page.getByRole('heading', { name: 'Import transactions' })).toBeFocused()
   })
 })
+
+async function expectAccessibleAcrossThemeAndViewports(page: Page) {
+  await expect(page.locator('a, [role="link"]')).toHaveCount(0)
+  const themeSelector = page.getByRole('combobox', { name: 'Theme' })
+  for (const viewport of [{ width: 320, height: 812 }, { width: 1280, height: 720 }]) {
+    await page.setViewportSize(viewport)
+    for (const mode of ['Light', 'Dark', 'System'] as const) {
+      await themeSelector.selectOption(mode)
+      await expect(themeSelector).toHaveValue(mode)
+      const colorSchemes = mode === 'System'
+        ? ['light', 'dark'] as const
+        : [mode === 'Dark' ? 'dark' : 'light'] as const
+      for (const colorScheme of colorSchemes) {
+        await page.emulateMedia({ colorScheme })
+        await expect.poll(() => page.locator('html').evaluate((element) =>
+          element.classList.contains('dark')))
+          .toBe(mode === 'Dark' || mode === 'System' && colorScheme === 'dark')
+        await expect.poll(() => page.locator('html').evaluate((element) =>
+          element.ownerDocument.documentElement.scrollWidth
+          <= element.ownerDocument.documentElement.clientWidth)).toBe(true)
+        const accessibility = await new AxeBuilder({ page })
+          .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+          .analyze()
+        expect(accessibility.violations).toEqual([])
+      }
+    }
+  }
+}

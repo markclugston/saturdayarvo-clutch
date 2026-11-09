@@ -67,6 +67,7 @@ export function TransactionsTable({
           className="rounded-md border border-border px-4 py-2 disabled:opacity-50"
           disabled={transactionsQuery.isFetchingNextPage}
           onClick={() => void transactionsQuery.fetchNextPage()}
+          type="button"
         >
           {transactionsQuery.isFetchingNextPage ? 'Loading…' : 'Load more'}
         </button>

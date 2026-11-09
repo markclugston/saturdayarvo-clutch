@@ -28,6 +28,7 @@ test('sign-in journey supports keyboard navigation and keeps the Light default',
     }))
   await page.goto(baseUrl)
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
+  await expect(page.locator('a[href]')).toHaveCount(0)
 
   await page.keyboard.press('Tab')
   await expect(page.getByLabel('Email')).toBeFocused()
@@ -47,6 +48,23 @@ test('sign-in journey supports keyboard navigation and keeps the Light default',
     element.classList.contains('dark'))).toBe(false)
 })
 
+test('switches to account creation using a button without hyperlink controls', async ({ page }) => {
+  await page.route('**/api/security/session', (route) =>
+    route.fulfill({
+      status: 401,
+      contentType: 'application/problem+json',
+      body: JSON.stringify({ status: 401, title: 'Authentication required' }),
+    }))
+  await page.goto('/')
+
+  const createAccountButton = page.getByRole('button', { name: 'New here? Create an account' })
+  await expect(createAccountButton).toBeVisible()
+  await expect(createAccountButton).toHaveJSProperty('tagName', 'BUTTON')
+  await expect(page.locator('a[href]')).toHaveCount(0)
+  await createAccountButton.click()
+  await expect(page.getByRole('heading', { name: 'Create your account' })).toBeVisible()
+})
+
 test.describe('family accounts and transaction import', () => {
   test.skip(
     !process.env.PLAYWRIGHT_STORAGE_STATE || !process.env.PLAYWRIGHT_OTHER_STORAGE_STATE,
@@ -59,6 +77,7 @@ test.describe('family accounts and transaction import', () => {
   }) => {
     const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:5173'
     await page.goto(baseUrl)
+    await expect(page.locator('a[href]')).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Import limits' })).toHaveCount(0)
     await page.keyboard.press('Tab')
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeFocused()
@@ -67,10 +86,13 @@ test.describe('family accounts and transaction import', () => {
     if (await createFamily.isVisible()) {
       await createFamily.click()
     } else {
-      await page.getByRole('button', { name: 'View accounts' }).click()
+      const viewAccounts = page.getByRole('button', { name: 'View accounts' })
+      await viewAccounts.focus()
+      await page.keyboard.press('Enter')
     }
 
     await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeFocused()
     const description = `Playwright ${Date.now()}`
     await page.getByLabel('Account description').fill(description)
     await page.getByLabel('Currency').selectOption('AUD')
@@ -82,6 +104,7 @@ test.describe('family accounts and transaction import', () => {
     expect(accountResponse.ok()).toBeTruthy()
     const account = await accountResponse.json() as { id: string }
     await expect(page.getByRole('heading', { name: 'Account details' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Account details' })).toBeFocused()
 
     const otherContext = await browser.newContext({
       storageState: process.env.PLAYWRIGHT_OTHER_STORAGE_STATE,
@@ -96,6 +119,7 @@ test.describe('family accounts and transaction import', () => {
     }
 
     await page.getByRole('button', { name: 'Import transactions' }).click()
+    await expect(page.getByRole('heading', { name: 'Import transactions' })).toBeFocused()
     await page.locator('#csv-file').setInputFiles({
       name: 'duplicate-transactions.csv',
       mimeType: 'text/csv',
@@ -124,6 +148,8 @@ test.describe('family accounts and transaction import', () => {
     await expect(confirmButton).toBeEnabled()
     await confirmButton.click()
     await expect(page.getByRole('status')).toContainText('2 transactions imported successfully')
+    await page.getByRole('button', { name: 'Return to account' }).click()
+    await expect(page.getByRole('heading', { name: 'Account details' })).toBeFocused()
 
     await page.emulateMedia({ colorScheme: 'dark' })
     await expect.poll(() => page.locator('html').evaluate((element) =>

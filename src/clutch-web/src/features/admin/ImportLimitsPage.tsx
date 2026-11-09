@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
+import { PageHeading } from '@/components/ui/page-heading'
 import { ApiError } from '@/lib/api/client'
 import type { ImportLimits } from '@/lib/api/schemas'
 import { getImportLimits, updateImportLimits } from './api'
@@ -56,13 +57,17 @@ export function ImportLimitsPage({ onBack }: ImportLimitsPageProps) {
 
   return (
     <section aria-labelledby="admin-limits-heading" className="max-w-xl space-y-6">
-      <button className="text-sm underline underline-offset-4" onClick={onBack}>
+      <button
+        className="rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
+        onClick={onBack}
+        type="button"
+      >
         Back to the application
       </button>
       <div>
-        <h1 id="admin-limits-heading" className="text-2xl font-semibold">
+        <PageHeading id="admin-limits-heading" className="text-2xl font-semibold">
           Import limits
-        </h1>
+        </PageHeading>
         <p className="mt-2 text-muted-foreground">
           These shared settings take effect immediately for all imports.
         </p>

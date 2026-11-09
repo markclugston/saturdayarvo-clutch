@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
+import { PageHeading } from '@/components/ui/page-heading'
 import { ApiError } from '@/lib/api/client'
 import { createAccount, getAccounts, getCurrencies } from './api'
 
@@ -64,7 +65,9 @@ export function AccountsPage({ onSelectAccount }: AccountsPageProps) {
   return (
     <section aria-labelledby="accounts-heading" className="space-y-8">
       <div>
-        <h1 id="accounts-heading" className="text-2xl font-semibold">Your accounts</h1>
+        <PageHeading id="accounts-heading" className="text-2xl font-semibold">
+          Your accounts
+        </PageHeading>
         <p className="mt-2 text-muted-foreground">Each account keeps its own currency and transactions.</p>
       </div>
 
@@ -74,6 +77,7 @@ export function AccountsPage({ onSelectAccount }: AccountsPageProps) {
             <button
               className="w-full rounded-lg border border-border bg-card p-4 text-left hover:bg-muted"
               onClick={() => onSelectAccount(account.id)}
+              type="button"
             >
               <span className="block font-medium">{account.description}</span>
               <span className="mt-1 block text-sm text-muted-foreground">

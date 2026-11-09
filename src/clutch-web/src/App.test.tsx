@@ -153,6 +153,21 @@ describe('session loading', () => {
     expect(await screen.findByRole('combobox', { name: 'Theme' })).toBeInTheDocument()
   })
 
+  it('exposes application actions as named buttons without hyperlink controls', async () => {
+    vi.mocked(getSession).mockResolvedValue({
+      id: 'user-1',
+      roles: ['Administrator'],
+    })
+
+    renderWithQueryClient(<App />)
+
+    const importLimitsButton = await screen.findByRole('button', { name: 'Import limits' })
+    const signOutButton = screen.getByRole('button', { name: 'Sign out' })
+    expect(importLimitsButton.tagName).toBe('BUTTON')
+    expect(signOutButton.tagName).toBe('BUTTON')
+    expect(document.querySelectorAll('a[href]')).toHaveLength(0)
+  })
+
   it('does not show the theme selector in the signed-out view', async () => {
     vi.mocked(getSession).mockRejectedValue(new ApiError(401, { title: 'Authentication required' }))
 
@@ -163,7 +178,9 @@ describe('session loading', () => {
   })
 
   it('resets the applied theme on sign-out', async () => {
-    vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
+    vi.mocked(getSession)
+      .mockResolvedValueOnce({ id: 'user-1', roles: [] })
+      .mockRejectedValueOnce(new ApiError(401, { title: 'Authentication required' }))
     vi.mocked(signOut).mockResolvedValue()
     const user = userEvent.setup()
 
@@ -175,5 +192,6 @@ describe('session loading', () => {
     await user.click(screen.getByRole('button', { name: 'Sign out' }))
 
     await waitFor(() => expect(document.documentElement).not.toHaveClass('dark'))
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toHaveFocus()
   })
 })

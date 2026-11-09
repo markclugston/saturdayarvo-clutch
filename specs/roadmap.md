@@ -1,4 +1,5 @@
 [x] complete ui redesign including styles for themes.
+[] remove any mention of family or the need to support other users with access to the data.
 [] import balance and display it for the account.
 [] update constitution to make sure the seed.sql is updated when database migrations are created.
 [] support creating a budget via categories.

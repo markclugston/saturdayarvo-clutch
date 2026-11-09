@@ -26,6 +26,7 @@ describe('FamilyPage', () => {
 
     renderWithQueryClient(<FamilyPage onReady={onReady} />)
 
+    expect(await screen.findByRole('heading', { name: 'Create your Family' })).toHaveFocus()
     const createButton = await screen.findByRole('button', { name: 'Create Family' })
     await user.tab()
     expect(createButton).toHaveFocus()
@@ -33,5 +34,22 @@ describe('FamilyPage', () => {
 
     await waitFor(() => expect(onReady).toHaveBeenCalledOnce())
     expect(createFamily).toHaveBeenCalledOnce()
+  })
+
+  it('opens the accounts view with the named navigation button', async () => {
+    const user = userEvent.setup()
+    const onReady = vi.fn()
+    vi.mocked(getFamilies).mockResolvedValue([{
+      id: '550e8400-e29b-41d4-a716-446655440000',
+      ownerUserId: 'owner-id',
+    }])
+
+    renderWithQueryClient(<FamilyPage onReady={onReady} />)
+
+    const viewAccountsButton = await screen.findByRole('button', { name: 'View accounts' })
+    expect(viewAccountsButton.tagName).toBe('BUTTON')
+    await user.click(viewAccountsButton)
+
+    expect(onReady).toHaveBeenCalledOnce()
   })
 })
