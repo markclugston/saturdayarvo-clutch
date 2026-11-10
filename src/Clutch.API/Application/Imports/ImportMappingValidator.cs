@@ -81,6 +81,11 @@ public static class ImportMappingValidator
                 throw InvalidMapping("AmountMode");
         }
 
+        if (mapping.BalanceColumn is not null)
+        {
+            columns.Add(mapping.BalanceColumn.Value);
+        }
+
         if (columns.Any(column => column < 0 || column >= columnCount)
             || columns.Distinct().Count() != columns.Count)
         {

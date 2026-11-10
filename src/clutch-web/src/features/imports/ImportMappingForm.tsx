@@ -58,6 +58,9 @@ export function ImportMappingForm({
     initialMapping?.outgoingDirectionValue ?? '',
   )
   const [numberFormat, setNumberFormat] = useState(initialMapping?.numberFormat ?? '')
+  const [balanceColumn, setBalanceColumn] = useState(
+    initialMapping?.balanceColumn?.toString() ?? '',
+  )
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -67,6 +70,7 @@ export function ImportMappingForm({
       dateFormat,
       amountMode,
       numberFormat,
+      ...(balanceColumn === '' ? {} : { balanceColumn: Number(balanceColumn) }),
     }
 
     if (amountMode === 'Signed' && incomingSign !== '') {
@@ -257,6 +261,22 @@ export function ImportMappingForm({
           </div>
         </div>
       )}
+
+      <div className="space-y-2">
+        <label htmlFor="import-balance-column">Balance column (optional)</label>
+        <select
+          id="import-balance-column"
+          className="w-full rounded-md border border-input bg-background px-3 py-2"
+          value={balanceColumn}
+          onChange={(event) => setBalanceColumn(event.currentTarget.value)}
+        >
+          <option value="">None</option>
+          {renderColumnOptions()}
+        </select>
+        <p className="text-sm text-muted-foreground">
+          The balance is read from the file as supplied and is not calculated.
+        </p>
+      </div>
 
       <div className="space-y-2">
         <label htmlFor="number-format">Number format used in this file</label>

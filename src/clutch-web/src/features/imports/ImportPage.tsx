@@ -412,6 +412,9 @@ function isMappingCompatible(mapping: ImportMapping, headers: string[]): boolean
       ? [mapping.incomingAmountColumn, mapping.outgoingAmountColumn]
       : [mapping.amountColumn, mapping.directionColumn]
   const columns = [mapping.dateColumn, mapping.descriptionColumn, ...amountColumns]
+  if (mapping.balanceColumn !== null && mapping.balanceColumn !== undefined) {
+    columns.push(mapping.balanceColumn)
+  }
 
   return columns.every((column) =>
     typeof column === 'number' && column >= 0 && column < headers.length)

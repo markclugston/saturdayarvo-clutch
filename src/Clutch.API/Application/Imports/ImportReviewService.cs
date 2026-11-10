@@ -218,8 +218,21 @@ public sealed class ImportReviewService(
                     cancellationToken);
             if (transitioned == 0)
             {
-                await transaction.RollbackAsync(cancellationToken);
-                return false;
+                // A review that is no longer Ready is terminal, so any lease it still holds is stale.
+                var currentState = await OwnedReviews(ownerUserId)
+                    .AsNoTracking()
+                    .Where(review => review.Id == reviewId && review.AccountId == accountId)
+                    .Select(review => (ImportReviewState?)review.State)
+                    .SingleOrDefaultAsync(cancellationToken);
+                if (currentState is null or ImportReviewState.Ready
+                    || !await importLease.ReleaseAsync(accountId, reviewId, cancellationToken))
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    return false;
+                }
+
+                await transaction.CommitAsync(cancellationToken);
+                return true;
             }
 
             await dbContext.ImportReviewRows
@@ -384,7 +397,8 @@ public sealed class ImportReviewService(
                 row.Description,
                 row.Amount,
                 row.Direction,
-                duplicateRows.Contains(row.SourceRowNumber)))
+                duplicateRows.Contains(row.SourceRowNumber),
+                row.Balance))
             .ToArray();
     }
 
@@ -420,7 +434,8 @@ public sealed class ImportReviewService(
                 row.Description,
                 row.Amount.ToString("0.############################", CultureInfo.InvariantCulture),
                 row.Direction.ToString(),
-                row.IsPossibleDuplicate)).ToArray());
+                row.IsPossibleDuplicate,
+                row.Balance?.ToString("0.############################", CultureInfo.InvariantCulture))).ToArray());
 
     private static ApiProblemException ToProblem(ImportValidationException exception)
     {
@@ -483,4 +498,5 @@ public sealed record ImportReviewRowResponse(
     string Description,
     string Amount,
     string Direction,
-    bool IsPossibleDuplicate);
+    bool IsPossibleDuplicate,
+    string? Balance = null);

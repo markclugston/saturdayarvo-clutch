@@ -37,6 +37,7 @@ export const ImportReviewRowSchema = z.object({
   amount: z.string().regex(/^[0-9]+(\.[0-9]+)?$/),
   direction: z.enum(['Incoming', 'Outgoing']),
   isPossibleDuplicate: z.boolean(),
+  balance: z.string().regex(/^-?[0-9]+(\.[0-9]+)?$/).nullable().optional(),
 })
 
 export const ImportReviewSchema = z.object({
@@ -69,6 +70,7 @@ export const ImportMappingSchema = z.object({
   incomingDirectionValue: z.string().nullable().optional(),
   outgoingDirectionValue: z.string().nullable().optional(),
   numberFormat: z.string().min(1),
+  balanceColumn: z.number().int().nonnegative().nullable().optional(),
 }).strict()
 
 export const AccountImportSettingsSchema = z.object({
@@ -81,6 +83,7 @@ export const TransactionSchema = z.object({
   description: z.string().min(1).max(200),
   amount: z.string().regex(/^[0-9]+(\.[0-9]+)?$/),
   direction: z.enum(['Incoming', 'Outgoing']),
+  balance: z.string().regex(/^-?[0-9]+(\.[0-9]+)?$/).nullable().optional(),
 })
 
 export const TransactionPageSchema = z.object({

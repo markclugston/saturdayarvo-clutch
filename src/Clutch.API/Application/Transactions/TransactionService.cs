@@ -63,7 +63,8 @@ public sealed class TransactionService(AppDbContext dbContext)
                 transaction.TransactionDate,
                 transaction.Description,
                 transaction.Amount,
-                transaction.Direction))
+                transaction.Direction,
+                transaction.Balance))
             .ToListAsync(cancellationToken);
         var hasMore = values.Count > size;
         if (hasMore)
@@ -80,7 +81,8 @@ public sealed class TransactionService(AppDbContext dbContext)
                 value.TransactionDate,
                 value.Description,
                 value.Amount.ToString("0.############################", CultureInfo.InvariantCulture),
-                value.Direction.ToString())).ToArray(),
+                value.Direction.ToString(),
+                value.Balance?.ToString("0.############################", CultureInfo.InvariantCulture))).ToArray(),
             nextCursor);
     }
 
@@ -139,7 +141,8 @@ public sealed class TransactionService(AppDbContext dbContext)
         DateOnly TransactionDate,
         string Description,
         decimal Amount,
-        TransactionDirection Direction);
+        TransactionDirection Direction,
+        decimal? Balance);
 }
 
 public sealed record TransactionListItem(
@@ -147,7 +150,8 @@ public sealed record TransactionListItem(
     DateOnly TransactionDate,
     string Description,
     string Amount,
-    string Direction);
+    string Direction,
+    string? Balance);
 
 public sealed record TransactionPageResponse(
     IReadOnlyList<TransactionListItem> Items,

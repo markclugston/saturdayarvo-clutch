@@ -308,6 +308,75 @@ describe('ImportPage', () => {
     expect(screen.getByRole('button', { name: 'Review import' })).toBeInTheDocument()
   })
 
+  it('prefills and submits the optional balance column, and allows clearing it', async () => {
+    vi.mocked(getAccountImportSettings).mockResolvedValue({
+      mapping: { ...savedMapping, balanceColumn: 3 },
+    })
+    const user = userEvent.setup()
+    renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
+    await user.upload(
+      await screen.findByLabelText('CSV file'),
+      new File(
+        ['Date,Description,Amount,Balance\n15/01/2025,Market,-10.00,90.00'],
+        'transactions.csv',
+        { type: 'text/csv' },
+      ),
+    )
+    await user.click(screen.getByRole('button', { name: 'View or change settings' }))
+    expect(screen.getByLabelText('Balance column (optional)')).toHaveValue('3')
+
+    await user.click(screen.getByRole('button', { name: 'Review import' }))
+    await waitFor(() => expect(createImportReview).toHaveBeenLastCalledWith(
+      account.id,
+      expect.any(File),
+      { ...savedMapping, balanceColumn: 3 },
+    ))
+  })
+
+  it('omits the balance column when the user clears the optional selection', async () => {
+    vi.mocked(getAccountImportSettings).mockResolvedValue({
+      mapping: { ...savedMapping, balanceColumn: 3 },
+    })
+    const user = userEvent.setup()
+    renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
+    await user.upload(
+      await screen.findByLabelText('CSV file'),
+      new File(
+        ['Date,Description,Amount,Balance\n15/01/2025,Market,-10.00,90.00'],
+        'transactions.csv',
+        { type: 'text/csv' },
+      ),
+    )
+    await user.click(screen.getByRole('button', { name: 'View or change settings' }))
+    await user.selectOptions(screen.getByLabelText('Balance column (optional)'), '')
+    await user.click(screen.getByRole('button', { name: 'Review import' }))
+    await waitFor(() => expect(createImportReview).toHaveBeenLastCalledWith(
+      account.id,
+      expect.any(File),
+      savedMapping,
+    ))
+  })
+
+  it('flags saved settings whose balance column does not fit the file', async () => {
+    vi.mocked(getAccountImportSettings).mockResolvedValue({
+      mapping: { ...savedMapping, balanceColumn: 5 },
+    })
+    const user = userEvent.setup()
+    renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
+    await user.upload(
+      await screen.findByLabelText('CSV file'),
+      new File(
+        ['Date,Description,Amount\n2025-01-15,Market,-10.00'],
+        'transactions.csv',
+        { type: 'text/csv' },
+      ),
+    )
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The saved settings do not match this file’s columns.',
+    )
+  })
+
   it('distinguishes a successful import from an unsuccessful defaults save', async () => {
     vi.mocked(getAccountImportSettings).mockResolvedValue({ mapping: savedMapping })
     vi.mocked(confirmImportReview).mockResolvedValue({

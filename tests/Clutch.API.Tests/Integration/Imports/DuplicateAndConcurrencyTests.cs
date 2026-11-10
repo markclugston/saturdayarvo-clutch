@@ -356,6 +356,7 @@ public sealed class DuplicateAndConcurrencyTests(SqlServerFixture fixture)
             description,
             amount,
             direction,
+            null,
             currency,
             DateTimeOffset.UtcNow,
             out var transaction));

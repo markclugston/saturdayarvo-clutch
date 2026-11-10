@@ -3,6 +3,18 @@ export function formatCurrencyAmount(
   currencyCode: string,
   locale?: string,
 ): string {
+  if (amount.startsWith('-')) {
+    return `-${formatUnsignedCurrencyAmount(amount.slice(1), currencyCode, locale)}`
+  }
+
+  return formatUnsignedCurrencyAmount(amount, currencyCode, locale)
+}
+
+function formatUnsignedCurrencyAmount(
+  amount: string,
+  currencyCode: string,
+  locale?: string,
+): string {
   const match = /^([0-9]+)(?:\.([0-9]+))?$/.exec(amount)
   const wholePart = match?.[1]
   if (!match || wholePart === undefined) {
@@ -13,6 +25,7 @@ export function formatCurrencyAmount(
   const currencyFormatter = new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: currencyCode,
+    currencyDisplay: 'narrowSymbol',
   })
   const fractionDigits = currencyFormatter.resolvedOptions().minimumFractionDigits
   if (fractionDigits === undefined) {
@@ -26,6 +39,7 @@ export function formatCurrencyAmount(
   const wholeFormatter = new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: currencyCode,
+    currencyDisplay: 'narrowSymbol',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   })
