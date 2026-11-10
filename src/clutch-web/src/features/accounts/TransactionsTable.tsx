@@ -22,6 +22,7 @@ export function TransactionsTable({
   }
 
   const transactions = transactionsQuery.data.pages.flatMap((page) => page.items)
+  const showBalance = transactions.some((transaction) => transaction.balance != null)
   if (transactions.length === 0) {
     return (
       <section aria-labelledby="transactions-heading" className="space-y-3">
@@ -41,8 +42,9 @@ export function TransactionsTable({
             <tr>
               <th className="px-3 py-2" scope="col">Date</th>
               <th className="px-3 py-2" scope="col">Description</th>
-              <th className="px-3 py-2" scope="col">Amount</th>
               <th className="px-3 py-2" scope="col">Direction</th>
+              <th className="px-3 py-2 text-right" scope="col">Amount</th>
+              {showBalance && <th className="px-3 py-2 text-right" scope="col">Balance</th>}
             </tr>
           </thead>
           <tbody>
@@ -53,10 +55,17 @@ export function TransactionsTable({
                     .format(new Date(`${transaction.transactionDate}T00:00:00`))}
                 </td>
                 <td className="px-3 py-2">{transaction.description}</td>
-                <td className="px-3 py-2">
+                <td className="px-3 py-2">{transaction.direction}</td>
+                <td className="px-3 py-2 text-right tabular-nums">
                   {formatCurrencyAmount(transaction.amount, currencyCode)}
                 </td>
-                <td className="px-3 py-2">{transaction.direction}</td>
+                {showBalance && (
+                  <td className="px-3 py-2 text-right tabular-nums">
+                    {transaction.balance == null
+                      ? ''
+                      : formatCurrencyAmount(transaction.balance, currencyCode)}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

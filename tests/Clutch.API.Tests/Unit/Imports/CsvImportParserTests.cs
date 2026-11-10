@@ -264,6 +264,76 @@ public sealed class CsvImportParserTests
         Assert.Equal("FileSizeLimitExceeded", byteLimit.Code);
     }
 
+    [Fact]
+    public async Task ParsesBalanceKeepingSignAndTreatingBlankAsNull()
+    {
+        const string quoted = "Date,Description,Amount,Balance\n2025-01-15,A,10.00,\"1,234.50\"\n2025-01-16,B,5.00,-20.25\n2025-01-17,C,5.00,";
+        var mapping = SignedAmountMapping("yyyy-MM-dd") with { BalanceColumn = 3 };
+
+        var result = await ParseAsync(quoted, "AUD", mapping);
+
+        Assert.Collection(
+            result.Rows,
+            row => Assert.Equal(1234.50m, row.Balance),
+            row => Assert.Equal(-20.25m, row.Balance),
+            row => Assert.Null(row.Balance));
+    }
+
+    [Fact]
+    public async Task BalanceIsNullWhenNotMapped()
+    {
+        const string csv = "Date,Description,Amount,Balance\n2025-01-15,A,10.00,99.00";
+
+        var result = await ParseAsync(csv, "AUD", SignedAmountMapping("yyyy-MM-dd"));
+
+        Assert.Null(Assert.Single(result.Rows).Balance);
+    }
+
+    [Fact]
+    public async Task RejectsInvalidBalanceWithBalanceFieldAndRowNumber()
+    {
+        const string csv = "Date,Description,Amount,Balance\n2025-01-15,A,10.00,abc";
+        var mapping = SignedAmountMapping("yyyy-MM-dd") with { BalanceColumn = 3 };
+
+        var exception = await Assert.ThrowsAsync<ImportValidationException>(
+            () => ParseAsync(csv, "AUD", mapping));
+
+        Assert.Equal("InvalidAmount", exception.Code);
+        Assert.Equal(2, exception.RowNumber);
+        Assert.Equal("Balance", exception.Field);
+        Assert.Contains("balance", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("abc", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RejectsBalanceCurrencyMismatch()
+    {
+        const string csv = "Date,Description,Amount,Balance\n2025-01-15,A,10.00,USD 5.00";
+        var mapping = SignedAmountMapping("yyyy-MM-dd") with { BalanceColumn = 3 };
+
+        var exception = await Assert.ThrowsAsync<ImportValidationException>(
+            () => ParseAsync(csv, "AUD", mapping));
+
+        Assert.Equal("CurrencyMismatch", exception.Code);
+        Assert.Equal("Balance", exception.Field);
+        Assert.DoesNotContain("USD", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("AUD")]
+    [InlineData("9999999999999999.00")]
+    public async Task RejectsBalanceThatIsOnlyACurrencyCodeOrExceedsStorageRange(string balance)
+    {
+        var csv = $"Date,Description,Amount,Balance\n2025-01-15,A,10.00,{balance}";
+        var mapping = SignedAmountMapping("yyyy-MM-dd") with { BalanceColumn = 3 };
+
+        var exception = await Assert.ThrowsAsync<ImportValidationException>(
+            () => ParseAsync(csv, "AUD", mapping));
+
+        Assert.Equal("InvalidAmount", exception.Code);
+        Assert.Equal("Balance", exception.Field);
+    }
+
     private Task<CsvImportResult> ParseAsync(
         string csv,
         string currencyCode,

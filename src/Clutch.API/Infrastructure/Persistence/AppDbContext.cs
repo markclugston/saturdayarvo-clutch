@@ -221,6 +221,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .IsRequired();
             entity.Property(transaction => transaction.Amount)
                 .HasPrecision(19, 4);
+            entity.Property(transaction => transaction.Balance)
+                .HasPrecision(19, 4);
             entity.Property(transaction => transaction.Direction)
                 .HasConversion<string>()
                 .HasMaxLength(16)
@@ -285,6 +287,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .HasMaxLength(AccountDescriptionValidator.MaximumLength)
                 .IsRequired();
             entity.Property(row => row.Amount)
+                .HasPrecision(19, 4);
+            entity.Property(row => row.Balance)
                 .HasPrecision(19, 4);
             entity.Property(row => row.Direction)
                 .HasConversion<string>()

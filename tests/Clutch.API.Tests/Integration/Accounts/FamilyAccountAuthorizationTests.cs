@@ -200,6 +200,7 @@ public sealed class FamilyAccountAuthorizationTests(SqlServerFixture fixture)
             "Test transaction",
             12.34m,
             TransactionDirection.Outgoing,
+            null,
             currency!,
             DateTimeOffset.UtcNow,
             out var transaction));

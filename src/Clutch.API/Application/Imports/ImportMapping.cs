@@ -30,14 +30,16 @@ public sealed record ImportMapping(
     IncomingSign? IncomingSign = null,
     string? IncomingDirectionValue = null,
     string? OutgoingDirectionValue = null,
-    string? NumberFormat = null);
+    string? NumberFormat = null,
+    int? BalanceColumn = null);
 
 public sealed record ParsedImportRow(
     int SourceRowNumber,
     DateOnly TransactionDate,
     string Description,
     decimal Amount,
-    Clutch.API.Domain.Transactions.TransactionDirection Direction);
+    Clutch.API.Domain.Transactions.TransactionDirection Direction,
+    decimal? Balance = null);
 
 public sealed record CsvImportResult(
     IReadOnlyList<ParsedImportRow> Rows,

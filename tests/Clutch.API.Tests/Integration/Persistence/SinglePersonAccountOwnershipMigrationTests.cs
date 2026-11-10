@@ -150,6 +150,8 @@ public sealed class SinglePersonAccountOwnershipMigrationTests(SqlServerFixture 
             {
                 await Assert.ThrowsAsync<SqlException>(
                     () => dbContext.Database.MigrateAsync(PrecedingMigration));
+                // The downgrade reverts later migrations before failing, so restore the current schema.
+                await dbContext.Database.MigrateAsync();
                 Assert.Null(await dbContext.Accounts
                     .AsNoTracking()
                     .Where(account => account.Id == accountId)
@@ -330,17 +332,6 @@ public sealed class SinglePersonAccountOwnershipMigrationTests(SqlServerFixture 
             familyOwnerUserId,
             now,
             now.AddMinutes(15));
-        review.AddRows(
-        [
-            new ImportReviewRow(
-                reviewId,
-                2,
-                new DateOnly(2026, 1, 2),
-                "Legacy imported row",
-                12.34m,
-                TransactionDirection.Outgoing,
-                false),
-        ]);
         var mapping = new ImportMapping(
             0,
             1,
@@ -361,6 +352,9 @@ public sealed class SinglePersonAccountOwnershipMigrationTests(SqlServerFixture 
             "ReviewCreated",
             now));
         await dbContext.SaveChangesAsync();
+        // Raw SQL keeps this seed valid against the pre-Balance legacy schema.
+        await dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"INSERT INTO ImportReviewRows (ReviewId, SourceRowNumber, TransactionDate, Description, Amount, Direction, IsPossibleDuplicate) VALUES ({reviewId}, {2}, {new DateOnly(2026, 1, 2)}, {"Legacy imported row"}, {12.34m}, {"Outgoing"}, {false})");
         await dbContext.Database.ExecuteSqlInterpolatedAsync(
             $"INSERT INTO AccountImportSettings (AccountId, SchemaVersion, SettingsJson, SourceImportReviewId, SavedAtUtc) VALUES ({accountId}, {ImportMappingSettingsSerializer.CurrentSchemaVersion}, {ImportMappingSettingsSerializer.Serialize(mapping)}, {reviewId}, {DateTimeOffset.UtcNow})");
         return reviewId;

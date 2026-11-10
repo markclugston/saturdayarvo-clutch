@@ -146,6 +146,78 @@ test.describe('account import settings', () => {
     }
   })
 
+  test('imports a balance column, shows it right-most, and preselects it next time', async ({
+    browser,
+  }) => {
+    const storageState = process.env.PLAYWRIGHT_STORAGE_STATE
+    test.skip(
+      !storageState,
+      'Provide an authenticated owner storage state for the import-settings journey.',
+    )
+
+    const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:5173'
+    const context = await browser.newContext({ storageState: storageState! })
+    const page = await context.newPage()
+    try {
+      await page.goto(baseUrl)
+      await createAccount(page, `Balance ${Date.now()}`)
+      await page.getByRole('button', { name: 'Import transactions' }).click()
+      await page.locator('#csv-file').setInputFiles({
+        name: 'balance-import.csv',
+        mimeType: 'text/csv',
+        buffer: Buffer.from('Date,Description,Amount,Balance\n2025-01-15,Market,10.00,90.00'),
+      })
+      await page.getByLabel('Transaction date column').selectOption('0')
+      await page.getByLabel('Description column').selectOption('1')
+      await page.getByLabel('Date format').selectOption('yyyy-MM-dd')
+      await page.getByLabel('Signed amount column').selectOption('2')
+      await page.getByLabel('Incoming transactions use').selectOption('Positive')
+      await page.getByLabel('Balance column (optional)').selectOption('3')
+      await page.getByLabel('Number format used in this file')
+        .selectOption('dot-decimal-comma-grouping')
+      await page.getByRole('button', { name: 'Review import' }).click()
+      await page.getByRole('button', { name: 'Confirm import' }).click()
+      await expect(page.getByRole('status')).toContainText('1 transactions imported successfully')
+
+      await page.getByRole('button', { name: 'Return to account' }).click()
+      const headers = page.getByRole('columnheader')
+      await expect(headers.last()).toHaveText('Balance')
+
+      await page.getByRole('button', { name: 'Import transactions' }).click()
+      await page.locator('#csv-file').setInputFiles({
+        name: 'balance-import-2.csv',
+        mimeType: 'text/csv',
+        buffer: Buffer.from('Date,Description,Amount,Balance\n2025-01-16,Market 2,5.00,85.00'),
+      })
+      await page.getByRole('button', { name: 'View or change settings' }).click()
+      await expect(page.getByLabel('Balance column (optional)')).toHaveValue('3')
+
+      await page.goto(baseUrl)
+      await createAccount(page, `No balance ${Date.now()}`)
+      await page.getByRole('button', { name: 'Import transactions' }).click()
+      await page.locator('#csv-file').setInputFiles({
+        name: 'plain-import.csv',
+        mimeType: 'text/csv',
+        buffer: Buffer.from('Date,Description,Amount\n2025-01-15,Plain,10.00'),
+      })
+      await page.getByLabel('Transaction date column').selectOption('0')
+      await page.getByLabel('Description column').selectOption('1')
+      await page.getByLabel('Date format').selectOption('yyyy-MM-dd')
+      await page.getByLabel('Signed amount column').selectOption('2')
+      await page.getByLabel('Incoming transactions use').selectOption('Positive')
+      await page.getByLabel('Number format used in this file')
+        .selectOption('dot-decimal-comma-grouping')
+      await page.getByRole('button', { name: 'Review import' }).click()
+      await page.getByRole('button', { name: 'Confirm import' }).click()
+      await expect(page.getByRole('status')).toContainText('1 transactions imported successfully')
+      await page.getByRole('button', { name: 'Return to account' }).click()
+      await expect(page.getByRole('columnheader', { name: 'Amount' })).toBeVisible()
+      await expect(page.getByRole('columnheader', { name: 'Balance' })).toHaveCount(0)
+    } finally {
+      await context.close()
+    }
+  })
+
   test('audits authenticated journeys across views, themes, and responsive sizes with mocked APIs', async ({
     page,
   }) => {
@@ -329,6 +401,14 @@ test.describe('account import settings', () => {
     await expect(page.getByRole('button', { name: 'Back to account' })).toBeFocused()
   })
 })
+
+async function createAccount(page: Page, description: string) {
+  await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
+  await page.getByLabel('Account description').fill(description)
+  await page.getByLabel('Currency').selectOption('AUD')
+  await page.getByRole('button', { name: 'Add account' }).click()
+  await expect(page.getByRole('heading', { name: 'Account details' })).toBeVisible()
+}
 
 async function expectAccessibleAcrossThemeAndViewports(page: Page) {
   await expect(page.locator('a, [role="link"]')).toHaveCount(0)

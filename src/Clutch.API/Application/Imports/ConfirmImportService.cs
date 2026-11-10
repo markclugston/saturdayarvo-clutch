@@ -187,6 +187,7 @@ public sealed class ConfirmImportService(
                 row.Description,
                 row.Amount,
                 row.Direction,
+                row.Balance,
                 currency,
                 now,
                 out var newTransaction)

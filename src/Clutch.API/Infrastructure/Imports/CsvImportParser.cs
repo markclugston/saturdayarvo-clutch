@@ -128,12 +128,23 @@ public sealed class CsvImportParser
                 }
 
                 var (amount, direction) = ParseAmount(csv, mapping, format, currency!, rowNumber);
+                decimal? balance = null;
+                if (mapping.BalanceColumn is not null)
+                {
+                    var balanceValue = ReadField(csv, mapping.BalanceColumn.Value, rowNumber, "Balance");
+                    if (balanceValue.Length > 0)
+                    {
+                        balance = ParseDecimal(balanceValue, format, currency!, rowNumber, "Balance");
+                    }
+                }
+
                 rows.Add(new ParsedImportRow(
                     rowNumber,
                     transactionDate,
                     description,
                     amount,
-                    direction));
+                    direction,
+                    balance));
             }
 
             if (rows.Count == 0)
@@ -328,14 +339,20 @@ public sealed class CsvImportParser
         string value,
         CurrencyAmountFormat format,
         Currency currency,
-        int rowNumber)
+        int rowNumber,
+        string field = "Amount")
     {
         if (value.Length == 0 || value.Length > MaximumCellLength)
         {
-            throw InvalidAmount(rowNumber);
+            throw InvalidAmount(rowNumber, field);
         }
 
-        value = RemoveCurrencyCode(value, currency, rowNumber);
+        value = RemoveCurrencyCode(value, currency, rowNumber, field);
+        if (value.Length == 0)
+        {
+            throw InvalidAmount(rowNumber, field);
+        }
+
         var isNegative = value[0] == '-';
         var hasSign = isNegative || value[0] == '+';
         var unsignedValue = hasSign ? value[1..] : value;
@@ -344,14 +361,14 @@ public sealed class CsvImportParser
             || pieces[0].Length == 0
             || (pieces.Length == 2 && pieces[1].Length == 0))
         {
-            throw InvalidAmount(rowNumber);
+            throw InvalidAmount(rowNumber, field);
         }
 
         if (pieces.Length == 2
             && (pieces[1].Length > currency.MinorUnits
                 || !pieces[1].All(character => character is >= '0' and <= '9')))
         {
-            throw InvalidAmount(rowNumber);
+            throw InvalidAmount(rowNumber, field);
         }
 
         var integerGroups = pieces[0].Split(format.GroupSeparator, StringSplitOptions.None);
@@ -361,7 +378,7 @@ public sealed class CsvImportParser
                 && (integerGroups[0].Length > 3
                     || integerGroups.Skip(1).Any(group => group.Length != 3)))
         {
-            throw InvalidAmount(rowNumber);
+            throw InvalidAmount(rowNumber, field);
         }
 
         var normalized = string.Concat(integerGroups);
@@ -370,19 +387,25 @@ public sealed class CsvImportParser
             normalized += $".{pieces[1]}";
         }
 
+        // Stay within the decimal(19,4) storage range so persistence cannot fail later.
         if (!decimal.TryParse(
             normalized,
             NumberStyles.AllowDecimalPoint,
             CultureInfo.InvariantCulture,
-            out var amount))
+            out var amount)
+            || amount >= 1_000_000_000_000_000m)
         {
-            throw InvalidAmount(rowNumber);
+            throw InvalidAmount(rowNumber, field);
         }
 
         return isNegative ? -amount : amount;
     }
 
-    private static string RemoveCurrencyCode(string value, Currency currency, int rowNumber)
+    private static string RemoveCurrencyCode(
+        string value,
+        Currency currency,
+        int rowNumber,
+        string field = "Amount")
     {
         var tokens = value.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
         var codes = tokens.Where(token => Currency.TryGet(token, out _)).ToArray();
@@ -396,9 +419,9 @@ public sealed class CsvImportParser
         {
             throw new ImportValidationException(
                 "CurrencyMismatch",
-                "A mapped amount uses a currency that conflicts with the selected account.",
+                $"A mapped {FieldLabel(field)} uses a currency that conflicts with the selected account.",
                 rowNumber,
-                "Amount");
+                field);
         }
 
         return string.Join(' ', tokens.Where(token => !string.Equals(
@@ -425,8 +448,11 @@ public sealed class CsvImportParser
     private static ImportValidationException InvalidRow(int rowNumber, string field) =>
         new("InvalidRow", "A mapped value is missing or invalid.", rowNumber, field);
 
-    private static ImportValidationException InvalidAmount(int rowNumber) =>
-        new("InvalidAmount", "A transaction amount is invalid.", rowNumber, "Amount");
+    private static ImportValidationException InvalidAmount(int rowNumber, string field = "Amount") =>
+        new("InvalidAmount", $"A transaction {FieldLabel(field)} is invalid.", rowNumber, field);
+
+    private static string FieldLabel(string field) =>
+        field == "Balance" ? "balance" : "amount";
 
     private sealed class BoundedReadStream(Stream inner, int maximumBytes) : Stream
     {

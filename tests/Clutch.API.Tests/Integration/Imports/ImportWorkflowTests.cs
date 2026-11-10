@@ -97,6 +97,69 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
 
     [Fact]
     [Trait("Category", "SqlServer")]
+    public async Task Balance_column_is_imported_listed_and_saved_with_the_import_settings()
+    {
+        using var client = CreateClient();
+        await RegisterAndSignInAsync(client);
+        var account = await CreateAccountAsync(client, "Balance account", "AUD");
+        var mapping = SignedMapping() with { BalanceColumn = 3 };
+
+        using var reviewResponse = await CreateReviewAsync(
+            client,
+            account.Id,
+            "Date,Description,Amount,Balance\n2025-01-15,Market,12.34,100.50\n2025-01-16,Refund,5.00,\n2025-01-17,Overdrawn,-3.00,-20.25",
+            mapping);
+        Assert.Equal(HttpStatusCode.Created, reviewResponse.StatusCode);
+        var review = await reviewResponse.Content.ReadFromJsonAsync<ReviewResponse>();
+        Assert.NotNull(review);
+        Assert.Equal(
+            ["100.5", null, "-20.25"],
+            review.Rows.OrderBy(row => row.SourceRowNumber).Select(row => row.Balance));
+
+        using var confirmResponse = await SendJsonAsync(
+            client,
+            HttpMethod.Post,
+            $"/api/import-reviews/{review.Id}/confirm",
+            new { confirmPossibleDuplicates = false });
+        Assert.Equal(HttpStatusCode.OK, confirmResponse.StatusCode);
+
+        using var transactionsResponse = await client.GetAsync(
+            $"/api/accounts/{account.Id}/transactions");
+        var page = await transactionsResponse.Content.ReadFromJsonAsync<TransactionPage>();
+        Assert.NotNull(page);
+        var balances = page.Items.ToDictionary(item => item.Description, item => item.Balance);
+        Assert.Equal("100.5", balances["Market"]);
+        Assert.Null(balances["Refund"]);
+        Assert.Equal("-20.25", balances["Overdrawn"]);
+
+        using var settingsResponse = await client.GetAsync(
+            $"/api/accounts/{account.Id}/import-settings");
+        var settings = await settingsResponse.Content.ReadFromJsonAsync<ImportSettingsResponse>();
+        Assert.NotNull(settings);
+        Assert.Equal(3, settings.Mapping?.BalanceColumn);
+
+        var noBalanceAccount = await CreateAccountAsync(client, "No balance account", "AUD");
+        using var plainReview = await CreateReviewAsync(
+            client,
+            noBalanceAccount.Id,
+            "Date,Description,Amount\n2025-01-15,Market,12.34",
+            SignedMapping());
+        var plain = await plainReview.Content.ReadFromJsonAsync<ReviewResponse>();
+        Assert.NotNull(plain);
+        using var plainConfirm = await SendJsonAsync(
+            client,
+            HttpMethod.Post,
+            $"/api/import-reviews/{plain.Id}/confirm",
+            new { confirmPossibleDuplicates = false });
+        Assert.Equal(HttpStatusCode.OK, plainConfirm.StatusCode);
+        using var plainList = await client.GetAsync($"/api/accounts/{noBalanceAccount.Id}/transactions");
+        var plainPage = await plainList.Content.ReadFromJsonAsync<TransactionPage>();
+        Assert.NotNull(plainPage);
+        Assert.Null(Assert.Single(plainPage.Items).Balance);
+    }
+
+    [Fact]
+    [Trait("Category", "SqlServer")]
     public async Task Transaction_pages_cover_tied_dates_without_gaps_or_duplicates()
     {
         using var client = CreateClient();
@@ -364,6 +427,41 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
             Assert.Equal(1, await db.ImportAuditEvents.CountAsync(
                 audit => audit.ReviewId == review.Id && audit.EventCode == "ReviewCancelled"));
             Assert.Equal(0, await db.Transactions.CountAsync(transaction => transaction.AccountId == account.Id));
+        }
+
+        using var next = await CreateReviewAsync(owner, account.Id, csv, SignedMapping());
+        Assert.Equal(HttpStatusCode.Created, next.StatusCode);
+    }
+
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task Cancelling_a_review_that_is_no_longer_ready_still_releases_a_stale_lease()
+    {
+        using var owner = CreateClient();
+        await RegisterAndSignInAsync(owner);
+        var account = await CreateAccountAsync(owner, "Savings", "AUD");
+        const string csv = "Date,Description,Amount\n2025-01-15,Market,12.34";
+        using var response = await CreateReviewAsync(owner, account.Id, csv, SignedMapping());
+        var review = await response.Content.ReadFromJsonAsync<ReviewResponse>();
+        Assert.NotNull(review);
+
+        await using (var scope = fixture.Factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.ImportReviews
+                .Where(candidate => candidate.Id == review.Id)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(
+                    candidate => candidate.State, ImportReviewState.Cancelled));
+        }
+
+        using var cancel = await SendJsonAsync(
+            owner, HttpMethod.Delete, $"/api/import-reviews/{review.Id}", null);
+        Assert.Equal(HttpStatusCode.NoContent, cancel.StatusCode);
+
+        await using (var scope = fixture.Factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert.Null((await db.Accounts.SingleAsync(candidate => candidate.Id == account.Id)).ActiveImportId);
         }
 
         using var next = await CreateReviewAsync(owner, account.Id, csv, SignedMapping());
@@ -826,7 +924,8 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
         string Description,
         string Amount,
         string Direction,
-        bool IsPossibleDuplicate);
+        bool IsPossibleDuplicate,
+        string? Balance = null);
 
     private sealed record ConfirmResponse(
         int ImportedCount,
@@ -842,5 +941,6 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
         DateOnly TransactionDate,
         string Description,
         string Amount,
-        string Direction);
+        string Direction,
+        string? Balance = null);
 }

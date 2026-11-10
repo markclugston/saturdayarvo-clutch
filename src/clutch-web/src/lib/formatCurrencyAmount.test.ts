@@ -17,6 +17,15 @@ describe('formatCurrencyAmount', () => {
     )
   })
 
+  it('formats negative balances with a leading minus', () => {
+    expect(formatCurrencyAmount('-20.25', 'USD', 'en-US')).toBe('-$20.25')
+  })
+
+  it('uses the plain dollar sign without a country prefix', () => {
+    expect(formatCurrencyAmount('35', 'AUD', 'en-US')).toBe('$35.00')
+    expect(formatCurrencyAmount('35', 'AUD', 'en-AU')).toBe('$35.00')
+  })
+
   it('preserves integer precision beyond the JavaScript safe integer range', () => {
     expect(formatCurrencyAmount('9007199254740993.25', 'USD', 'en-US')).toBe(
       '$9,007,199,254,740,993.25',

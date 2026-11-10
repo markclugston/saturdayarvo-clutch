@@ -16,7 +16,8 @@ public sealed class ImportReviewRow
         string description,
         decimal amount,
         TransactionDirection direction,
-        bool isPossibleDuplicate)
+        bool isPossibleDuplicate,
+        decimal? balance = null)
     {
         if (reviewId == Guid.Empty
             || sourceRowNumber < 2
@@ -34,6 +35,7 @@ public sealed class ImportReviewRow
         Amount = amount;
         Direction = direction;
         IsPossibleDuplicate = isPossibleDuplicate;
+        Balance = balance;
     }
 
     public Guid ReviewId { get; private set; }
@@ -47,6 +49,8 @@ public sealed class ImportReviewRow
     public decimal Amount { get; private set; }
 
     public TransactionDirection Direction { get; private set; }
+
+    public decimal? Balance { get; private set; }
 
     public bool IsPossibleDuplicate { get; private set; }
 

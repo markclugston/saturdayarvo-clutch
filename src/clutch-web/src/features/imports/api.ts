@@ -23,6 +23,7 @@ export type ImportMapping = {
   incomingDirectionValue?: string | null
   outgoingDirectionValue?: string | null
   numberFormat: string
+  balanceColumn?: number | null
 }
 
 const EmptyResponseSchema = z.undefined()

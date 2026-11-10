@@ -21,6 +21,7 @@ public sealed class Transaction
         string description,
         decimal amount,
         TransactionDirection direction,
+        decimal? balance,
         DateTimeOffset createdAtUtc)
     {
         Id = Guid.NewGuid();
@@ -29,6 +30,7 @@ public sealed class Transaction
         Description = description.Trim();
         Amount = amount;
         Direction = direction;
+        Balance = balance;
         CreatedAtUtc = createdAtUtc;
     }
 
@@ -44,6 +46,8 @@ public sealed class Transaction
 
     public TransactionDirection Direction { get; private set; }
 
+    public decimal? Balance { get; private set; }
+
     public DateTimeOffset CreatedAtUtc { get; private set; }
 
     public static bool TryCreate(
@@ -52,6 +56,7 @@ public sealed class Transaction
         string? description,
         decimal amount,
         TransactionDirection direction,
+        decimal? balance,
         Currency currency,
         DateTimeOffset createdAtUtc,
         out Transaction? transaction)
@@ -60,6 +65,7 @@ public sealed class Transaction
             || !AccountDescriptionValidator.IsValid(description)
             || amount < 0
             || decimal.Round(amount, currency.MinorUnits) != amount
+            || (balance is not null && decimal.Round(balance.Value, currency.MinorUnits) != balance.Value)
             || !Enum.IsDefined(direction))
         {
             transaction = null;
@@ -72,6 +78,7 @@ public sealed class Transaction
             description!,
             amount,
             direction,
+            balance,
             createdAtUtc);
         return true;
     }

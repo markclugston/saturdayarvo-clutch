@@ -7,6 +7,7 @@ type ImportReviewTableProps = {
 }
 
 export function ImportReviewTable({ review, currencyCode }: ImportReviewTableProps) {
+  const showBalance = review.rows.some((row) => row.balance != null)
   return (
     <section aria-labelledby="import-review-heading" className="space-y-4">
       <div>
@@ -29,8 +30,9 @@ export function ImportReviewTable({ review, currencyCode }: ImportReviewTablePro
               <th className="px-3 py-2" scope="col">Row</th>
               <th className="px-3 py-2" scope="col">Date</th>
               <th className="px-3 py-2" scope="col">Description</th>
-              <th className="px-3 py-2" scope="col">Amount</th>
               <th className="px-3 py-2" scope="col">Direction</th>
+              <th className="px-3 py-2 text-right" scope="col">Amount</th>
+              {showBalance && <th className="px-3 py-2 text-right" scope="col">Balance</th>}
               <th className="px-3 py-2" scope="col">Warning</th>
             </tr>
           </thead>
@@ -43,10 +45,15 @@ export function ImportReviewTable({ review, currencyCode }: ImportReviewTablePro
                     .format(new Date(`${row.transactionDate}T00:00:00`))}
                 </td>
                 <td className="px-3 py-2">{row.description}</td>
-                <td className="px-3 py-2">
+                <td className="px-3 py-2">{row.direction}</td>
+                <td className="px-3 py-2 text-right tabular-nums">
                   {formatCurrencyAmount(row.amount, currencyCode)}
                 </td>
-                <td className="px-3 py-2">{row.direction}</td>
+                {showBalance && (
+                  <td className="px-3 py-2 text-right tabular-nums">
+                    {row.balance == null ? '' : formatCurrencyAmount(row.balance, currencyCode)}
+                  </td>
+                )}
                 <td className="px-3 py-2">
                   {row.isPossibleDuplicate ? 'Possible duplicate' : '—'}
                 </td>
