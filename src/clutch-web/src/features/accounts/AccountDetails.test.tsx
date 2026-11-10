@@ -80,7 +80,8 @@ describe('AccountDetails', () => {
       <AccountDetails accountId={existingAccount.id} onBack={onBack} onImport={onImport} />,
     )
 
-    expect(await screen.findByRole('heading', { name: 'Account details' })).toHaveFocus()
+    await screen.findByRole('heading', { name: 'Account details' })
+    expect(screen.getByRole('button', { name: 'Back to accounts' })).toHaveFocus()
     await user.click(screen.getByRole('button', { name: 'Back to accounts' }))
     await user.click(screen.getByRole('button', { name: 'Import transactions' }))
 

@@ -265,16 +265,18 @@ test.describe('account import settings', () => {
     })
 
     await page.goto(baseUrl)
-    await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeFocused()
+    await expect(page.getByLabel('Account description')).toBeFocused()
+    await page.getByRole('heading', { name: 'Your accounts' }).evaluate((heading) => heading.focus())
+    await expect(page.getByLabel('Account description')).toBeFocused()
     await expect(page.locator('a[href]')).toHaveCount(0)
     await expectAccessibleAcrossThemeAndViewports(page)
     await page.getByLabel('Account description').fill(account.description)
     await page.getByLabel('Currency').selectOption('AUD')
     await page.getByRole('button', { name: 'Add account' }).click()
-    await expect(page.getByRole('heading', { name: 'Account details' })).toBeFocused()
+    await expect(page.getByRole('button', { name: 'Back to accounts' })).toBeFocused()
     await expectAccessibleAcrossThemeAndViewports(page)
     await page.getByRole('button', { name: 'Import transactions' }).click()
-    await expect(page.getByRole('heading', { name: 'Import transactions' })).toBeFocused()
+    await expect(page.getByRole('button', { name: 'Back to account' })).toBeFocused()
     await expectAccessibleAcrossThemeAndViewports(page)
     const firstFileChooser = page.waitForEvent('filechooser')
     await page.getByRole('button', { name: 'Choose CSV file' }).click()
@@ -296,9 +298,9 @@ test.describe('account import settings', () => {
     await expect(page.getByRole('status')).toContainText('1 transactions imported successfully')
 
     await page.getByRole('button', { name: 'Return to account' }).click()
-    await expect(page.getByRole('heading', { name: 'Account details' })).toBeFocused()
+    await expect(page.getByRole('button', { name: 'Back to accounts' })).toBeFocused()
     await page.getByRole('button', { name: 'Import transactions' }).click()
-    await expect(page.getByRole('heading', { name: 'Import transactions' })).toBeFocused()
+    await expect(page.getByRole('button', { name: 'Back to account' })).toBeFocused()
     await page.locator('#csv-file').setInputFiles({
       name: 'second-import.csv',
       mimeType: 'text/csv',
@@ -312,13 +314,13 @@ test.describe('account import settings', () => {
     await expectAccessibleAcrossThemeAndViewports(page)
 
     await page.getByRole('button', { name: 'Import limits' }).click()
-    await expect(page.getByRole('heading', { name: 'Import limits' })).toBeFocused()
+    await expect(page.getByRole('button', { name: 'Back to the application' })).toBeFocused()
     await expectAccessibleAcrossThemeAndViewports(page)
     await page.getByLabel('Maximum rows per import').fill('12000')
     await page.getByRole('button', { name: 'Save limits' }).click()
     await expect(page.getByLabel('Maximum rows per import')).toHaveValue('12000')
     await page.getByRole('button', { name: 'Back to the application' }).click()
-    await expect(page.getByRole('heading', { name: 'Import transactions' })).toBeFocused()
+    await expect(page.getByRole('button', { name: 'Back to account' })).toBeFocused()
   })
 })
 

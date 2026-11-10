@@ -19,7 +19,7 @@ test.describe('administrator import limits', () => {
       await expect(page.locator('a[href]')).toHaveCount(0)
       await page.getByRole('button', { name: 'Import limits' }).click()
       await expect(page.getByRole('heading', { name: 'Import limits' })).toBeVisible()
-      await expect(page.getByRole('heading', { name: 'Import limits' })).toBeFocused()
+      await expect(page.getByRole('button', { name: 'Back to the application' })).toBeFocused()
       const accessibility = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
         .analyze()
@@ -35,7 +35,7 @@ test.describe('administrator import limits', () => {
       await page.getByRole('button', { name: 'Save limits' }).click()
       await expect(rowLimit).toHaveValue(String(originalLimit))
       await page.getByRole('button', { name: 'Back to the application' }).click()
-      await expect(page.locator('main h1')).toBeFocused()
+      await expect(page.locator('main h1')).not.toBeFocused()
     } finally {
       await context.close()
     }

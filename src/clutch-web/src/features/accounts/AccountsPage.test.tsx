@@ -65,13 +65,14 @@ describe('AccountsPage', () => {
     ).toBeInTheDocument()
   })
 
-  it('moves focus to the accounts heading after loading', async () => {
+  it('focuses an interactive control rather than the accounts heading after loading', async () => {
     renderWithQueryClient(<AccountsPage onSelectAccount={vi.fn()} />)
 
     const heading = await screen.findByRole('heading', { name: 'Your accounts' })
 
-    expect(heading).toHaveAttribute('tabindex', '-1')
-    expect(heading).toHaveFocus()
+    expect(heading).not.toHaveAttribute('tabindex')
+    expect(heading).not.toHaveFocus()
+    expect(screen.getByLabelText('Account description')).toHaveFocus()
     expect(screen.queryByRole('heading', { name: 'Your Family' })).not.toBeInTheDocument()
   })
 
@@ -144,7 +145,7 @@ describe('AccountsPage', () => {
     renderWithQueryClient(<AccountsPage onSelectAccount={onSelectAccount} />)
 
     const accountButton = await screen.findByRole('button', { name: /Everyday spending/ })
-    expect(screen.getByRole('heading', { name: 'Your accounts' })).toHaveFocus()
+    expect(accountButton).toHaveFocus()
     expect(accountButton.tagName).toBe('BUTTON')
     await user.click(accountButton)
 

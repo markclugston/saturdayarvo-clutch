@@ -137,11 +137,8 @@ test.describe('authenticated personal accounts and transaction import', () => {
     await page.goto(baseUrl)
     await expect(page.locator('a[href]')).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Import limits' })).toHaveCount(0)
-    await page.keyboard.press('Tab')
-    await expect(page.getByRole('button', { name: 'Sign out' })).toBeFocused()
-
     await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeFocused()
+    await expect(page.getByRole('heading', { name: 'Your accounts' })).not.toBeFocused()
     const description = `Playwright ${Date.now()}`
     await page.getByLabel('Account description').fill(description)
     await page.getByLabel('Currency').selectOption('AUD')
@@ -153,7 +150,7 @@ test.describe('authenticated personal accounts and transaction import', () => {
     expect(accountResponse.ok()).toBeTruthy()
     const account = await accountResponse.json() as { id: string }
     await expect(page.getByRole('heading', { name: 'Account details' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Account details' })).toBeFocused()
+    await expect(page.getByRole('button', { name: 'Back to accounts' })).toBeFocused()
 
     const otherContext = await browser.newContext({
       storageState: process.env.PLAYWRIGHT_OTHER_STORAGE_STATE,
@@ -168,7 +165,7 @@ test.describe('authenticated personal accounts and transaction import', () => {
     }
 
     await page.getByRole('button', { name: 'Import transactions' }).click()
-    await expect(page.getByRole('heading', { name: 'Import transactions' })).toBeFocused()
+    await expect(page.getByRole('button', { name: 'Back to account' })).toBeFocused()
     await page.locator('#csv-file').setInputFiles({
       name: 'duplicate-transactions.csv',
       mimeType: 'text/csv',
@@ -198,7 +195,7 @@ test.describe('authenticated personal accounts and transaction import', () => {
     await confirmButton.click()
     await expect(page.getByRole('status')).toContainText('2 transactions imported successfully')
     await page.getByRole('button', { name: 'Return to account' }).click()
-    await expect(page.getByRole('heading', { name: 'Account details' })).toBeFocused()
+    await expect(page.getByRole('button', { name: 'Back to accounts' })).toBeFocused()
 
     await page.emulateMedia({ colorScheme: 'dark' })
     await expect.poll(() => page.locator('html').evaluate((element) =>

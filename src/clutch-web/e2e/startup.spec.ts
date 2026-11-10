@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 
-test('shows a blocking startup dialog until the session check completes', async ({ page }) => {
+test('shows a blocking startup status without focusing non-interactive content', async ({ page }) => {
   let releaseSession: (() => void) | undefined
   await page.route('**/api/security/session', async (route) => {
     await new Promise<void>((resolve) => {
@@ -15,22 +15,32 @@ test('shows a blocking startup dialog until the session check completes', async 
   })
 
   await page.goto('/')
-  const dialog = page.getByRole('dialog', { name: 'Checking your session' })
-  await expect(dialog).toBeVisible()
+  const status = page.getByRole('status')
+  await expect(status).toContainText('Checking your session')
   await expect(page.locator('h1')).toHaveText('Sign in')
-  await expect(dialog).toHaveAttribute('aria-describedby')
-  await expect(dialog).toHaveAttribute('aria-modal', 'true')
-  const backdrop = await page.locator('[data-slot="dialog-backdrop"]').boundingBox()
+  await expect(page.locator('main')).toHaveAttribute('inert')
+  const backdrop = await page.locator('[data-slot="startup-backdrop"]').boundingBox()
   expect(backdrop).toMatchObject({ x: 0, y: 0, width: 1280, height: 720 })
-  await expect(dialog).toBeFocused()
+  const emailBox = await page.locator('#email').boundingBox()
+  expect(emailBox).not.toBeNull()
+  if (!emailBox) throw new Error('Email input has no bounding box')
+  await page.mouse.click(emailBox.x + emailBox.width / 2, emailBox.y + emailBox.height / 2)
+  await page.keyboard.type('blocked')
+  await expect(page.locator('#email')).toHaveValue('')
+  await expect(status).not.toBeFocused()
   await page.keyboard.press('Escape')
   await page.keyboard.press('Tab')
-  await expect(dialog).toBeVisible()
-  await expect(dialog).toBeFocused()
+  await expect(status).toBeVisible()
+  await expect(status).not.toBeFocused()
+  await expect(page.locator('#email')).not.toBeFocused()
 
   releaseSession?.()
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
-  await expect(dialog).toBeHidden()
+  await expect(status).toBeHidden()
+  await page.getByRole('heading', { name: 'Sign in' }).evaluate((heading) => heading.focus())
+  await expect(page.getByRole('heading', { name: 'Sign in' })).not.toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(page.getByLabel('Email')).toBeFocused()
 })
 
 test('recovers automatically from a temporary session failure', async ({ page }) => {
@@ -145,7 +155,7 @@ test('keeps startup loading accessible across supported viewport and color modes
       await page.locator('html').evaluate((html, scheme) => {
         html.classList.toggle('dark', scheme !== 'light')
       }, mode)
-      await expect(page.getByRole('dialog', { name: 'Checking your session' })).toBeVisible()
+      await expect(page.getByRole('status')).toContainText('Checking your session')
       const results = await new AxeBuilder({ page }).analyze()
       expect(results.violations).toEqual([])
     }

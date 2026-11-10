@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { AccountDetails } from '@/features/accounts/AccountDetails'
 import { AccountsPage } from '@/features/accounts/AccountsPage'
 import { ImportLimitsPage } from '@/features/admin/ImportLimitsPage'
@@ -16,7 +16,6 @@ export default function App() {
   const { setMode } = useTheme()
   const sessionAttemptActive = useRef(false)
   const sessionAttemptStartedAt = useRef(performance.now())
-  const mainRef = useRef<HTMLElement>(null)
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
   const [isImporting, setIsImporting] = useState(false)
   const [showAdminSettings, setShowAdminSettings] = useState(false)
@@ -64,20 +63,10 @@ export default function App() {
     },
   })
 
-  useEffect(() => {
-    mainRef.current?.querySelector<HTMLElement>('h1[tabindex="-1"]')?.focus()
-  }, [isImporting, selectedAccountId, showAdminSettings])
-
-  useEffect(() => {
-    if (sessionQuery.error instanceof ApiError && sessionQuery.error.status === 401) {
-      document.getElementById('auth-heading')?.focus()
-    }
-  }, [sessionQuery.error])
-
   if (sessionQuery.isPending || sessionQuery.isFetching) {
     return (
       <>
-        <AuthPage />
+        <AuthPage inert />
         <StartupLoadingDialog open />
       </>
     )
@@ -136,7 +125,7 @@ export default function App() {
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-5 py-8" ref={mainRef}>
+      <main className="mx-auto max-w-5xl px-5 py-8">
         {signOutMutation.isError && (
           <p className="mb-5" role="alert">Unable to sign out. Please try again.</p>
         )}

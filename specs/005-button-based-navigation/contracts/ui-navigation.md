@@ -11,7 +11,7 @@ This contract covers user-facing navigation and action controls in `clutch-web`.
 - Enter and Space activate the button using native browser behavior.
 - Buttons are visually identifiable as buttons and show a hand pointer cursor when hovered. Navigation buttons do not use hyperlink-like underline styling.
 - Existing permissions, destinations, outcomes, disabled states, loading states, and error feedback are preserved.
-- A view-changing button moves focus to the destination view's primary heading. An action that does not change views retains normal button focus behavior.
+- When a view loads, focus moves to its first enabled interactive control, including after a view-changing button is activated. Headings are not focusable. An action that does not change views retains normal button focus behavior.
 - A user action has visible feedback within 500 ms. Longer operations show a busy state and progress when measurable.
 - Native form controls (including the theme selector) remain form controls; they are not navigation controls.
 

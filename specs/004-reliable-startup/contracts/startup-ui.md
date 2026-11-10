@@ -8,18 +8,17 @@ This is the browser-facing contract for initial session discovery and retry afte
 
 | Condition | Background content | Blocking UI | Result |
 |---|---|---|---|
-| Initial request or eligible automatic retry is active | Existing sign-in/account-creation page | Full-viewport, non-dismissible modal dialog with announced loading status | Remains active only while the bounded check is running |
-| Session endpoint returns a valid session | Existing signed-in experience is not exposed until validation completes | Dialog closes | Existing signed-in destination appears |
-| Session endpoint returns HTTP 401 | Existing sign-in/account-creation page | Dialog closes | Auth controls become usable |
-| Non-transient failure or recovery window expires | Sign-in page; no private content | No blocking dialog | Accessible error and retry action appear |
-| Retry is selected | Sign-in page | Blocking dialog appears within 500 ms | A fresh bounded check begins without a page reload |
+| Initial request or eligible automatic retry is active | Existing sign-in/account-creation page | Full-viewport, non-dismissible overlay with announced loading status | Remains active only while the bounded check is running |
+| Session endpoint returns a valid session | Existing signed-in experience is not exposed until validation completes | Overlay closes | Existing signed-in destination appears |
+| Session endpoint returns HTTP 401 | Existing sign-in/account-creation page | Overlay closes | Auth controls become usable |
+| Non-transient failure or recovery window expires | Sign-in page; no private content | No blocking overlay | Accessible error and retry action appear |
+| Retry is selected | Sign-in page | Blocking overlay appears within 500 ms | A fresh bounded check begins without a page reload |
 
 ## Accessibility and responsive requirements
 
-- Use the project-owned shadcn/ui Dialog primitive so background content is inert and keyboard focus remains within the dialog during checking.
-- Give the dialog an accessible name and description and announce the loading state to assistive technology.
+- Keep background content inert during checking and announce the loading state using a status region. The non-interactive loading message must not receive focus.
 - Prevent Escape, backdrop interaction, and other dismissal while a check is active.
-- On dialog close, restore normal page interaction and focus behavior.
+- On overlay close, restore normal page interaction and focus behavior.
 - Keep loading and error presentation usable at narrow viewport sizes in Light, Dark, and System appearance modes.
 - Expose errors and retry through semantic alert/status and button roles and names.
 

@@ -3,7 +3,7 @@ import { useState, type FormEvent } from 'react'
 import { ApiError } from '@/lib/api/client'
 import { register, signIn } from './api'
 
-export function AuthPage() {
+export function AuthPage({ inert = false }: { inert?: boolean }) {
   const queryClient = useQueryClient()
   const [isRegistering, setIsRegistering] = useState(false)
   const [email, setEmail] = useState('')
@@ -27,13 +27,12 @@ export function AuthPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-svh w-full max-w-md items-center px-5 py-10">
+    <main className="mx-auto flex min-h-svh w-full max-w-md items-center px-5 py-10" inert={inert}>
       <section aria-labelledby="auth-heading" className="w-full space-y-6 rounded-xl border border-border bg-card p-6">
         <div>
           <h1
-            className="text-2xl font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className="text-2xl font-semibold"
             id="auth-heading"
-            tabIndex={-1}
           >
             {isRegistering ? 'Create your account' : 'Sign in'}
           </h1>

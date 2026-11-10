@@ -57,7 +57,7 @@ describe('session loading', () => {
     vi.resetAllMocks()
   })
 
-  it('keeps the sign-in page behind a blocking dialog until session discovery completes', async () => {
+  it('keeps the sign-in page inert behind a blocking status until session discovery completes', async () => {
     let resolveSession: ((value: { id: string; roles: string[] }) => void) | undefined
     vi.mocked(getSession).mockImplementation(() => new Promise((resolve) => {
       resolveSession = resolve
@@ -65,13 +65,14 @@ describe('session loading', () => {
 
     renderWithQueryClient(<App />)
 
-    expect(screen.getByRole('dialog', { name: 'Checking your session' })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Checking your session')
     expect(document.querySelector('h1')).toHaveTextContent('Sign in')
+    expect(document.querySelector('main')).toHaveAttribute('inert')
     expect(screen.queryByRole('combobox', { name: 'Theme' })).not.toBeInTheDocument()
 
     resolveSession?.({ id: 'user-1', roles: [] })
     expect(await screen.findByRole('combobox', { name: 'Theme' })).toBeInTheDocument()
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
   it('keeps loading during a temporary gateway failure and shows sign-in when the API is ready', async () => {
@@ -84,6 +85,7 @@ describe('session loading', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Please wait while we check your session.')
     await waitFor(() => expect(getSession).toHaveBeenCalledTimes(1))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument(), { timeout: 3000 })
     expect(await screen.findByRole('heading', { name: 'Sign in' }, { timeout: 3000 }))
       .toBeInTheDocument()
     expect(getSession).toHaveBeenCalledTimes(2)
@@ -107,8 +109,8 @@ describe('session loading', () => {
 
     renderWithQueryClient(<App />)
 
-    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument())
+    expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
     expect(getSession).toHaveBeenCalledTimes(1)
   })
 
@@ -147,7 +149,7 @@ describe('session loading', () => {
     expect(vi.mocked(getSession).mock.calls.length).toBeGreaterThan(1)
   })
 
-  it('shows the blocking dialog immediately when a failed startup check is retried', async () => {
+  it('shows the blocking status immediately when a failed startup check is retried', async () => {
     vi.mocked(getSession)
       .mockRejectedValueOnce(new ApiError(500, { title: 'Server error' }))
       .mockImplementationOnce(() => new Promise(() => {}))
@@ -159,7 +161,7 @@ describe('session loading', () => {
     await user.click(screen.getByRole('button', { name: 'Try again' }))
 
     expect(performance.now() - retryStartedAt).toBeLessThan(500)
-    expect(screen.getByRole('dialog', { name: 'Checking your session' })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Checking your session')
     expect(getSession).toHaveBeenCalledTimes(2)
   })
 
@@ -211,7 +213,8 @@ describe('session loading', () => {
     await user.click(screen.getByRole('button', { name: 'Sign out' }))
 
     await waitFor(() => expect(document.documentElement).not.toHaveClass('dark'))
-    expect(await screen.findByRole('heading', { name: 'Sign in' })).toHaveFocus()
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).not.toHaveFocus()
+    expect(screen.getByRole('heading', { name: 'Sign in' })).not.toHaveAttribute('tabindex')
   })
 
   it('does not expose cached account or import data after another user signs in', async () => {

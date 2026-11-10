@@ -65,8 +65,9 @@ describe('ImportLimitsPage', () => {
     const onBack = vi.fn()
     renderWithQueryClient(<ImportLimitsPage onBack={onBack} />)
 
-    expect(await screen.findByRole('heading', { name: 'Import limits' })).toHaveFocus()
+    await screen.findByRole('heading', { name: 'Import limits' })
     const backButton = screen.getByRole('button', { name: 'Back to the application' })
+    expect(backButton).toHaveFocus()
     expect(backButton.tagName).toBe('BUTTON')
     await user.click(backButton)
 
