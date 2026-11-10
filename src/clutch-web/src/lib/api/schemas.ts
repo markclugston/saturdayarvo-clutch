@@ -109,6 +109,19 @@ export const ThemePreferenceSchema = z.object({
   mode: ThemeModeSchema,
 }).strict()
 
+export const CategoryNodeSchema = z.object({
+  id: z.string().min(1),
+  parentId: z.string().min(1).nullable(),
+  name: z.string().min(1),
+  depth: z.number().int().min(0),
+})
+
+export const DeletionImpactSchema = z.object({
+  itemCount: z.number().int().min(1),
+})
+
+export type CategoryNode = z.infer<typeof CategoryNodeSchema>
+export type DeletionImpact = z.infer<typeof DeletionImpactSchema>
 export type ProblemDetails = z.infer<typeof ProblemDetailsSchema>
 export type Currency = z.infer<typeof CurrencySchema>
 export type CurrencyAmountFormat = z.infer<typeof CurrencyAmountFormatSchema>

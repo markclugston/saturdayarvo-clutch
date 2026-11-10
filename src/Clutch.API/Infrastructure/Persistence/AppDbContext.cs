@@ -1,4 +1,5 @@
 using Clutch.API.Domain.Accounts;
+using Clutch.API.Domain.Categories;
 using Clutch.API.Domain.Imports;
 using Clutch.API.Domain.Preferences;
 using Clutch.API.Domain.Transactions;
@@ -13,6 +14,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     : IdentityDbContext<ApplicationUser>(options)
 {
     public DbSet<Account> Accounts => Set<Account>();
+    public DbSet<CategoryNode> CategoryNodes => Set<CategoryNode>();
 
     public DbSet<ImportLimitSettings> ImportLimitSettings => Set<ImportLimitSettings>();
 
@@ -70,6 +72,38 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .WithMany()
                 .HasForeignKey(account => account.OwnerUserId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<CategoryNode>(entity =>
+        {
+            entity.ToTable("CategoryNodes", table =>
+                table.HasCheckConstraint(
+                    "CK_CategoryNodes_NonBlankName",
+                    "LEN(LTRIM(RTRIM([Name]))) > 0"));
+            entity.HasKey(node => node.Id);
+            entity.Property(node => node.OwnerUserId)
+                .HasMaxLength(450)
+                .IsRequired();
+            entity.Property(node => node.Name)
+                .HasMaxLength(CategoryNameValidator.MaximumLength)
+                .IsRequired();
+            entity.Property(node => node.Position);
+            entity.Ignore(node => node.IsGroup);
+            entity.HasOne<ApplicationUser>()
+                .WithMany()
+                .HasForeignKey(node => node.OwnerUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<CategoryNode>()
+                .WithMany()
+                .HasForeignKey(node => node.ParentId)
+                .OnDelete(DeleteBehavior.NoAction);
+            entity.HasIndex(node => new { node.OwnerUserId, node.ParentId });
+            entity.HasIndex(node => new { node.OwnerUserId, node.ParentId, node.Name })
+                            .IsUnique()
+                            .HasFilter(null);
+                        entity.HasIndex(node => new { node.OwnerUserId, node.ParentId, node.Position })
+                            .IsUnique()
+                            .HasFilter(null);
         });
 
         builder.Entity<ImportLimitSettings>(entity =>

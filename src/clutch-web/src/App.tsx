@@ -5,6 +5,7 @@ import { AccountsPage } from '@/features/accounts/AccountsPage'
 import { ImportLimitsPage } from '@/features/admin/ImportLimitsPage'
 import { AuthPage } from '@/features/auth/AuthPage'
 import { StartupLoadingDialog } from '@/features/auth/StartupLoadingDialog'
+import { CategoriesPage } from '@/features/categories/CategoriesPage'
 import { signOut, getSession } from '@/features/auth/api'
 import { ImportPage } from '@/features/imports/ImportPage'
 import { ApiError } from '@/lib/api/client'
@@ -19,6 +20,7 @@ export default function App() {
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
   const [isImporting, setIsImporting] = useState(false)
   const [showAdminSettings, setShowAdminSettings] = useState(false)
+  const [showCategories, setShowCategories] = useState(false)
   const sessionQuery = useQuery({
     queryKey: ['session'],
     queryFn: async ({ signal }) => {
@@ -55,6 +57,7 @@ export default function App() {
       setSelectedAccountId(null)
       setIsImporting(false)
       setShowAdminSettings(false)
+      setShowCategories(false)
       setMode('Light')
       queryClient.removeQueries({
         predicate: (query) => query.queryKey[0] !== 'session',
@@ -103,6 +106,32 @@ export default function App() {
       <header className="border-b border-border">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-5 py-4">
           <p className="font-semibold">SaturdayArvo Clutch</p>
+          <nav aria-label="Primary" className="flex gap-2">
+            <button
+              aria-current={!showCategories && !showAdminSettings ? 'page' : undefined}
+              className="cursor-pointer rounded-md border border-border px-3 py-2 text-sm hover:bg-muted aria-[current=page]:bg-muted"
+              onClick={() => {
+                setShowCategories(false)
+                setShowAdminSettings(false)
+                setSelectedAccountId(null)
+                setIsImporting(false)
+              }}
+              type="button"
+            >
+              Accounts
+            </button>
+            <button
+              aria-current={showCategories && !showAdminSettings ? 'page' : undefined}
+              className="cursor-pointer rounded-md border border-border px-3 py-2 text-sm hover:bg-muted aria-[current=page]:bg-muted"
+              onClick={() => {
+                setShowCategories(true)
+                setShowAdminSettings(false)
+              }}
+              type="button"
+            >
+              Categories
+            </button>
+          </nav>
           <div className="flex flex-wrap items-center gap-3">
             {sessionQuery.data.id && <ThemeSelector userId={sessionQuery.data.id} />}
             {sessionQuery.data.roles?.includes('Administrator') && (
@@ -131,6 +160,8 @@ export default function App() {
         )}
         {showAdminSettings ? (
           <ImportLimitsPage onBack={() => setShowAdminSettings(false)} />
+        ) : showCategories ? (
+          <CategoriesPage />
         ) : selectedAccountId ? (
             isImporting ? (
               <ImportPage

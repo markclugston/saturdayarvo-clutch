@@ -68,6 +68,46 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Clutch.API.Domain.Categories.CategoryNode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("OwnerUserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<Guid?>("ParentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParentId");
+
+                    b.HasIndex("OwnerUserId", "ParentId");
+
+                    b.HasIndex("OwnerUserId", "ParentId", "Name")
+                        .IsUnique();
+
+                    b.HasIndex("OwnerUserId", "ParentId", "Position")
+                        .IsUnique();
+
+                    b.ToTable("CategoryNodes", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CategoryNodes_NonBlankName", "LEN(LTRIM(RTRIM([Name]))) > 0");
+                        });
+                });
+
             modelBuilder.Entity("Clutch.API.Domain.Imports.ImportAuditEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -556,6 +596,20 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("OwnerUserId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Clutch.API.Domain.Categories.CategoryNode", b =>
+                {
+                    b.HasOne("Clutch.API.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Clutch.API.Domain.Categories.CategoryNode", null)
+                        .WithMany()
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.NoAction);
                 });
 
             modelBuilder.Entity("Clutch.API.Domain.Imports.ImportAuditEvent", b =>

@@ -83,6 +83,7 @@ if (app.Environment.IsDevelopment())
 
 app.MapSecurityEndpoints();
 app.MapAccountEndpoints();
+app.MapCategoryNodeEndpoints();
 app.MapImportEndpoints();
 app.MapTransactionEndpoints();
 app.MapAdminImportLimitEndpoints();

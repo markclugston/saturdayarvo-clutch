@@ -2,8 +2,8 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: 'family-accounts-import.spec.ts',
-  grep: /provisions two real API sessions/,
+  testMatch: ['accounts-import.spec.ts', 'categories-groups.spec.ts'],
+  grep: /provisions two real API sessions|categories journey/,
   globalTeardown: './e2e/cleanup-test-api.mjs',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),

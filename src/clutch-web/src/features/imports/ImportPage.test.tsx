@@ -286,6 +286,35 @@ describe('ImportPage', () => {
     ))
   })
 
+  it('opens saved settings before selecting a file and retains edits for the review', async () => {
+    vi.mocked(getAccountImportSettings).mockResolvedValue({ mapping: savedMapping })
+    const user = userEvent.setup()
+    renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
+
+    const toggle = await screen.findByRole('button', { name: 'View or change settings' })
+    await user.click(toggle)
+    expect(screen.getByRole('heading', { name: 'Map CSV columns' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Transaction date column')).toHaveValue('0')
+    expect(screen.getByLabelText('Date format')).toHaveValue('yyyy-MM-dd')
+    expect(screen.getByRole('button', { name: 'Review import' })).toBeDisabled()
+    await user.selectOptions(screen.getByLabelText('Date format'), 'dd/MM/yyyy')
+
+    await user.upload(
+      screen.getByLabelText('CSV file'),
+      new File(['Date,Description,Amount\n15/01/2025,Market,-10.00'], 'transactions.csv', {
+        type: 'text/csv',
+      }),
+    )
+    await waitFor(() => expect(screen.getByLabelText('Transaction date column'))
+      .toHaveTextContent('1: Date'))
+    expect(screen.getByLabelText('Date format')).toHaveValue('dd/MM/yyyy')
+    expect(screen.getByLabelText('Transaction date column')).toHaveValue('0')
+    await user.click(screen.getByRole('button', { name: 'Review import' }))
+    await waitFor(() => expect(createImportReview).toHaveBeenCalledWith(
+      account.id, expect.any(File), { ...savedMapping, dateFormat: 'dd/MM/yyyy' },
+    ))
+  })
+
   it('offers an accessible correction path when saved columns do not fit the file', async () => {
     vi.mocked(getAccountImportSettings).mockResolvedValue({
       mapping: { ...savedMapping, signedAmountColumn: 3 },
@@ -306,6 +335,7 @@ describe('ImportPage', () => {
     )
     expect(screen.getByRole('heading', { name: 'Map CSV columns' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Review import' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'View or change settings' })).not.toBeInTheDocument()
   })
 
   it('distinguishes a successful import from an unsuccessful defaults save', async () => {
