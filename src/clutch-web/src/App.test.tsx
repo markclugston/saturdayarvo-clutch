@@ -47,6 +47,10 @@ vi.mock('@/features/accounts/AccountsPage', () => ({
   },
 }))
 
+vi.mock('@/features/categories/CategoriesPage', () => ({
+  CategoriesPage: () => <h1>Categories and groups</h1>,
+}))
+
 describe('session loading', () => {
   afterEach(() => {
     vi.useRealTimers()
@@ -187,6 +191,25 @@ describe('session loading', () => {
     expect(importLimitsButton.tagName).toBe('BUTTON')
     expect(signOutButton.tagName).toBe('BUTTON')
     expect(document.querySelectorAll('a[href]')).toHaveLength(0)
+  })
+
+  it('navigates between Accounts and Categories using buttons', async () => {
+    const user = userEvent.setup()
+    vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
+
+    renderWithQueryClient(<App />)
+
+    const categoriesButton = await screen.findByRole('button', { name: 'Categories' })
+    const accountsButton = screen.getByRole('button', { name: 'Accounts' })
+    expect(accountsButton).toHaveAttribute('aria-current', 'page')
+    expect(accountsButton).toHaveClass('cursor-pointer')
+    expect(categoriesButton).toHaveClass('cursor-pointer')
+    await user.click(categoriesButton)
+    expect(screen.getByRole('heading', { name: 'Categories and groups' })).toBeInTheDocument()
+    expect(categoriesButton).toHaveAttribute('aria-current', 'page')
+
+    await user.click(accountsButton)
+    expect(screen.getByRole('heading', { name: 'Your accounts' })).toBeInTheDocument()
   })
 
   it('does not show the theme selector in the signed-out view', async () => {

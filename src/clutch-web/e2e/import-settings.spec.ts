@@ -301,11 +301,17 @@ test.describe('account import settings', () => {
     await expect(page.getByRole('button', { name: 'Back to accounts' })).toBeFocused()
     await page.getByRole('button', { name: 'Import transactions' }).click()
     await expect(page.getByRole('button', { name: 'Back to account' })).toBeFocused()
+    await page.getByRole('button', { name: 'View or change settings' }).click()
+    await expect(page.getByLabel('Transaction date column')).toHaveValue('0')
+    await expect(page.getByRole('button', { name: 'Review import', exact: true })).toBeDisabled()
+    await page.getByLabel('Incoming transactions use').selectOption('Negative')
     await page.locator('#csv-file').setInputFiles({
       name: 'second-import.csv',
       mimeType: 'text/csv',
       buffer: Buffer.from('Date,Description,Amount\n2025-01-16,Market second,20.00'),
     })
+    await expect(page.getByLabel('Incoming transactions use')).toHaveValue('Negative')
+    await page.getByRole('button', { name: 'Use saved settings' }).click()
     await expect(page.getByRole('status')).toContainText(
       'Using this account’s saved import settings.',
     )

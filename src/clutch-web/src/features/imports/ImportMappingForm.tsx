@@ -3,7 +3,7 @@ import type { CurrencyAmountFormat } from '@/lib/api/schemas'
 import type { ImportMapping } from './api'
 
 type ImportMappingFormProps = {
-  headers: string[]
+  headers: string[] | null
   amountFormats: CurrencyAmountFormat[]
   onSubmit: (mapping: ImportMapping) => void
   initialMapping?: ImportMapping | null
@@ -61,6 +61,9 @@ export function ImportMappingForm({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!headers || disabled) {
+      return
+    }
     const common = {
       dateColumn: Number(dateColumn),
       descriptionColumn: Number(descriptionColumn),
@@ -93,14 +96,31 @@ export function ImportMappingForm({
   }
 
   function renderColumnOptions() {
+    if (!headers) {
+      const savedColumns = [
+        initialMapping?.dateColumn,
+        initialMapping?.descriptionColumn,
+        initialMapping?.signedAmountColumn,
+        initialMapping?.incomingAmountColumn,
+        initialMapping?.outgoingAmountColumn,
+        initialMapping?.amountColumn,
+        initialMapping?.directionColumn,
+      ].filter((column): column is number => typeof column === 'number')
+      return [...new Set(savedColumns)].sort((a, b) => a - b).map((column) => (
+        <option key={column} value={column}>{`Column ${column + 1}`}</option>
+      ))
+    }
     return headers.map((header, index) => (
       <option key={index} value={index}>{`${index + 1}: ${header}`}</option>
     ))
   }
 
   return (
-    <form className="space-y-5 rounded-lg border border-border bg-card p-5" onSubmit={submit}>
+    <form id="import-mapping" className="space-y-5 rounded-lg border border-border bg-card p-5" onSubmit={submit}>
       <h2 className="text-lg font-semibold">Map CSV columns</h2>
+      {!headers && (
+        <p>Choose a CSV file to see its column names and review the import.</p>
+      )}
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <label htmlFor="import-date-column">Transaction date column</label>
@@ -281,7 +301,7 @@ export function ImportMappingForm({
 
       <button
         className="rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
-        disabled={disabled}
+        disabled={disabled || !headers}
         type="submit"
       >
         {disabled ? 'Creating review…' : 'Review import'}

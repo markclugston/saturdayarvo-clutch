@@ -282,15 +282,17 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
           {savedMapping && (
             <div className="space-y-2">
               <p role="status">Using this account’s saved import settings.</p>
-              <button
-                className="rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
-                onClick={() => setShowSettings((current) => !current)}
-                type="button"
-              >
-                {showSettings && savedMappingCompatible
-                  ? 'Use saved settings'
-                  : 'View or change settings'}
-              </button>
+              {(!headers || savedMappingCompatible) && (
+                <button
+                  aria-controls={showSettings ? 'import-mapping' : undefined}
+                  aria-expanded={showSettings}
+                  className="rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
+                  onClick={() => setShowSettings((current) => !current)}
+                  type="button"
+                >
+                  {showSettings ? 'Use saved settings' : 'View or change settings'}
+                </button>
+              )}
             </div>
           )}
           <div className="space-y-2">
@@ -323,8 +325,8 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
           {fileError && <p role="alert">{fileError}</p>}
           {savedMapping && headers && !savedMappingCompatible && (
             <p role="alert">
-              The saved settings do not match this file’s columns. View or change settings
-              before reviewing the import.
+              The saved settings do not match this file’s columns. Change the settings
+              below before reviewing the import.
             </p>
           )}
           {savedMappingError && (
@@ -347,8 +349,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
               {createReviewMutation.isPending ? 'Creating review…' : 'Review import with saved settings'}
             </button>
           )}
-          {headers && (
-            (!savedMapping || showSettings || !savedMappingCompatible) && (
+          {((headers && (!savedMapping || !savedMappingCompatible)) || (savedMapping && showSettings)) && (
               <ImportMappingForm
                 amountFormats={currency.amountFormats}
                 disabled={createReviewMutation.isPending || recoverMutation.isPending}
@@ -356,7 +357,6 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
                 initialMapping={savedMapping}
                 onSubmit={startReview}
               />
-            )
           )}
           {createReviewMutation.isError && (
             <p role="alert">{getErrorMessage(createReviewMutation.error)}</p>

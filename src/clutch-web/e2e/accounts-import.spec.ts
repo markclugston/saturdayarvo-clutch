@@ -107,6 +107,9 @@ test('provisions two real API sessions and denies cross-user account access', as
     const ownerAccountsResponse = await ownerContext.request.get('/api/accounts')
     expect(ownerAccountsResponse.ok()).toBeTruthy()
     const [account] = await ownerAccountsResponse.json() as Array<{ id: string; description: string }>
+    if (!account) {
+      throw new Error('Expected the owner to have one account.')
+    }
     expect(account.description).toBe(description)
 
     const otherContext = await browser.newContext({ baseURL: baseUrl })
