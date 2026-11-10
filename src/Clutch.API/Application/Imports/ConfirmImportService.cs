@@ -250,16 +250,13 @@ public sealed class ConfirmImportService(
     }
 
     private IQueryable<Account> OwnedAccounts(string ownerUserId) =>
-        dbContext.Accounts.Where(account =>
-            dbContext.Families.Any(family =>
-                family.Id == account.FamilyId && family.OwnerUserId == ownerUserId));
+        dbContext.Accounts.Where(account => account.OwnerUserId == ownerUserId);
 
     private IQueryable<ImportReview> OwnedReviews(string ownerUserId) =>
         dbContext.ImportReviews.Where(review =>
             dbContext.Accounts.Any(account =>
                 account.Id == review.AccountId
-                && dbContext.Families.Any(family =>
-                    family.Id == account.FamilyId && family.OwnerUserId == ownerUserId)));
+                && account.OwnerUserId == ownerUserId));
 
     private static ApiProblemException AccountNotFound() =>
         new(

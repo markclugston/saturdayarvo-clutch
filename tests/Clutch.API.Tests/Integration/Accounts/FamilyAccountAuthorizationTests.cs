@@ -1,7 +1,12 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Clutch.API.Domain.Shared;
+using Clutch.API.Domain.Transactions;
+using Clutch.API.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Clutch.API.Tests.Integration.Accounts;
 
@@ -10,7 +15,7 @@ public sealed class FamilyAccountAuthorizationTests(SqlServerFixture fixture)
 {
     [Fact]
     [Trait("Category", "SqlServer")]
-    public async Task Signing_in_requires_a_fresh_antiforgery_token_for_family_creation()
+    public async Task Removed_family_routes_are_not_available()
     {
         using var client = CreateClient();
         var email = $"{Guid.NewGuid():N}@example.test";
@@ -22,25 +27,17 @@ public sealed class FamilyAccountAuthorizationTests(SqlServerFixture fixture)
             new { email, password });
         Assert.Equal(HttpStatusCode.Created, register.StatusCode);
 
-        using var tokenResponse = await client.GetAsync("/api/security/csrf-token");
-        tokenResponse.EnsureSuccessStatusCode();
-        var token = await tokenResponse.Content.ReadFromJsonAsync<CsrfTokenResponse>();
-        Assert.NotNull(token);
-        using var loginRequest = new HttpRequestMessage(HttpMethod.Post, "/api/security/login")
-        {
-            Content = JsonContent.Create(new { email, password }),
-        };
-        loginRequest.Headers.Add("X-CSRF-TOKEN", token.RequestToken);
-        using var login = await client.SendAsync(loginRequest);
+        using var login = await SendJsonAsync(
+            client,
+            HttpMethod.Post,
+            "/api/security/login",
+            new { email, password });
         Assert.Equal(HttpStatusCode.NoContent, login.StatusCode);
 
-        using var staleRequest = new HttpRequestMessage(HttpMethod.Post, "/api/families");
-        staleRequest.Headers.Add("X-CSRF-TOKEN", token.RequestToken);
-        using var staleResponse = await client.SendAsync(staleRequest);
-        Assert.Equal(HttpStatusCode.BadRequest, staleResponse.StatusCode);
-
-        using var freshResponse = await SendJsonAsync(client, HttpMethod.Post, "/api/families", null);
-        Assert.Equal(HttpStatusCode.Created, freshResponse.StatusCode);
+        using var listResponse = await client.GetAsync("/api/families");
+        using var createResponse = await SendJsonAsync(client, HttpMethod.Post, "/api/families", null);
+        Assert.Equal(HttpStatusCode.NotFound, listResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, createResponse.StatusCode);
     }
 
     [Fact]
@@ -91,7 +88,6 @@ public sealed class FamilyAccountAuthorizationTests(SqlServerFixture fixture)
     {
         using var client = CreateClient();
         await RegisterAndSignInAsync(client);
-        await CreateFamilyAsync(client);
 
         var first = await CreateAccountAsync(client, "Daily spending", "AUD");
         var second = await CreateAccountAsync(client, "Travel savings", "NZD");
@@ -115,24 +111,21 @@ public sealed class FamilyAccountAuthorizationTests(SqlServerFixture fixture)
 
     [Fact]
     [Trait("Category", "SqlServer")]
-    public async Task Owner_cannot_create_a_second_family()
+    public async Task Same_owner_can_access_accounts_from_separate_sessions()
     {
-        using var client = CreateClient();
-        await RegisterAndSignInAsync(client);
-        using var firstResponse = await SendJsonAsync(
-            client,
-            HttpMethod.Post,
-            "/api/families",
-            content: null);
-        Assert.Equal(HttpStatusCode.Created, firstResponse.StatusCode);
+        using var firstSession = CreateClient();
+        var (email, password) = await RegisterAndSignInAsync(firstSession);
+        var account = await CreateAccountAsync(firstSession, "Shared session", "AUD");
+        using var secondSession = CreateClient();
+        await SignInAsync(secondSession, email, password);
 
-        using var secondResponse = await SendJsonAsync(
-            client,
-            HttpMethod.Post,
-            "/api/families",
-            content: null);
-        Assert.Equal(HttpStatusCode.Conflict, secondResponse.StatusCode);
-        Assert.Single(await GetFamiliesAsync(client));
+        using var listResponse = await secondSession.GetAsync("/api/accounts");
+        using var accountResponse = await secondSession.GetAsync($"/api/accounts/{account.Id}");
+        Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, accountResponse.StatusCode);
+        var accounts = await listResponse.Content.ReadFromJsonAsync<AccountResponse[]>();
+        Assert.NotNull(accounts);
+        Assert.Contains(accounts, response => response.Id == account.Id);
     }
 
     [Fact]
@@ -141,7 +134,6 @@ public sealed class FamilyAccountAuthorizationTests(SqlServerFixture fixture)
     {
         using var owner = CreateClient();
         await RegisterAndSignInAsync(owner);
-        await CreateFamilyAsync(owner);
 
         using var invalidResponse = await SendJsonAsync(
             owner,
@@ -168,12 +160,51 @@ public sealed class FamilyAccountAuthorizationTests(SqlServerFixture fixture)
 
         using var otherUser = CreateClient();
         await RegisterAndSignInAsync(otherUser);
-        using var forbiddenFamily = await otherUser.GetAsync("/api/families");
-        using var forbiddenAccount = await otherUser.GetAsync($"/api/accounts/{account.Id}");
+        using var ownerList = await owner.GetAsync("/api/accounts");
+        using var otherUserList = await otherUser.GetAsync("/api/accounts");
+        Assert.Equal(HttpStatusCode.OK, ownerList.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, otherUserList.StatusCode);
+        var otherAccounts = await otherUserList.Content.ReadFromJsonAsync<AccountResponse[]>();
+        Assert.NotNull(otherAccounts);
+        Assert.Empty(otherAccounts);
 
-        Assert.Equal(HttpStatusCode.OK, forbiddenFamily.StatusCode);
-        Assert.Equal("[]", await forbiddenFamily.Content.ReadAsStringAsync());
+        await AddTransactionAsync(account.Id);
+        using var ownerAccount = await owner.GetAsync($"/api/accounts/{account.Id}");
+        using var forbiddenAccount = await otherUser.GetAsync($"/api/accounts/{account.Id}");
+        using var ownerTransactions = await owner.GetAsync(
+            $"/api/accounts/{account.Id}/transactions");
+        using var forbiddenTransactions = await otherUser.GetAsync(
+            $"/api/accounts/{account.Id}/transactions");
+        using var forbiddenUpdate = await SendJsonAsync(
+            otherUser,
+            HttpMethod.Patch,
+            $"/api/accounts/{account.Id}",
+            new { description = "Not the owner" });
+
+        Assert.Equal(HttpStatusCode.OK, ownerAccount.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, forbiddenAccount.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, ownerTransactions.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, forbiddenTransactions.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, forbiddenUpdate.StatusCode);
+    }
+
+    private async Task AddTransactionAsync(Guid accountId)
+    {
+        await using var scope = fixture.Factory.Services.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var account = await dbContext.Accounts.SingleAsync(value => value.Id == accountId);
+        Assert.True(Currency.TryGet(account.CurrencyCode, out var currency));
+        Assert.True(Transaction.TryCreate(
+            accountId,
+            new DateOnly(2026, 1, 2),
+            "Test transaction",
+            12.34m,
+            TransactionDirection.Outgoing,
+            currency!,
+            DateTimeOffset.UtcNow,
+            out var transaction));
+        dbContext.Transactions.Add(transaction!);
+        await dbContext.SaveChangesAsync();
     }
 
     private HttpClient CreateClient() =>
@@ -183,41 +214,29 @@ public sealed class FamilyAccountAuthorizationTests(SqlServerFixture fixture)
             AllowAutoRedirect = false,
         });
 
-    private static async Task RegisterAndSignInAsync(HttpClient client)
+    private static async Task<(string Email, string Password)> RegisterAndSignInAsync(HttpClient client)
     {
         var email = $"{Guid.NewGuid():N}@example.test";
+        const string password = "Test-only!Password-123";
         using var register = await SendJsonAsync(
             client,
             HttpMethod.Post,
             "/api/security/register",
-            new { email, password = "Test-only!Password-123" });
+            new { email, password });
         Assert.Equal(HttpStatusCode.Created, register.StatusCode);
 
+        await SignInAsync(client, email, password);
+        return (email, password);
+    }
+
+    private static async Task SignInAsync(HttpClient client, string email, string password)
+    {
         using var login = await SendJsonAsync(
             client,
             HttpMethod.Post,
             "/api/security/login",
-            new { email, password = "Test-only!Password-123" });
+            new { email, password });
         Assert.Equal(HttpStatusCode.NoContent, login.StatusCode);
-    }
-
-    private static async Task CreateFamilyAsync(HttpClient client)
-    {
-        using var response = await SendJsonAsync(
-            client,
-            HttpMethod.Post,
-            "/api/families",
-            content: null);
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-    }
-
-    private static async Task<FamilyResponse[]> GetFamiliesAsync(HttpClient client)
-    {
-        using var response = await client.GetAsync("/api/families");
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var families = await response.Content.ReadFromJsonAsync<FamilyResponse[]>();
-        Assert.NotNull(families);
-        return families;
     }
 
     private static async Task<AccountResponse> CreateAccountAsync(
@@ -258,11 +277,8 @@ public sealed class FamilyAccountAuthorizationTests(SqlServerFixture fixture)
 
     private sealed record CsrfTokenResponse(string RequestToken);
 
-    private sealed record FamilyResponse(Guid Id, string OwnerUserId);
-
     private sealed record AccountResponse(
         Guid Id,
-        Guid FamilyId,
         string Description,
         string CurrencyCode,
         DateTimeOffset? LastSuccessfulImportAtUtc);

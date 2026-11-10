@@ -103,7 +103,6 @@ public static class AccountEndpoints
 
     private sealed record AccountResponse(
         Guid Id,
-        Guid FamilyId,
         string Description,
         string CurrencyCode,
         DateTimeOffset? LastSuccessfulImportAtUtc)
@@ -111,7 +110,6 @@ public static class AccountEndpoints
         public static AccountResponse FromDomain(Account account) =>
             new(
                 account.Id,
-                account.FamilyId,
                 account.Description,
                 account.CurrencyCode,
                 account.LastSuccessfulImportAtUtc);

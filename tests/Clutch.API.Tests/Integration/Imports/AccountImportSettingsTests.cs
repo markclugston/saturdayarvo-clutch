@@ -24,7 +24,7 @@ public sealed class AccountImportSettingsTests(SqlServerFixture fixture)
     [Trait("Category", "SqlServer")]
     public async Task Settings_are_isolated_by_account_and_owner()
     {
-        using var owner = await CreateSignedInUserAsync(createFamily: true);
+        using var owner = await CreateSignedInUserAsync();
         var firstAccount = await CreateAccountAsync(owner.Client, "First account");
         var secondAccount = await CreateAccountAsync(owner.Client, "Second account");
         Assert.Null((await GetSettingsAsync(owner.Client, firstAccount)).Mapping);
@@ -53,7 +53,7 @@ public sealed class AccountImportSettingsTests(SqlServerFixture fixture)
         Assert.Equal(firstMapping, firstResponse.Mapping);
         Assert.Equal(secondMapping, secondResponse.Mapping);
 
-        using var otherOwner = await CreateSignedInUserAsync(createFamily: false);
+        using var otherOwner = await CreateSignedInUserAsync();
         using var unauthorizedResponse = await otherOwner.Client.GetAsync(
             $"/api/accounts/{firstAccount}/import-settings");
         Assert.Equal(HttpStatusCode.NotFound, unauthorizedResponse.StatusCode);
@@ -63,7 +63,7 @@ public sealed class AccountImportSettingsTests(SqlServerFixture fixture)
     [Trait("Category", "SqlServer")]
     public async Task Latest_confirmation_token_wins_for_both_settings_write_orders()
     {
-        using var owner = await CreateSignedInUserAsync(createFamily: true);
+        using var owner = await CreateSignedInUserAsync();
         var accountId = await CreateAccountAsync(owner.Client, "Concurrency account");
         var olderReviewId = Guid.NewGuid();
         var newerReviewId = Guid.NewGuid();
@@ -97,7 +97,7 @@ public sealed class AccountImportSettingsTests(SqlServerFixture fixture)
     [Trait("Category", "SqlServer")]
     public async Task Defaults_write_failure_preserves_previous_settings_and_imported_transactions()
     {
-        using var owner = await CreateSignedInUserAsync(createFamily: true);
+        using var owner = await CreateSignedInUserAsync();
         var accountId = await CreateAccountAsync(owner.Client, "Failure account");
         var initialMapping = Mapping();
         using var initialReviewResponse = await CreateReviewAsync(
@@ -127,10 +127,10 @@ public sealed class AccountImportSettingsTests(SqlServerFixture fixture)
         await using (var readScope = fixture.Factory.Services.CreateAsyncScope())
         {
             var readDb = readScope.ServiceProvider.GetRequiredService<AppDbContext>();
-            ownerUserId = await readDb.Families
-                .Where(family => family.Id == owner.FamilyId)
-                .Select(family => family.OwnerUserId)
-                .SingleAsync();
+            ownerUserId = await readDb.Accounts
+                .Where(account => account.Id == accountId)
+                .Select(account => account.OwnerUserId)
+                .SingleAsync() ?? throw new InvalidOperationException("The account must have an owner.");
         }
 
         var interceptor = new FailSettingsWriteInterceptor();
@@ -183,7 +183,7 @@ public sealed class AccountImportSettingsTests(SqlServerFixture fixture)
     [Trait("Category", "SqlServer")]
     public async Task Cancelling_a_ready_review_deletes_its_mapping_snapshot()
     {
-        using var owner = await CreateSignedInUserAsync(createFamily: true);
+        using var owner = await CreateSignedInUserAsync();
         var accountId = await CreateAccountAsync(owner.Client, "Cancellation account");
         using var reviewResponse = await CreateReviewAsync(
             owner.Client,
@@ -217,16 +217,16 @@ public sealed class AccountImportSettingsTests(SqlServerFixture fixture)
     [Trait("Category", "SqlServer")]
     public async Task Settings_read_and_upsert_use_one_joined_database_read_each()
     {
-        using var owner = await CreateSignedInUserAsync(createFamily: true);
+        using var owner = await CreateSignedInUserAsync();
         var accountId = await CreateAccountAsync(owner.Client, "Query account");
         var reviewId = Guid.NewGuid();
         await using var seedScope = fixture.Factory.Services.CreateAsyncScope();
         var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
         await SetLatestReviewAsync(seedDb, accountId, reviewId);
-        var ownerUserId = await seedDb.Families
-            .Where(family => family.Id == owner.FamilyId)
-            .Select(family => family.OwnerUserId)
-            .SingleAsync();
+        var ownerUserId = await seedDb.Accounts
+            .Where(account => account.Id == accountId)
+            .Select(account => account.OwnerUserId)
+            .SingleAsync() ?? throw new InvalidOperationException("The account must have an owner.");
         var interceptor = new CapturingCommandInterceptor();
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseSqlServer(seedDb.Database.GetConnectionString())
@@ -259,7 +259,7 @@ public sealed class AccountImportSettingsTests(SqlServerFixture fixture)
             || command.Contains("INSERT INTO [AccountImportSettings]", StringComparison.Ordinal));
     }
 
-    private async Task<SignedInUser> CreateSignedInUserAsync(bool createFamily)
+    private async Task<SignedInUser> CreateSignedInUserAsync()
     {
         var client = fixture.Factory.CreateClient(new WebApplicationFactoryClientOptions
         {
@@ -280,20 +280,7 @@ public sealed class AccountImportSettingsTests(SqlServerFixture fixture)
             new { email, password = "Test-only!Password-123" });
         Assert.Equal(HttpStatusCode.NoContent, login.StatusCode);
 
-        if (!createFamily)
-        {
-            return new SignedInUser(client, Guid.Empty);
-        }
-
-        using var familyResponse = await SendJsonAsync(
-            client,
-            HttpMethod.Post,
-            "/api/families",
-            content: null);
-        Assert.Equal(HttpStatusCode.Created, familyResponse.StatusCode);
-        var family = await familyResponse.Content.ReadFromJsonAsync<FamilyResponse>();
-        Assert.NotNull(family);
-        return new SignedInUser(client, family.Id);
+        return new SignedInUser(client);
     }
 
     private static async Task SetLatestReviewAsync(
@@ -452,19 +439,15 @@ public sealed class AccountImportSettingsTests(SqlServerFixture fixture)
 
     private sealed record CsrfTokenResponse(string RequestToken);
 
-    private sealed record FamilyResponse(Guid Id);
-
     private sealed record AccountResponse(Guid Id);
 
     private sealed record ReviewResponse(Guid Id);
 
     private sealed record ImportSettingsResponse(ImportMapping? Mapping);
 
-    private sealed class SignedInUser(HttpClient client, Guid familyId) : IDisposable
+    private sealed class SignedInUser(HttpClient client) : IDisposable
     {
         public HttpClient Client { get; } = client;
-
-        public Guid FamilyId { get; } = familyId;
 
         public void Dispose() => Client.Dispose();
     }

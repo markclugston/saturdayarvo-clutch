@@ -10,7 +10,6 @@ describe('API schemas', () => {
   it('accepts a valid account response with an optional import timestamp', () => {
     const account = AccountSchema.parse({
       id: '550e8400-e29b-41d4-a716-446655440000',
-      familyId: '550e8400-e29b-41d4-a716-446655440001',
       description: 'Everyday spending',
       currencyCode: 'AUD',
       lastSuccessfulImportAtUtc: null,
@@ -22,7 +21,6 @@ describe('API schemas', () => {
   it('rejects malformed or unsupported account currency data', () => {
     const result = AccountSchema.safeParse({
       id: 'not-a-guid',
-      familyId: '550e8400-e29b-41d4-a716-446655440001',
       description: 'Everyday spending',
       currencyCode: 'Australian dollars',
     })
@@ -46,7 +44,6 @@ describe('API schemas', () => {
     (timestamp) => {
       expect(AccountSchema.safeParse({
         id: '550e8400-e29b-41d4-a716-446655440000',
-        familyId: '550e8400-e29b-41d4-a716-446655440001',
         description: 'Everyday spending',
         currencyCode: 'AUD',
         lastSuccessfulImportAtUtc: timestamp,

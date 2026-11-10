@@ -8,17 +8,17 @@ public sealed class Account
     {
     }
 
-    private Account(Guid familyId, string description, string currencyCode)
+    private Account(string ownerUserId, string description, string currencyCode)
     {
         Id = Guid.NewGuid();
-        FamilyId = familyId;
+        OwnerUserId = ownerUserId;
         Description = description.Trim();
         CurrencyCode = currencyCode;
     }
 
     public Guid Id { get; private set; }
 
-    public Guid FamilyId { get; private set; }
+    public string? OwnerUserId { get; private set; }
 
     public string Description { get; private set; } = string.Empty;
 
@@ -31,12 +31,12 @@ public sealed class Account
     public Guid? ActiveImportId { get; private set; }
 
     public static bool TryCreate(
-        Guid familyId,
+        string? ownerUserId,
         string? description,
         string? currencyCode,
         out Account? account)
     {
-        if (familyId == Guid.Empty
+        if (string.IsNullOrWhiteSpace(ownerUserId)
             || !AccountDescriptionValidator.IsValid(description)
             || !Currency.TryGet(currencyCode, out _))
         {
@@ -44,7 +44,7 @@ public sealed class Account
             return false;
         }
 
-        account = new Account(familyId, description!, currencyCode!);
+        account = new Account(ownerUserId, description!, currencyCode!);
         return true;
     }
 

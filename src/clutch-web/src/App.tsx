@@ -6,7 +6,6 @@ import { ImportLimitsPage } from '@/features/admin/ImportLimitsPage'
 import { AuthPage } from '@/features/auth/AuthPage'
 import { StartupLoadingDialog } from '@/features/auth/StartupLoadingDialog'
 import { signOut, getSession } from '@/features/auth/api'
-import { FamilyPage } from '@/features/families/FamilyPage'
 import { ImportPage } from '@/features/imports/ImportPage'
 import { ApiError } from '@/lib/api/client'
 import { ThemeSelector } from '@/components/theme/ThemeSelector'
@@ -18,7 +17,6 @@ export default function App() {
   const sessionAttemptActive = useRef(false)
   const sessionAttemptStartedAt = useRef(performance.now())
   const mainRef = useRef<HTMLElement>(null)
-  const [showAccounts, setShowAccounts] = useState(false)
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
   const [isImporting, setIsImporting] = useState(false)
   const [showAdminSettings, setShowAdminSettings] = useState(false)
@@ -56,18 +54,19 @@ export default function App() {
     mutationFn: signOut,
     onSuccess: async () => {
       setSelectedAccountId(null)
-      setShowAccounts(false)
       setIsImporting(false)
       setShowAdminSettings(false)
       setMode('Light')
-      queryClient.removeQueries({ queryKey: ['themePreference'] })
+      queryClient.removeQueries({
+        predicate: (query) => query.queryKey[0] !== 'session',
+      })
       await queryClient.invalidateQueries({ queryKey: ['session'] })
     },
   })
 
   useEffect(() => {
     mainRef.current?.querySelector<HTMLElement>('h1[tabindex="-1"]')?.focus()
-  }, [isImporting, selectedAccountId, showAccounts, showAdminSettings])
+  }, [isImporting, selectedAccountId, showAdminSettings])
 
   useEffect(() => {
     if (sessionQuery.error instanceof ApiError && sessionQuery.error.status === 401) {
@@ -156,10 +155,8 @@ export default function App() {
                 onImport={() => setIsImporting(true)}
               />
             )
-        ) : showAccounts ? (
-          <AccountsPage onSelectAccount={setSelectedAccountId} />
         ) : (
-          <FamilyPage onReady={() => setShowAccounts(true)} />
+          <AccountsPage onSelectAccount={setSelectedAccountId} />
         )}
       </main>
     </div>

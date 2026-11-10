@@ -24,7 +24,6 @@ public sealed class DuplicateAndConcurrencyTests(SqlServerFixture fixture)
     {
         using var client = CreateClient();
         await RegisterAndSignInAsync(client);
-        await CreateFamilyAsync(client);
         var accountId = await CreateAccountAsync(client);
         const string duplicateCsv =
             "Date,Description,Amount\n2025-01-15,Market,10.00\n2025-01-15,Market,10.00";
@@ -69,7 +68,6 @@ public sealed class DuplicateAndConcurrencyTests(SqlServerFixture fixture)
     {
         using var client = CreateClient();
         await RegisterAndSignInAsync(client);
-        await CreateFamilyAsync(client);
         var firstAccountId = await CreateAccountAsync(client);
         var secondAccountId = await CreateAccountAsync(client);
         const string csv = "Date,Description,Amount\n2025-01-15,Market,10.00";
@@ -94,7 +92,6 @@ public sealed class DuplicateAndConcurrencyTests(SqlServerFixture fixture)
     {
         using var client = CreateClient();
         await RegisterAndSignInAsync(client);
-        await CreateFamilyAsync(client);
         var accountId = await CreateAccountAsync(client);
         const string csv = "Date,Description,Amount\n2025-01-15,Late charge,10.00";
 
@@ -125,7 +122,6 @@ public sealed class DuplicateAndConcurrencyTests(SqlServerFixture fixture)
     {
         using var client = CreateClient();
         await RegisterAndSignInAsync(client);
-        await CreateFamilyAsync(client);
         var accountId = await CreateAccountAsync(client);
         var csrfToken = await GetCsrfTokenAsync(client);
         const string csv = "Date,Description,Amount\n2025-01-15,Market,10.00";
@@ -148,7 +144,6 @@ public sealed class DuplicateAndConcurrencyTests(SqlServerFixture fixture)
     {
         using var client = CreateClient();
         await RegisterAndSignInAsync(client);
-        await CreateFamilyAsync(client);
         var accountId = await CreateAccountAsync(client);
         const string csv = "Date,Description,Amount\n2025-01-15,Market,10.00";
         using var response = await CreateReviewAsync(client, accountId, csv);
@@ -188,7 +183,6 @@ public sealed class DuplicateAndConcurrencyTests(SqlServerFixture fixture)
     {
         using var client = CreateClient();
         await RegisterAndSignInAsync(client);
-        await CreateFamilyAsync(client);
         var accountId = await CreateAccountAsync(client);
         const string csv = "Date,Description,Amount\n2025-01-15,Market,10.00";
 
@@ -256,16 +250,6 @@ public sealed class DuplicateAndConcurrencyTests(SqlServerFixture fixture)
             "/api/security/login",
             new { email, password = "Test-only!Password-123" });
         Assert.Equal(HttpStatusCode.NoContent, login.StatusCode);
-    }
-
-    private static async Task CreateFamilyAsync(HttpClient client)
-    {
-        using var response = await SendJsonAsync(
-            client,
-            HttpMethod.Post,
-            "/api/families",
-            content: null);
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
     private static async Task<Guid> CreateAccountAsync(HttpClient client)

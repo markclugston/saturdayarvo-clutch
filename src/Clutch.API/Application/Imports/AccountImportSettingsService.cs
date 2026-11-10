@@ -20,12 +20,10 @@ public sealed class AccountImportSettingsService(
     {
         var ownedAccount = await (
             from account in dbContext.Accounts.AsNoTracking()
-            join family in dbContext.Families.AsNoTracking()
-                on account.FamilyId equals family.Id
             join settings in dbContext.AccountImportSettings.AsNoTracking()
                 on account.Id equals settings.AccountId into accountSettings
             from settings in accountSettings.DefaultIfEmpty()
-            where account.Id == accountId && family.OwnerUserId == ownerUserId
+            where account.Id == accountId && account.OwnerUserId == ownerUserId
             select new StoredSettingsResult(
                 account.Id,
                 settings == null ? null : settings.SchemaVersion,

@@ -1,5 +1,4 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { createFamily } from '@/features/families/api'
 import { clearCsrfToken } from '@/lib/api/client'
 import { getSession, register, signIn, signOut } from './api'
 
@@ -68,12 +67,10 @@ it.each([false, true])(
         authenticated = true
         return new Response(null, { status: 204 })
       }
-      if (path === '/api/families') {
+      if (path === '/api/security/logout') {
         expect(token).toBe('authenticated-token')
-        return Response.json({
-          id: '550e8400-e29b-41d4-a716-446655440000',
-          ownerUserId: 'user-id',
-        }, { status: 201 })
+        authenticated = false
+        return new Response(null, { status: 204 })
       }
       throw new Error(`Unexpected request: ${path}`)
     })
@@ -83,7 +80,7 @@ it.each([false, true])(
       await register('user@example.test', 'Example-password-123!')
     }
     await signIn('user@example.test', 'Example-password-123!')
-    await createFamily()
+    await signOut()
 
     expect(tokenRequests).toEqual(['anonymous-token', 'authenticated-token'])
   },

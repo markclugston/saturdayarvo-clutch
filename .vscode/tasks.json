@@ -31,6 +31,10 @@
         "${workspaceFolder}/src/Clutch.API/Clutch.API.csproj",
         "--no-build"
       ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
       "options": {
         "cwd": "${workspaceFolder}",
         "env": {

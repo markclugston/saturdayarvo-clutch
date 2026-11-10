@@ -25,7 +25,6 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
     {
         using var client = CreateClient();
         await RegisterAndSignInAsync(client);
-        await CreateFamilyAsync(client);
         var account = await CreateAccountAsync(client, "Daily spending", "AUD");
 
         using var reviewResponse = await CreateReviewAsync(
@@ -102,7 +101,6 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
     {
         using var client = CreateClient();
         await RegisterAndSignInAsync(client);
-        await CreateFamilyAsync(client);
         var account = await CreateAccountAsync(client, "Paging account", "AUD");
         const string csv = "Date,Description,Amount\n"
             + "2025-01-15,Market 1,1.00\n"
@@ -160,7 +158,6 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
     {
         using var client = CreateClient();
         await RegisterAndSignInAsync(client);
-        await CreateFamilyAsync(client);
         var account = await CreateAccountAsync(client, "Savings", "AUD");
         const string description = "Merchant 4029357700 AUS";
         using var response = await CreateReviewAsync(
@@ -193,7 +190,6 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
     {
         using var client = CreateClient();
         await RegisterAndSignInAsync(client);
-        await CreateFamilyAsync(client);
         var account = await CreateAccountAsync(client, "Daily spending", "AUD");
         var mapping = new ImportMapping(
             0,
@@ -237,7 +233,6 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
     {
         using var client = CreateClient();
         await RegisterAndSignInAsync(client);
-        await CreateFamilyAsync(client);
         var account = await CreateAccountAsync(client, "Savings", "AUD");
         var mapping = new ImportMapping(
             0, 1, "yyyy-MM-dd", ImportAmountMode.SeparateIncomingOutgoing,
@@ -274,7 +269,6 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
     {
         using var client = CreateClient();
         await RegisterAndSignInAsync(client);
-        await CreateFamilyAsync(client);
         var account = await CreateAccountAsync(client, "Savings", "AUD");
 
         using var invalidResponse = await CreateReviewAsync(
@@ -334,7 +328,6 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
     {
         using var owner = CreateClient();
         await RegisterAndSignInAsync(owner);
-        await CreateFamilyAsync(owner);
         var account = await CreateAccountAsync(owner, "Savings", "AUD");
         var otherAccount = await CreateAccountAsync(owner, "Other", "AUD");
         const string csv = "Date,Description,Amount\n2025-01-15,Market,12.34";
@@ -379,11 +372,59 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
 
     [Fact]
     [Trait("Category", "SqlServer")]
+    public async Task Another_user_cannot_confirm_or_cancel_an_import_review()
+    {
+        using var owner = CreateClient();
+        await RegisterAndSignInAsync(owner);
+        var account = await CreateAccountAsync(owner, "Private review", "AUD");
+        using var reviewResponse = await CreateReviewAsync(
+            owner,
+            account.Id,
+            "Date,Description,Amount\n2025-01-15,Private transaction,12.34",
+            SignedMapping());
+        Assert.Equal(HttpStatusCode.Created, reviewResponse.StatusCode);
+        var review = await reviewResponse.Content.ReadFromJsonAsync<ReviewResponse>();
+        Assert.NotNull(review);
+
+        using var otherUser = CreateClient();
+        await RegisterAndSignInAsync(otherUser);
+        using var deniedConfirmation = await SendJsonAsync(
+            otherUser,
+            HttpMethod.Post,
+            $"/api/import-reviews/{review.Id}/confirm",
+            new { confirmPossibleDuplicates = false });
+        using var deniedCancellation = await SendJsonAsync(
+            otherUser,
+            HttpMethod.Delete,
+            $"/api/import-reviews/{review.Id}",
+            content: null);
+        Assert.Equal(HttpStatusCode.NotFound, deniedConfirmation.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, deniedCancellation.StatusCode);
+
+        await using var verifyScope = fixture.Factory.Services.CreateAsyncScope();
+        var db = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var persistedReview = await db.ImportReviews
+            .AsNoTracking()
+            .SingleAsync(candidate => candidate.Id == review.Id);
+        Assert.Equal(ImportReviewState.Ready, persistedReview.State);
+        Assert.Equal(review.Id, (await db.Accounts
+            .AsNoTracking()
+            .SingleAsync(candidate => candidate.Id == account.Id))
+            .ActiveImportId);
+        Assert.Single(await db.ImportReviewRows
+            .AsNoTracking()
+            .Where(row => row.ReviewId == review.Id)
+            .ToListAsync());
+        Assert.Equal(0, await db.Transactions
+            .CountAsync(transaction => transaction.AccountId == account.Id));
+    }
+
+    [Fact]
+    [Trait("Category", "SqlServer")]
     public async Task Unrecoverable_confirmation_failure_cancels_the_review_and_releases_the_lease()
     {
         using var client = CreateClient();
         await RegisterAndSignInAsync(client);
-        await CreateFamilyAsync(client);
         var account = await CreateAccountAsync(client, "Savings", "AUD");
         const string csv = "Date,Description,Amount\n2025-01-15,Market,12.34";
         using var response = await CreateReviewAsync(client, account.Id, csv, SignedMapping());
@@ -418,14 +459,13 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
     {
         using var client = CreateClient();
         await RegisterAndSignInAsync(client);
-        await CreateFamilyAsync(client);
         var account = await CreateAccountAsync(client, "Savings", "AUD");
         await using var scope = fixture.Factory.Services.CreateAsyncScope();
         var original = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var ownerId = await original.Families
-            .Where(family => family.Id == account.FamilyId)
-            .Select(family => family.OwnerUserId)
-            .SingleAsync();
+        var ownerId = await original.Accounts
+            .Where(candidate => candidate.Id == account.Id)
+            .Select(candidate => candidate.OwnerUserId)
+            .SingleAsync() ?? throw new InvalidOperationException("The account must have an owner.");
         var interceptor = new FailReviewInsertInterceptor();
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseSqlServer(original.Database.GetConnectionString())
@@ -457,7 +497,6 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
     {
         using var client = CreateClient();
         await RegisterAndSignInAsync(client);
-        await CreateFamilyAsync(client);
         var account = await CreateAccountAsync(client, "Savings", "AUD");
         var leaseId = Guid.NewGuid();
         await using (var scope = fixture.Factory.Services.CreateAsyncScope())
@@ -485,7 +524,6 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
     {
         using var client = CreateClient();
         await RegisterAndSignInAsync(client);
-        await CreateFamilyAsync(client);
         var account = await CreateAccountAsync(client, "European account", "EUR");
         var mapping = new ImportMapping(
             0,
@@ -517,7 +555,6 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
     {
         using var client = CreateClient();
         await RegisterAndSignInAsync(client);
-        await CreateFamilyAsync(client);
         var account = await CreateAccountAsync(client, "Savings", "AUD");
 
         foreach (var csv in new[] { string.Empty, "Date,Description,Amount\n2025-01-15,\"unfinished,12.34" })
@@ -541,7 +578,6 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
     {
         using var client = CreateClient();
         await RegisterAndSignInAsync(client);
-        await CreateFamilyAsync(client);
         var account = await CreateAccountAsync(client, "Savings", "AUD");
         using var reviewResponse = await CreateReviewAsync(
             client,
@@ -596,7 +632,6 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
     {
         using var client = CreateClient();
         await RegisterAndSignInAsync(client);
-        await CreateFamilyAsync(client);
         var account = await CreateAccountAsync(client, "Savings", "AUD");
         using var reviewResponse = await CreateReviewAsync(
             client,
@@ -662,16 +697,6 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
             "/api/security/login",
             new { email, password = "Test-only!Password-123" });
         Assert.Equal(HttpStatusCode.NoContent, login.StatusCode);
-    }
-
-    private static async Task CreateFamilyAsync(HttpClient client)
-    {
-        using var response = await SendJsonAsync(
-            client,
-            HttpMethod.Post,
-            "/api/families",
-            content: null);
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
     private static async Task<AccountResponse> CreateAccountAsync(
@@ -782,7 +807,6 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
 
     private sealed record AccountResponse(
         Guid Id,
-        Guid FamilyId,
         string Description,
         string CurrencyCode,
         DateTimeOffset? LastSuccessfulImportAtUtc);

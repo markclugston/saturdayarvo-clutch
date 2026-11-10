@@ -23,9 +23,7 @@ public sealed class TransactionService(AppDbContext dbContext)
         var accountExists = await dbContext.Accounts
             .AsNoTracking()
             .AnyAsync(account =>
-                account.Id == accountId
-                && dbContext.Families.Any(family =>
-                    family.Id == account.FamilyId && family.OwnerUserId == ownerUserId),
+                account.Id == accountId && account.OwnerUserId == ownerUserId,
                 cancellationToken);
         if (!accountExists)
         {

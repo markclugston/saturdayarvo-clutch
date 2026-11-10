@@ -109,9 +109,6 @@ public sealed class ImportAttemptLimiterTests(SqlServerFixture fixture)
             new { email, password = "Test-only!Password-123" });
         Assert.Equal(HttpStatusCode.NoContent, login.StatusCode);
 
-        using var family = await SendJsonAsync(client, HttpMethod.Post, "/api/families", null);
-        Assert.Equal(HttpStatusCode.Created, family.StatusCode);
-
         await using var scope = fixture.Factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var userId = await db.Users

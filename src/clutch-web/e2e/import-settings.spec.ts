@@ -16,13 +16,6 @@ test.describe('account import settings', () => {
     const context = await browser.newContext({ storageState: storageState! })
     const page = await context.newPage()
     await page.goto(baseUrl)
-    const createFamily = page.getByRole('button', { name: 'Create Family' })
-    if (await createFamily.isVisible()) {
-      await createFamily.click()
-    } else {
-      await page.getByRole('button', { name: 'View accounts' }).click()
-    }
-
     await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
     const description = `Import settings ${Date.now()}`
     await page.getByLabel('Account description').fill(description)
@@ -158,11 +151,9 @@ test.describe('account import settings', () => {
   }) => {
     test.setTimeout(120_000)
     const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:5173'
-    const familyId = '550e8400-e29b-41d4-a716-446655440010'
     const accountId = '550e8400-e29b-41d4-a716-446655440011'
     const account = {
       id: accountId,
-      familyId,
       description: 'Browser test account',
       currencyCode: 'AUD',
       lastSuccessfulImportAtUtc: null,
@@ -209,8 +200,6 @@ test.describe('account import settings', () => {
         })
       } else if (path === '/api/security/csrf-token') {
         await route.fulfill({ json: { requestToken: 'test-token' } })
-      } else if (path === '/api/families') {
-        await route.fulfill({ json: [{ id: familyId, ownerUserId: 'browser-test-owner' }] })
       } else if (path === '/api/accounts' && request.method() === 'GET') {
         await route.fulfill({ json: accountCreated ? [account] : [] })
       } else if (path === '/api/accounts' && request.method() === 'POST') {
@@ -276,16 +265,8 @@ test.describe('account import settings', () => {
     })
 
     await page.goto(baseUrl)
-    await expect(page.getByRole('heading', { name: 'Your Family' })).toBeVisible()
-    await expect(page.locator('a[href]')).toHaveCount(0)
-    await expectAccessibleAcrossThemeAndViewports(page)
-    const viewAccountsButton = page.getByRole('button', { name: 'View accounts' })
-    await viewAccountsButton.hover()
-    await expect.poll(() => viewAccountsButton.evaluate((button) =>
-      button.ownerDocument.defaultView?.getComputedStyle(button).cursor)).toBe('pointer')
-    await viewAccountsButton.focus()
-    await page.keyboard.press('Enter')
     await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeFocused()
+    await expect(page.locator('a[href]')).toHaveCount(0)
     await expectAccessibleAcrossThemeAndViewports(page)
     await page.getByLabel('Account description').fill(account.description)
     await page.getByLabel('Currency').selectOption('AUD')
