@@ -8,10 +8,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Clutch.API.Application.Transactions;
 
-public sealed class TransactionService(AppDbContext dbContext)
+public sealed class TransactionService(
+    AppDbContext dbContext,
+    ILogger<TransactionService> logger)
 {
     private const int DefaultPageSize = 50;
     private const int MaximumPageSize = 100;
+    private static readonly TimeSpan DeleteTimeout = TimeSpan.FromSeconds(8);
 
     public async Task<TransactionPageResponse> GetPageAsync(
         string ownerUserId,
@@ -84,6 +87,61 @@ public sealed class TransactionService(AppDbContext dbContext)
                 value.Direction.ToString(),
                 value.Balance?.ToString("0.############################", CultureInfo.InvariantCulture))).ToArray(),
             nextCursor);
+    }
+
+    public async Task<TransactionDeleteResult> DeleteAsync(
+        string ownerUserId,
+        Guid accountId,
+        Guid transactionId,
+        CancellationToken cancellationToken)
+    {
+        var startedAt = TransactionMetrics.StartDelete();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(DeleteTimeout);
+        var token = timeout.Token;
+
+        try
+        {
+            var transaction = await dbContext.Transactions
+                .SingleOrDefaultAsync(candidate =>
+                    candidate.Id == transactionId
+                    && candidate.AccountId == accountId
+                    && dbContext.Accounts.Any(account =>
+                        account.Id == accountId && account.OwnerUserId == ownerUserId),
+                    token);
+            if (transaction is null)
+            {
+                TransactionMetrics.RecordDelete("not_found", startedAt);
+                return TransactionDeleteResult.NotFound;
+            }
+
+            dbContext.Transactions.Remove(transaction);
+            dbContext.TransactionDeletionAudits.Add(new TransactionDeletionAudit(
+                ownerUserId,
+                accountId,
+                transactionId,
+                DateTimeOffset.UtcNow));
+            await dbContext.SaveChangesAsync(token);
+
+            TransactionMetrics.RecordDelete("success", startedAt);
+            return TransactionDeleteResult.Deleted;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Another request removed the row between the load and the save.
+            TransactionMetrics.RecordDelete("not_found", startedAt);
+            return TransactionDeleteResult.NotFound;
+        }
+        catch (Exception exception)
+        {
+            TransactionMetrics.RecordDelete("error", startedAt);
+            logger.LogError(
+                exception,
+                "Transaction {TransactionId} could not be deleted from account {AccountId}.",
+                transactionId,
+                accountId);
+            throw;
+        }
     }
 
     private static string EncodeCursor(DateOnly date, Guid id)

@@ -2,6 +2,7 @@ using Clutch.API.Api.ProblemDetails;
 using Clutch.API.Api.Endpoints;
 using Clutch.API.Api.Security;
 using Clutch.API.Application.Imports;
+using Clutch.API.Application.Transactions;
 using Clutch.API.Infrastructure;
 using Clutch.API.Infrastructure.Identity;
 using Clutch.API.Infrastructure.Persistence;
@@ -19,6 +20,7 @@ builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddOpenTelemetry()
     .WithMetrics(metrics => metrics
         .AddMeter(ImportMetrics.MeterName)
+        .AddMeter(TransactionMetrics.MeterName)
         .AddOtlpExporter());
 builder.Services.AddHealthChecks();
 builder.Services.AddInfrastructure(builder.Configuration);

@@ -115,7 +115,9 @@ public sealed class SinglePersonAccountOwnershipMigrationTests(SqlServerFixture 
                     ownerUserId,
                     accountId,
                     CancellationToken.None));
-                var transactionService = new TransactionService(dbContext);
+                var transactionService = new TransactionService(
+                    dbContext,
+                    NullLogger<TransactionService>.Instance);
                 var exception = await Assert.ThrowsAsync<ApiProblemException>(
                     () => transactionService.GetPageAsync(
                         ownerUserId,
@@ -217,7 +219,9 @@ public sealed class SinglePersonAccountOwnershipMigrationTests(SqlServerFixture 
                     .Where(auditEvent => auditEvent.AccountId == accountId)
                     .ToListAsync(),
                     auditEvent => auditEvent.EventCode == "ReviewCancelled");
-                var transactionService = new TransactionService(dbContext);
+                var transactionService = new TransactionService(
+                    dbContext,
+                    NullLogger<TransactionService>.Instance);
                 var page = await transactionService.GetPageAsync(
                     ownerUserId,
                     accountId,

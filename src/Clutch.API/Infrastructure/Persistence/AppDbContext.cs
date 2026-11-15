@@ -27,6 +27,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<Transaction> Transactions => Set<Transaction>();
 
+    public DbSet<TransactionDeletionAudit> TransactionDeletionAudits =>
+        Set<TransactionDeletionAudit>();
+
     public DbSet<ImportReview> ImportReviews => Set<ImportReview>();
 
     public DbSet<ImportReviewRow> ImportReviewRows => Set<ImportReviewRow>();
@@ -325,6 +328,17 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .WithMany()
                 .HasForeignKey(auditEvent => auditEvent.ReviewId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        builder.Entity<TransactionDeletionAudit>(entity =>
+        {
+            entity.ToTable("TransactionDeletionAudits");
+            entity.HasKey(audit => audit.Id);
+            entity.Property(audit => audit.ActingUserId)
+                .HasMaxLength(256)
+                .IsRequired();
+            entity.Property(audit => audit.DeletedAtUtc)
+                .HasColumnType("datetimeoffset");
         });
     }
 }

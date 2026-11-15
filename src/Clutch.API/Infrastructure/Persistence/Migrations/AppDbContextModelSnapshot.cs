@@ -277,6 +277,31 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Clutch.API.Domain.Transactions.TransactionDeletionAudit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ActingUserId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset>("DeletedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("TransactionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("TransactionDeletionAudits", (string)null);
+                });
+
             modelBuilder.Entity("Clutch.API.Infrastructure.Identity.ApplicationUser", b =>
                 {
                     b.Property<string>("Id")

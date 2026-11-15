@@ -1,5 +1,8 @@
+import { Trash2 } from 'lucide-react'
+import { useState } from 'react'
 import { ApiError } from '@/lib/api/client'
 import { formatCurrencyAmount } from '@/lib/formatCurrencyAmount'
+import { DeleteTransactionDialog } from './DeleteTransactionDialog'
 import { useTransactions } from './useTransactions'
 
 type TransactionsTableProps = {
@@ -12,6 +15,7 @@ export function TransactionsTable({
   currencyCode,
 }: TransactionsTableProps) {
   const transactionsQuery = useTransactions(accountId)
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; description: string } | null>(null)
 
   if (transactionsQuery.isPending) {
     return <p role="status">Loading transactions…</p>
@@ -35,6 +39,13 @@ export function TransactionsTable({
   return (
     <section aria-labelledby="transactions-heading" className="space-y-3">
       <h2 id="transactions-heading" className="text-lg font-semibold">Transactions</h2>
+      {pendingDelete && (
+        <DeleteTransactionDialog
+          accountId={accountId}
+          onClose={() => setPendingDelete(null)}
+          transaction={pendingDelete}
+        />
+      )}
       <div className="overflow-x-auto rounded-lg border border-border">
         <table className="w-full text-left text-sm">
           <caption className="sr-only">Transactions for this account</caption>
@@ -45,6 +56,7 @@ export function TransactionsTable({
               <th className="px-3 py-2" scope="col">Direction</th>
               <th className="px-3 py-2 text-right" scope="col">Amount</th>
               {showBalance && <th className="px-3 py-2 text-right" scope="col">Balance</th>}
+              <th className="px-3 py-2 text-right" scope="col"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>
@@ -66,6 +78,19 @@ export function TransactionsTable({
                       : formatCurrencyAmount(transaction.balance, currencyCode)}
                   </td>
                 )}
+                <td className="px-3 py-2 text-right">
+                  <button
+                    aria-label="Delete transaction"
+                    className="cursor-pointer rounded-md p-1 text-destructive hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+                    onClick={() => setPendingDelete({
+                      id: transaction.id,
+                      description: transaction.description,
+                    })}
+                    type="button"
+                  >
+                    <Trash2 aria-hidden="true" className="size-4" />
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>

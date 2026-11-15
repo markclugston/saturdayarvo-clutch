@@ -84,13 +84,49 @@ describe('TransactionsTable', () => {
 
     expect(await screen.findByText('Market')).toBeInTheDocument()
     const headers = screen.getAllByRole('columnheader').map((header) => header.textContent)
-    expect(headers.at(-1)).toBe('Balance')
+    expect(headers.at(-2)).toBe('Balance')
+    expect(headers.at(-1)).toBe('Actions')
     expect(headers.indexOf('Balance')).toBe(headers.indexOf('Amount') + 1)
     expect(screen.getByRole('row', { name: /Market/ })).toHaveTextContent(
       formatCurrencyAmount('-20.25', 'AUD'),
     )
     const salaryCells = within(screen.getByRole('row', { name: /Salary/ })).getAllByRole('cell')
     expect(salaryCells.at(-1)).toHaveTextContent('')
+  })
+
+  it('gives each row an icon-only button named Delete transaction', async () => {
+    vi.mocked(getTransactions).mockResolvedValueOnce({
+      items: [
+        {
+          id: '550e8400-e29b-41d4-a716-446655440020',
+          transactionDate: '2025-01-15',
+          description: 'First row',
+          amount: '5.00',
+          direction: 'Outgoing',
+          balance: null,
+        },
+        {
+          id: '550e8400-e29b-41d4-a716-446655440021',
+          transactionDate: '2025-01-14',
+          description: 'Second row',
+          amount: '6.00',
+          direction: 'Incoming',
+          balance: null,
+        },
+      ],
+      nextCursor: null,
+    })
+
+    renderWithQueryClient(
+      <TransactionsTable accountId="account-id" currencyCode="AUD" />,
+    )
+
+    expect(await screen.findByText('First row')).toBeInTheDocument()
+    const deleteButtons = screen.getAllByRole('button', { name: 'Delete transaction' })
+    expect(deleteButtons).toHaveLength(2)
+    for (const button of deleteButtons) {
+      expect(button.textContent).toBe('')
+    }
   })
 
   it('omits the Balance column when no loaded transaction has a balance', async () => {
