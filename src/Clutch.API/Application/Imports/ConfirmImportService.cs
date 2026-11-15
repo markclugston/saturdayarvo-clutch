@@ -115,8 +115,7 @@ public sealed class ConfirmImportService(
                 .Where(snapshot => snapshot.ReviewId == review.Id)
                 .ExecuteDeleteAsync(cancellationToken);
             auditWriter.Add(
-                review.Id,
-                account.Id,
+                account.Description,
                 ownerUserId,
                 "ReviewExpired",
                 now);
@@ -228,8 +227,7 @@ public sealed class ConfirmImportService(
             .Where(candidate => candidate.ReviewId == review.Id)
             .ExecuteDeleteAsync(cancellationToken);
         auditWriter.Add(
-            review.Id,
-            account.Id,
+            account.Description,
             ownerUserId,
             "ImportConfirmed",
             now);

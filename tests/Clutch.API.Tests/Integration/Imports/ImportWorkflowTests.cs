@@ -1,6 +1,7 @@
+using System.Data.Common;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
-using System.Data.Common;
 using System.Text;
 using System.Text.Json;
 using Clutch.API.Application.Imports;
@@ -11,14 +12,58 @@ using Clutch.API.Tests.Integration.Accounts;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Clutch.API.Tests.Integration.Imports;
 
 [Collection(SqlServerCollection.Name)]
 public sealed class ImportWorkflowTests(SqlServerFixture fixture)
 {
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task Import_confirmation_requests_complete_under_500_milliseconds()
+    {
+        for (var attempt = 0; attempt < 6; attempt++)
+        {
+            using var client = CreateClient();
+            await RegisterAndSignInAsync(client);
+            var account = await CreateAccountAsync(client, "Import timing account", "AUD");
+            using var reviewResponse = await CreateReviewAsync(
+                client,
+                account.Id,
+                $"Date,Description,Amount\n2025-01-15,Response time {attempt},12.34",
+                SignedMapping());
+            Assert.Equal(HttpStatusCode.Created, reviewResponse.StatusCode);
+            var review = await reviewResponse.Content.ReadFromJsonAsync<ReviewResponse>();
+            Assert.NotNull(review);
+
+            using var tokenResponse = await client.GetAsync("/api/security/csrf-token");
+            tokenResponse.EnsureSuccessStatusCode();
+            var csrfToken = await tokenResponse.Content.ReadFromJsonAsync<CsrfTokenResponse>();
+            Assert.NotNull(csrfToken);
+            using var request = new HttpRequestMessage(
+                HttpMethod.Post,
+                $"/api/import-reviews/{review.Id}/confirm")
+            {
+                Content = JsonContent.Create(new { confirmPossibleDuplicates = false }),
+            };
+            request.Headers.Add("X-CSRF-TOKEN", csrfToken.RequestToken);
+
+            var stopwatch = Stopwatch.StartNew();
+            using var confirmation = await client.SendAsync(request);
+            stopwatch.Stop();
+            Assert.Equal(HttpStatusCode.OK, confirmation.StatusCode);
+
+            if (attempt > 0)
+            {
+                Assert.True(
+                    stopwatch.Elapsed < TimeSpan.FromMilliseconds(500),
+                    $"Import confirmation {attempt} took {stopwatch.Elapsed.TotalMilliseconds:F1} ms.");
+            }
+        }
+    }
+
     [Fact]
     [Trait("Category", "SqlServer")]
     public async Task Owner_can_review_and_confirm_all_valid_transactions()
@@ -65,6 +110,22 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
         Assert.NotNull(confirmation);
         Assert.Equal(2, confirmation.ImportedCount);
         Assert.True(confirmation.SettingsSaved);
+        await using (var auditScope = fixture.Factory.Services.CreateAsyncScope())
+        {
+            var auditDb = auditScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var ownerUserId = await auditDb.Accounts
+                .Where(candidate => candidate.Id == account.Id)
+                .Select(candidate => candidate.OwnerUserId)
+                .SingleAsync();
+            var audit = await auditDb.Audits.SingleAsync(candidate =>
+                candidate.EventCode == "ImportConfirmed"
+                && candidate.OccurredAtUtc == confirmation.CompletedAtUtc);
+            Assert.Equal(ownerUserId, audit.ActingUserId);
+            Assert.False(string.IsNullOrWhiteSpace(audit.Description));
+            Assert.Contains(account.Description, audit.Description, StringComparison.Ordinal);
+            Assert.DoesNotContain(account.Id.ToString(), audit.Description, StringComparison.Ordinal);
+            Assert.DoesNotContain(review.Id.ToString(), audit.Description, StringComparison.Ordinal);
+        }
         await using (var snapshotScope = fixture.Factory.Services.CreateAsyncScope())
         {
             var snapshotDb = snapshotScope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -424,8 +485,14 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
             Assert.Null((await db.Accounts.SingleAsync(candidate => candidate.Id == account.Id)).ActiveImportId);
             Assert.Equal(otherReview.Id,
                 (await db.Accounts.SingleAsync(candidate => candidate.Id == otherAccount.Id)).ActiveImportId);
-            Assert.Equal(1, await db.ImportAuditEvents.CountAsync(
-                audit => audit.ReviewId == review.Id && audit.EventCode == "ReviewCancelled"));
+            var ownerUserId = await db.Accounts
+                .Where(candidate => candidate.Id == account.Id)
+                .Select(candidate => candidate.OwnerUserId)
+                .SingleAsync();
+            Assert.Equal(1, await db.Audits.CountAsync(
+                audit => audit.EventCode == "ReviewCancelled"
+                    && audit.ActingUserId == ownerUserId
+                    && audit.Description.Contains(account.Description)));
             Assert.Equal(0, await db.Transactions.CountAsync(transaction => transaction.AccountId == account.Id));
         }
 
@@ -544,8 +611,14 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
             Assert.Equal(ImportReviewState.Cancelled,
                 (await db.ImportReviews.SingleAsync(candidate => candidate.Id == review.Id)).State);
             Assert.Null((await db.Accounts.SingleAsync(candidate => candidate.Id == account.Id)).ActiveImportId);
-            Assert.Equal(1, await db.ImportAuditEvents.CountAsync(
-                audit => audit.ReviewId == review.Id && audit.EventCode == "ConfirmationFailed"));
+            var ownerUserId = await db.Accounts
+                .Where(candidate => candidate.Id == account.Id)
+                .Select(candidate => candidate.OwnerUserId)
+                .SingleAsync();
+            Assert.Equal(1, await db.Audits.CountAsync(
+                audit => audit.EventCode == "ConfirmationFailed"
+                    && audit.ActingUserId == ownerUserId
+                    && audit.Description.Contains(account.Description)));
         }
         using var retry = await CreateReviewAsync(client, account.Id, csv, SignedMapping());
         Assert.Equal(HttpStatusCode.Created, retry.StatusCode);
@@ -768,8 +841,11 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
         var accountEntity = await verifyDbContext.Accounts
             .SingleAsync(candidate => candidate.Id == account.Id);
         Assert.Null(accountEntity.ActiveImportId);
-        Assert.Equal(1, await verifyDbContext.ImportAuditEvents
-            .CountAsync(audit => audit.ReviewId == review.Id && audit.EventCode == "ReviewExpired"));
+        var ownerUserId = accountEntity.OwnerUserId;
+        Assert.Equal(1, await verifyDbContext.Audits
+            .CountAsync(audit => audit.EventCode == "ReviewExpired"
+                && audit.ActingUserId == ownerUserId
+                && audit.Description.Contains(account.Description)));
     }
 
     private HttpClient CreateClient() =>

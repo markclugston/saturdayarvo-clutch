@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
 using Clutch.API.Domain.Shared;
@@ -14,7 +15,45 @@ namespace Clutch.API.Tests.Integration.Transactions;
 [Collection(SqlServerCollection.Name)]
 public sealed class TransactionDeleteEndpointTests(SqlServerFixture fixture)
 {
-    private const string FailInsertTriggerName = "TR_TransactionDeletionAudits_FailInsert_Test";
+    private const string FailInsertTriggerName = "TR_Audit_FailInsert_Test";
+
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task Transaction_deletion_requests_complete_under_500_milliseconds()
+    {
+        using var owner = CreateClient();
+        await RegisterAndSignInAsync(owner);
+        var accountId = await CreateAccountAsync(owner, "Deletion timing account");
+        var transactionIds = new List<Guid>(6);
+        for (var attempt = 0; attempt < 6; attempt++)
+        {
+            transactionIds.Add(await SeedTransactionAsync(accountId, $"Response time {attempt}"));
+        }
+
+        for (var attempt = 0; attempt < transactionIds.Count; attempt++)
+        {
+            using var tokenResponse = await owner.GetAsync("/api/security/csrf-token");
+            tokenResponse.EnsureSuccessStatusCode();
+            var csrfToken = await tokenResponse.Content.ReadFromJsonAsync<CsrfTokenResponse>();
+            Assert.NotNull(csrfToken);
+            using var request = new HttpRequestMessage(
+                HttpMethod.Delete,
+                $"/api/accounts/{accountId}/transactions/{transactionIds[attempt]}");
+            request.Headers.Add("X-CSRF-TOKEN", csrfToken.RequestToken);
+
+            var stopwatch = Stopwatch.StartNew();
+            using var response = await owner.SendAsync(request);
+            stopwatch.Stop();
+            Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+            if (attempt > 0)
+            {
+                Assert.True(
+                    stopwatch.Elapsed < TimeSpan.FromMilliseconds(500),
+                    $"Transaction deletion {attempt} took {stopwatch.Elapsed.TotalMilliseconds:F1} ms.");
+            }
+        }
+    }
 
     [Fact]
     [Trait("Category", "SqlServer")]
@@ -34,10 +73,16 @@ public sealed class TransactionDeleteEndpointTests(SqlServerFixture fixture)
         await using var verifyScope = fixture.Factory.Services.CreateAsyncScope();
         var verifyContext = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
         Assert.False(await verifyContext.Transactions.AnyAsync(transaction => transaction.Id == target));
-        var audit = await verifyContext.TransactionDeletionAudits
-            .SingleAsync(entry => entry.TransactionId == target);
+        var audit = await verifyContext.Audits
+            .SingleAsync(entry => entry.EventCode == "TransactionDelete"
+                && entry.Description.Contains("Target"));
         Assert.Equal(ownerUserId, audit.ActingUserId);
-        Assert.Equal(accountId, audit.AccountId);
+        Assert.Contains("Delete endpoint account", audit.Description, StringComparison.Ordinal);
+        Assert.Contains("2026-02-01", audit.Description, StringComparison.Ordinal);
+        Assert.Contains("5.55", audit.Description, StringComparison.Ordinal);
+        Assert.Contains("Outgoing", audit.Description, StringComparison.Ordinal);
+        Assert.DoesNotContain(accountId.ToString(), audit.Description, StringComparison.Ordinal);
+        Assert.DoesNotContain(target.ToString(), audit.Description, StringComparison.Ordinal);
 
         var siblingAfter = await GetTransactionSnapshotAsync(sibling);
         Assert.Equal(siblingBefore, siblingAfter);
@@ -145,7 +190,7 @@ public sealed class TransactionDeleteEndpointTests(SqlServerFixture fixture)
 
             Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
             var body = await response.Content.ReadAsStringAsync();
-            Assert.DoesNotContain("TransactionDeletionAudits", body, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("TR_Audit", body, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("THROW", body, StringComparison.OrdinalIgnoreCase);
         }
         finally
@@ -156,8 +201,9 @@ public sealed class TransactionDeleteEndpointTests(SqlServerFixture fixture)
         await using var verifyScope = fixture.Factory.Services.CreateAsyncScope();
         var verifyContext = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
         Assert.True(await verifyContext.Transactions.AnyAsync(transaction => transaction.Id == transactionId));
-        Assert.False(await verifyContext.TransactionDeletionAudits
-            .AnyAsync(entry => entry.TransactionId == transactionId));
+        Assert.False(await verifyContext.Audits
+            .AnyAsync(entry => entry.EventCode == "TransactionDelete"
+                && entry.Description.Contains("Atomic target")));
     }
 
     [Fact]
@@ -177,13 +223,20 @@ public sealed class TransactionDeleteEndpointTests(SqlServerFixture fixture)
         await using var scope = fixture.Factory.Services.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        await Assert.ThrowsAsync<Microsoft.Data.SqlClient.SqlException>(() =>
-            dbContext.Database.ExecuteSqlInterpolatedAsync(
-                $"UPDATE TransactionDeletionAudits SET AccountId = AccountId WHERE TransactionId = {transactionId}"));
+        var audit = await dbContext.Audits.SingleAsync(entry =>
+            entry.EventCode == "TransactionDelete" && entry.Description.Contains("Immutable target"));
+        var descriptionBefore = audit.Description;
 
         await Assert.ThrowsAsync<Microsoft.Data.SqlClient.SqlException>(() =>
             dbContext.Database.ExecuteSqlInterpolatedAsync(
-                $"DELETE FROM TransactionDeletionAudits WHERE TransactionId = {transactionId}"));
+                $"UPDATE Audit SET Description = Description WHERE Id = {audit.Id}"));
+
+        await Assert.ThrowsAsync<Microsoft.Data.SqlClient.SqlException>(() =>
+            dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"DELETE FROM Audit WHERE Id = {audit.Id}"));
+
+        var unchanged = await dbContext.Audits.SingleAsync(entry => entry.Id == audit.Id);
+        Assert.Equal(descriptionBefore, unchanged.Description);
     }
 
     [Fact]
@@ -206,7 +259,7 @@ public sealed class TransactionDeleteEndpointTests(SqlServerFixture fixture)
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await dbContext.Database.ExecuteSqlRawAsync($"""
             CREATE TRIGGER [{FailInsertTriggerName}]
-            ON [TransactionDeletionAudits]
+            ON [Audit]
             AFTER INSERT
             AS
             BEGIN

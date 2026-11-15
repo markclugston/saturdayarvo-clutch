@@ -1,4 +1,4 @@
-using Clutch.API.Domain.Imports;
+using Clutch.API.Domain.Audit;
 using Clutch.API.Infrastructure.Persistence;
 
 namespace Clutch.API.Infrastructure.Imports;
@@ -6,27 +6,30 @@ namespace Clutch.API.Infrastructure.Imports;
 public sealed class ImportAuditWriter(AppDbContext dbContext, TimeProvider timeProvider)
 {
     public void Add(
-        Guid? reviewId,
-        Guid accountId,
+        string accountDescription,
         string actingUserId,
         string eventCode,
         DateTimeOffset? occurredAtUtc = null)
     {
-        dbContext.ImportAuditEvents.Add(new ImportAuditEvent(
-            reviewId,
-            accountId,
+        if (string.IsNullOrWhiteSpace(accountDescription))
+        {
+            throw new ArgumentException("The account description is required.", nameof(accountDescription));
+        }
+
+        dbContext.Audits.Add(new Audit(
             actingUserId,
+            occurredAtUtc ?? timeProvider.GetUtcNow(),
             eventCode,
-            occurredAtUtc ?? timeProvider.GetUtcNow()));
+            $"Import {eventCode} for account {accountDescription}."));
     }
 
     public async Task WriteAsync(
-        Guid accountId,
+        string accountDescription,
         string actingUserId,
         string eventCode,
         CancellationToken cancellationToken)
     {
-        Add(null, accountId, actingUserId, eventCode);
+        Add(accountDescription, actingUserId, eventCode);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 }

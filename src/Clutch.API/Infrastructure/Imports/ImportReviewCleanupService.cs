@@ -45,14 +45,20 @@ public sealed class ImportReviewCleanupService(
                 .Where(review =>
                     review.State == ImportReviewState.Ready
                     && review.ExpiresAtUtc <= now)
+                .Join(
+                    dbContext.Accounts.AsNoTracking(),
+                    review => review.AccountId,
+                    account => account.Id,
+                    (review, account) => new
+                    {
+                        review.Id,
+                        review.AccountId,
+                        review.ActingUserId,
+                        review.ExpiresAtUtc,
+                        AccountDescription = account.Description,
+                    })
                 .OrderBy(review => review.ExpiresAtUtc)
                 .Take(BatchSize)
-                .Select(review => new
-                {
-                    review.Id,
-                    review.AccountId,
-                    review.ActingUserId,
-                })
                 .ToListAsync(cancellationToken);
 
             var transitionedCount = 0;
@@ -89,8 +95,7 @@ public sealed class ImportReviewCleanupService(
                             (Guid?)null),
                         cancellationToken);
                 auditWriter.Add(
-                    review.Id,
-                    review.AccountId,
+                    review.AccountDescription,
                     review.ActingUserId,
                     "ReviewExpired",
                     now);

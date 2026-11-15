@@ -1,4 +1,5 @@
 using Clutch.API.Domain.Accounts;
+using Clutch.API.Domain.Audit;
 using Clutch.API.Domain.Categories;
 using Clutch.API.Domain.Imports;
 using Clutch.API.Domain.Preferences;
@@ -27,14 +28,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<Transaction> Transactions => Set<Transaction>();
 
-    public DbSet<TransactionDeletionAudit> TransactionDeletionAudits =>
-        Set<TransactionDeletionAudit>();
+    public DbSet<Audit> Audits => Set<Audit>();
 
     public DbSet<ImportReview> ImportReviews => Set<ImportReview>();
 
     public DbSet<ImportReviewRow> ImportReviewRows => Set<ImportReviewRow>();
-
-    public DbSet<ImportAuditEvent> ImportAuditEvents => Set<ImportAuditEvent>();
 
     public DbSet<UserThemePreference> UserThemePreferences => Set<UserThemePreference>();
 
@@ -302,43 +300,31 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .HasColumnType("date");
         });
 
-        builder.Entity<ImportAuditEvent>(entity =>
+        builder.Entity<Audit>(entity =>
         {
-            entity.ToTable("ImportAuditEvents");
-            entity.HasKey(auditEvent => auditEvent.Id);
-            entity.Property(auditEvent => auditEvent.ActingUserId)
+            entity.ToTable("Audit", table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_Audit_NonBlankEventCode",
+                    "LEN(LTRIM(RTRIM([EventCode]))) > 0");
+                table.HasCheckConstraint(
+                    "CK_Audit_NonBlankDescription",
+                    "LEN(LTRIM(RTRIM([Description]))) > 0");
+            });
+            entity.HasKey(audit => audit.Id);
+            entity.Property(audit => audit.ActingUserId)
                 .HasMaxLength(450)
                 .IsRequired();
-            entity.Property(auditEvent => auditEvent.EventCode)
+            entity.Property(audit => audit.EventCode)
                 .HasMaxLength(50)
                 .IsUnicode(false)
                 .IsRequired();
-            entity.Property(auditEvent => auditEvent.OccurredAtUtc)
-                .HasColumnType("datetimeoffset");
-            entity.HasIndex(auditEvent => new
-            {
-                auditEvent.AccountId,
-                auditEvent.OccurredAtUtc,
-            });
-            entity.HasOne<Account>()
-                .WithMany()
-                .HasForeignKey(auditEvent => auditEvent.AccountId)
-                .OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne<ImportReview>()
-                .WithMany()
-                .HasForeignKey(auditEvent => auditEvent.ReviewId)
-                .OnDelete(DeleteBehavior.SetNull);
-        });
-
-        builder.Entity<TransactionDeletionAudit>(entity =>
-        {
-            entity.ToTable("TransactionDeletionAudits");
-            entity.HasKey(audit => audit.Id);
-            entity.Property(audit => audit.ActingUserId)
-                .HasMaxLength(256)
+            entity.Property(audit => audit.Description)
+                .HasMaxLength(500)
                 .IsRequired();
-            entity.Property(audit => audit.DeletedAtUtc)
+            entity.Property(audit => audit.OccurredAtUtc)
                 .HasColumnType("datetimeoffset");
+            entity.HasIndex(audit => audit.OccurredAtUtc);
         });
     }
 }

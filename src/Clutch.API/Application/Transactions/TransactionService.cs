@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using Clutch.API.Api.ProblemDetails;
 using Clutch.API.Domain.Accounts;
+using Clutch.API.Domain.Audit;
 using Clutch.API.Domain.Transactions;
 using Clutch.API.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -102,25 +103,40 @@ public sealed class TransactionService(
 
         try
         {
-            var transaction = await dbContext.Transactions
-                .SingleOrDefaultAsync(candidate =>
-                    candidate.Id == transactionId
+            var deletion = await (
+                from candidate in dbContext.Transactions
+                join account in dbContext.Accounts on candidate.AccountId equals account.Id
+                where candidate.Id == transactionId
                     && candidate.AccountId == accountId
-                    && dbContext.Accounts.Any(account =>
-                        account.Id == accountId && account.OwnerUserId == ownerUserId),
-                    token);
-            if (transaction is null)
+                    && account.OwnerUserId == ownerUserId
+                select new
+                {
+                    Transaction = candidate,
+                    AccountDescription = account.Description,
+                })
+                .SingleOrDefaultAsync(token);
+            if (deletion is null)
             {
                 TransactionMetrics.RecordDelete("not_found", startedAt);
                 return TransactionDeleteResult.NotFound;
             }
 
+            var transaction = deletion.Transaction;
+            var transactionDescription = string.IsNullOrWhiteSpace(transaction.Description)
+                ? "A transaction"
+                : $"Transaction {transaction.Description}";
+            var duplicateFingerprint =
+                $"({transaction.TransactionDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}, "
+                + $"{transaction.Amount.ToString("0.############################", CultureInfo.InvariantCulture)}, "
+                + $"{transaction.Direction})";
+            var description =
+                $"{transactionDescription} {duplicateFingerprint} was reviewed and deleted in account {deletion.AccountDescription}.";
             dbContext.Transactions.Remove(transaction);
-            dbContext.TransactionDeletionAudits.Add(new TransactionDeletionAudit(
+            dbContext.Audits.Add(new Audit(
                 ownerUserId,
-                accountId,
-                transactionId,
-                DateTimeOffset.UtcNow));
+                DateTimeOffset.UtcNow,
+                "TransactionDelete",
+                description));
             await dbContext.SaveChangesAsync(token);
 
             TransactionMetrics.RecordDelete("success", startedAt);

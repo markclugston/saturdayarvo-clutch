@@ -68,6 +68,43 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Clutch.API.Domain.Audit.Audit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ActingUserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("EventCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OccurredAtUtc");
+
+                    b.ToTable("Audit", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Audit_NonBlankDescription", "LEN(LTRIM(RTRIM([Description]))) > 0");
+
+                            t.HasCheckConstraint("CK_Audit_NonBlankEventCode", "LEN(LTRIM(RTRIM([EventCode]))) > 0");
+                        });
+                });
+
             modelBuilder.Entity("Clutch.API.Domain.Categories.CategoryNode", b =>
                 {
                     b.Property<Guid>("Id")
@@ -106,41 +143,6 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_CategoryNodes_NonBlankName", "LEN(LTRIM(RTRIM([Name]))) > 0");
                         });
-                });
-
-            modelBuilder.Entity("Clutch.API.Domain.Imports.ImportAuditEvent", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("AccountId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("ActingUserId")
-                        .IsRequired()
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("EventCode")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)");
-
-                    b.Property<DateTimeOffset>("OccurredAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<Guid?>("ReviewId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ReviewId");
-
-                    b.HasIndex("AccountId", "OccurredAtUtc");
-
-                    b.ToTable("ImportAuditEvents", (string)null);
                 });
 
             modelBuilder.Entity("Clutch.API.Domain.Imports.ImportReview", b =>
@@ -275,31 +277,6 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("CK_Transactions_ValidDirection", "[Direction] IN ('Incoming', 'Outgoing')");
                         });
-                });
-
-            modelBuilder.Entity("Clutch.API.Domain.Transactions.TransactionDeletionAudit", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("AccountId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("ActingUserId")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<DateTimeOffset>("DeletedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<Guid>("TransactionId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("TransactionDeletionAudits", (string)null);
                 });
 
             modelBuilder.Entity("Clutch.API.Infrastructure.Identity.ApplicationUser", b =>
@@ -643,20 +620,6 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("ParentId")
                         .OnDelete(DeleteBehavior.NoAction);
-                });
-
-            modelBuilder.Entity("Clutch.API.Domain.Imports.ImportAuditEvent", b =>
-                {
-                    b.HasOne("Clutch.API.Domain.Accounts.Account", null)
-                        .WithMany()
-                        .HasForeignKey("AccountId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Clutch.API.Domain.Imports.ImportReview", null)
-                        .WithMany()
-                        .HasForeignKey("ReviewId")
-                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("Clutch.API.Domain.Imports.ImportReview", b =>

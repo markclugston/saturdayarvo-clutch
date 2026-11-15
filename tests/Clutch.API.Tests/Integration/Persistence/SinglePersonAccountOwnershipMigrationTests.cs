@@ -69,7 +69,7 @@ public sealed class SinglePersonAccountOwnershipMigrationTests(SqlServerFixture 
             Assert.Equal(2, await dbContext.ImportReviews.CountAsync());
             Assert.Equal(2, await dbContext.ImportReviewRows.CountAsync());
             Assert.Equal(2, await dbContext.ImportReviewMappingSnapshots.CountAsync());
-            Assert.Equal(2, await dbContext.ImportAuditEvents.CountAsync());
+            Assert.Equal(2, await dbContext.Audits.CountAsync());
             await AssertImportRecordsPreservedAsync(
                 dbContext,
                 firstAccountId,
@@ -150,10 +150,8 @@ public sealed class SinglePersonAccountOwnershipMigrationTests(SqlServerFixture 
 
             await using (var dbContext = CreateDbContext(connectionString))
             {
-                await Assert.ThrowsAsync<SqlException>(
+                await Assert.ThrowsAsync<NotSupportedException>(
                     () => dbContext.Database.MigrateAsync(PrecedingMigration));
-                // The downgrade reverts later migrations before failing, so restore the current schema.
-                await dbContext.Database.MigrateAsync();
                 Assert.Null(await dbContext.Accounts
                     .AsNoTracking()
                     .Where(account => account.Id == accountId)
@@ -215,10 +213,10 @@ public sealed class SinglePersonAccountOwnershipMigrationTests(SqlServerFixture 
                 Assert.Empty(await dbContext.ImportReviewMappingSnapshots
                     .Where(snapshot => snapshot.ReviewId == reviewId)
                     .ToListAsync());
-                Assert.Contains(await dbContext.ImportAuditEvents
-                    .Where(auditEvent => auditEvent.AccountId == accountId)
+                Assert.Contains(await dbContext.Audits
+                    .Where(audit => audit.Description.Contains("Legacy account"))
                     .ToListAsync(),
-                    auditEvent => auditEvent.EventCode == "ReviewCancelled");
+                    audit => audit.EventCode == "ReviewCancelled");
                 var transactionService = new TransactionService(
                     dbContext,
                     NullLogger<TransactionService>.Instance);
@@ -283,12 +281,11 @@ public sealed class SinglePersonAccountOwnershipMigrationTests(SqlServerFixture 
         Assert.True(await dbContext.ImportReviewMappingSnapshots
             .AsNoTracking()
             .AnyAsync(snapshot => snapshot.ReviewId == reviewId));
-        Assert.True(await dbContext.ImportAuditEvents
+        Assert.True(await dbContext.Audits
             .AsNoTracking()
-            .AnyAsync(auditEvent => auditEvent.AccountId == accountId
-                && auditEvent.ReviewId == reviewId
-                && auditEvent.ActingUserId == actingUserId
-                && auditEvent.EventCode == "ReviewCreated"));
+            .AnyAsync(audit => audit.Description.Contains("Legacy account")
+                && audit.ActingUserId == actingUserId
+                && audit.EventCode == "ReviewCreated"));
     }
 
     private static async Task AddUserAsync(AppDbContext dbContext, string userId)
@@ -349,13 +346,9 @@ public sealed class SinglePersonAccountOwnershipMigrationTests(SqlServerFixture 
             reviewId,
             ImportMappingSettingsSerializer.CurrentSchemaVersion,
             ImportMappingSettingsSerializer.Serialize(mapping)));
-        dbContext.ImportAuditEvents.Add(new ImportAuditEvent(
-            reviewId,
-            accountId,
-            familyOwnerUserId,
-            "ReviewCreated",
-            now));
         await dbContext.SaveChangesAsync();
+        await dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"INSERT INTO ImportAuditEvents (Id, ReviewId, AccountId, ActingUserId, EventCode, OccurredAtUtc) VALUES ({Guid.NewGuid()}, {reviewId}, {accountId}, {familyOwnerUserId}, {"ReviewCreated"}, {now})");
         // Raw SQL keeps this seed valid against the pre-Balance legacy schema.
         await dbContext.Database.ExecuteSqlInterpolatedAsync(
             $"INSERT INTO ImportReviewRows (ReviewId, SourceRowNumber, TransactionDate, Description, Amount, Direction, IsPossibleDuplicate) VALUES ({reviewId}, {2}, {new DateOnly(2026, 1, 2)}, {"Legacy imported row"}, {12.34m}, {"Outgoing"}, {false})");

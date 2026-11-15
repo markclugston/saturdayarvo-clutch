@@ -35,7 +35,8 @@ public sealed class ImportReviewService(
             .Select(candidate => new AccountImportInfo(
                 candidate.Id,
                 candidate.CurrencyCode,
-                candidate.ActiveImportId))
+                candidate.ActiveImportId,
+                candidate.Description))
             .SingleOrDefaultAsync(cancellationToken);
         if (account is null)
         {
@@ -49,7 +50,7 @@ public sealed class ImportReviewService(
             cancellationToken))
         {
             await auditWriter.WriteAsync(
-                accountId,
+                account.Description,
                 ownerUserId,
                 "RateLimitExceeded",
                 cancellationToken);
@@ -62,7 +63,7 @@ public sealed class ImportReviewService(
         if (fileSize > limits.MaxFileSizeBytes)
         {
             await auditWriter.WriteAsync(
-                accountId,
+                account.Description,
                 ownerUserId,
                 "FileSizeLimitExceeded",
                 cancellationToken);
@@ -78,6 +79,7 @@ public sealed class ImportReviewService(
             await ExpireStaleReviewAsync(
                 account.Id,
                 account.ActiveImportId.Value,
+                account.Description,
                 now,
                 cancellationToken);
         }
@@ -95,7 +97,7 @@ public sealed class ImportReviewService(
         catch (ImportValidationException exception)
         {
             await auditWriter.WriteAsync(
-                accountId,
+                account.Description,
                 ownerUserId,
                 exception.Code,
                 cancellationToken);
@@ -133,7 +135,7 @@ public sealed class ImportReviewService(
                 review.Id,
                 ImportMappingSettingsSerializer.CurrentSchemaVersion,
                 ImportMappingSettingsSerializer.Serialize(mapping)));
-            auditWriter.Add(review.Id, accountId, ownerUserId, "ReviewCreated", createdAt);
+            auditWriter.Add(account.Description, ownerUserId, "ReviewCreated", createdAt);
             var result = ToResponse(review, account.CurrencyCode);
             await dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
@@ -142,7 +144,11 @@ public sealed class ImportReviewService(
 
         if (response is null)
         {
-            await auditWriter.WriteAsync(accountId, ownerUserId, "ConcurrentImportRejected", cancellationToken);
+            await auditWriter.WriteAsync(
+                account.Description,
+                ownerUserId,
+                "ConcurrentImportRejected",
+                cancellationToken);
             throw Problem(
                 StatusCodes.Status409Conflict,
                 "An import is already active for this account.",
@@ -157,17 +163,33 @@ public sealed class ImportReviewService(
         Guid reviewId,
         CancellationToken cancellationToken)
     {
-        var review = await OwnedReviews(ownerUserId)
+        var review = await dbContext.ImportReviews
             .AsNoTracking()
             .Where(candidate => candidate.Id == reviewId)
-            .Select(candidate => new { candidate.Id, candidate.AccountId })
+            .Join(
+                dbContext.Accounts
+                    .AsNoTracking()
+                    .Where(account => account.OwnerUserId == ownerUserId),
+                candidate => candidate.AccountId,
+                account => account.Id,
+                (candidate, account) => new
+                {
+                    candidate.Id,
+                    candidate.AccountId,
+                    AccountDescription = account.Description,
+                })
             .SingleOrDefaultAsync(cancellationToken);
         if (review is null)
         {
             throw ReviewNotFound();
         }
 
-        await CancelReadyAsync(ownerUserId, review.AccountId, reviewId, cancellationToken);
+        await CancelReadyAsync(
+            ownerUserId,
+            review.AccountId,
+            reviewId,
+            review.AccountDescription,
+            cancellationToken);
     }
 
     public async Task CancelActiveAsync(
@@ -178,7 +200,7 @@ public sealed class ImportReviewService(
         var account = await OwnedAccounts(ownerUserId)
             .AsNoTracking()
             .Where(candidate => candidate.Id == accountId)
-            .Select(candidate => new { candidate.ActiveImportId })
+            .Select(candidate => new { candidate.ActiveImportId, candidate.Description })
             .SingleOrDefaultAsync(cancellationToken);
         if (account is null)
         {
@@ -186,7 +208,12 @@ public sealed class ImportReviewService(
         }
 
         if (account.ActiveImportId is Guid reviewId
-            && !await CancelReadyAsync(ownerUserId, accountId, reviewId, cancellationToken))
+            && !await CancelReadyAsync(
+                ownerUserId,
+                accountId,
+                reviewId,
+                account.Description,
+                cancellationToken))
         {
             throw Problem(
                 StatusCodes.Status409Conflict,
@@ -199,6 +226,7 @@ public sealed class ImportReviewService(
         string ownerUserId,
         Guid accountId,
         Guid reviewId,
+        string accountDescription,
         CancellationToken cancellationToken,
         string eventCode = "ReviewCancelled")
     {
@@ -242,7 +270,7 @@ public sealed class ImportReviewService(
                 .Where(snapshot => snapshot.ReviewId == reviewId)
                 .ExecuteDeleteAsync(cancellationToken);
             await importLease.ReleaseAsync(accountId, reviewId, cancellationToken);
-            auditWriter.Add(reviewId, accountId, ownerUserId, eventCode, timeProvider.GetUtcNow());
+            auditWriter.Add(accountDescription, ownerUserId, eventCode, timeProvider.GetUtcNow());
             await dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return true;
@@ -254,20 +282,37 @@ public sealed class ImportReviewService(
         Guid reviewId,
         CancellationToken cancellationToken)
     {
-        var accountId = await OwnedReviews(ownerUserId)
+        var review = await dbContext.ImportReviews
             .AsNoTracking()
             .Where(review => review.Id == reviewId)
-            .Select(review => (Guid?)review.AccountId)
+            .Join(
+                dbContext.Accounts
+                    .AsNoTracking()
+                    .Where(account => account.OwnerUserId == ownerUserId),
+                candidate => candidate.AccountId,
+                account => account.Id,
+                (candidate, account) => new
+                {
+                    candidate.AccountId,
+                    AccountDescription = account.Description,
+                })
             .SingleOrDefaultAsync(cancellationToken);
-        if (accountId is Guid id)
+        if (review is not null)
         {
-            await CancelReadyAsync(ownerUserId, id, reviewId, cancellationToken, "ConfirmationFailed");
+            await CancelReadyAsync(
+                ownerUserId,
+                review.AccountId,
+                reviewId,
+                review.AccountDescription,
+                cancellationToken,
+                "ConfirmationFailed");
         }
     }
 
     private async Task ExpireStaleReviewAsync(
         Guid accountId,
         Guid activeReviewId,
+        string accountDescription,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
@@ -340,8 +385,7 @@ public sealed class ImportReviewService(
                 .ExecuteDeleteAsync(cancellationToken);
             await importLease.ReleaseAsync(accountId, activeReviewId, cancellationToken);
             auditWriter.Add(
-                activeReviewId,
-                accountId,
+                accountDescription,
                 review.ActingUserId,
                 "ReviewExpired",
                 now);
@@ -479,7 +523,11 @@ public sealed class ImportReviewService(
             "Import review not found.",
             "The import review does not exist or is not available to this user.");
 
-    private sealed record AccountImportInfo(Guid Id, string CurrencyCode, Guid? ActiveImportId);
+    private sealed record AccountImportInfo(
+        Guid Id,
+        string CurrencyCode,
+        Guid? ActiveImportId,
+        string Description);
 
 }
 

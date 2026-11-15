@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics.Metrics;
 using Clutch.API.Application.Transactions;
 using Clutch.API.Domain.Accounts;
+using Clutch.API.Domain.Audit;
 using Clutch.API.Domain.Shared;
 using Clutch.API.Domain.Transactions;
 using Clutch.API.Infrastructure.Identity;
@@ -35,10 +36,21 @@ public sealed class TransactionServiceDeleteTests(SqlServerFixture fixture)
 
         Assert.Equal(TransactionDeleteResult.Deleted, result);
         Assert.False(await dbContext.Transactions.AnyAsync(transaction => transaction.Id == transactionId));
-        var audit = await dbContext.TransactionDeletionAudits
-            .SingleAsync(entry => entry.TransactionId == transactionId);
+        var audit = await dbContext.Audits.SingleAsync(entry =>
+            entry.EventCode == "TransactionDelete"
+            && entry.ActingUserId == ownerUserId);
         Assert.Equal(ownerUserId, audit.ActingUserId);
-        Assert.Equal(accountId, audit.AccountId);
+        Assert.False(string.IsNullOrWhiteSpace(audit.EventCode));
+        Assert.False(string.IsNullOrWhiteSpace(audit.Description));
+        Assert.Contains("reviewed and deleted", audit.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Delete test transaction", audit.Description, StringComparison.Ordinal);
+        Assert.Contains("2026-01-15", audit.Description, StringComparison.Ordinal);
+        Assert.Contains("12.34", audit.Description, StringComparison.Ordinal);
+        Assert.Contains("Outgoing", audit.Description, StringComparison.Ordinal);
+        Assert.Contains("Delete test account", audit.Description, StringComparison.Ordinal);
+        Assert.DoesNotContain(accountId.ToString(), audit.Description, StringComparison.Ordinal);
+        Assert.DoesNotContain(transactionId.ToString(), audit.Description, StringComparison.Ordinal);
+        Assert.InRange(audit.OccurredAtUtc, DateTimeOffset.UtcNow.AddMinutes(-1), DateTimeOffset.UtcNow);
     }
 
     [Fact]
@@ -61,7 +73,8 @@ public sealed class TransactionServiceDeleteTests(SqlServerFixture fixture)
 
         Assert.Equal(TransactionDeleteResult.NotFound, result);
         Assert.True(await dbContext.Transactions.AnyAsync(transaction => transaction.Id == transactionId));
-        Assert.False(await dbContext.TransactionDeletionAudits.AnyAsync(entry => entry.TransactionId == transactionId));
+        Assert.False(await dbContext.Audits.AnyAsync(entry =>
+            entry.EventCode == "TransactionDelete" && entry.ActingUserId == otherUserId));
     }
 
     [Fact]
