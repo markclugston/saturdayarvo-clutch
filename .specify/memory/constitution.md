@@ -1,8 +1,8 @@
 <!--
 Sync Impact Report
-Version change: 4.3.0 -> 4.4.0
-Modified principles: VI. Frontend Engineering (clutch-web) (prohibit hyperlinks and require
-  button controls with pointer cursors)
+Version change: 4.4.0 -> 4.5.0
+Modified principles: III. Data Access, Async, and Performance (require persisted Audit records to
+  be append-only and immutable)
 Added sections: None
 Removed sections: None
 Follow-up TODOs: None
@@ -50,6 +50,10 @@ and verification. Known SQL-related performance bottlenecks MUST be resolved bef
 Critical API behavior involving database queries and migrations MUST have integration tests using
 a disposable container running the production database provider. In-memory fakes MAY be used when
 provider-specific behavior is irrelevant.
+
+Audit data MUST be append-only. Once an Audit record is written to the database, no application
+operation, background job, or database migration may update or delete it. Corrections or additional
+context MUST be recorded as new Audit records without altering existing records.
 
 ### IV. Testing and Quality Gates
 Every behavior-bearing project MUST have appropriate automated tests, and tests MUST cover
@@ -188,6 +192,7 @@ traceability and do not refer to separate policy documents.
 | ARC-001 | Architecture boundaries | A change alters project boundaries, dependency registration, or application architecture, or uses modern C# language features. | Repository maintainers |
 | DOT-001 | .NET service practices | A change targets or modifies a .NET project, service, or runtime behavior. | Clutch.API maintainers |
 | DOT-002 | EF Core data access and performance | A change accesses a database, changes an EF Core query or migration, or affects database performance. | Clutch.API maintainers |
+| AUD-001 | Audit data immutability | A change writes to, migrates, or otherwise affects persisted Audit records. | Clutch.API maintainers |
 | ENG-001 | Testing and quality gates | A change adds or modifies behavior, tests, or delivery quality gates. | Repository maintainers |
 | OPS-001 | Reliability and data changes | A change affects service operations, logging, health checks, database migrations, rollback, or backfills. | Repository maintainers |
 | SEC-001 | Application security | Any code change requiring an independent security review; also changes affecting security controls, authentication, authorization, untrusted input, or dependencies. | Repository maintainers |
@@ -291,4 +296,4 @@ Exceptions require an explicit amendment; review findings MUST NOT be waived sil
 4. Commit with message format: `docs: amend constitution to vX.Y.Z (description)`.
 5. Tag commit with `constitution-vX.Y.Z`.
 
-**Version**: 4.4.0 | **Ratified**: 2026-11-01 | **Last Amended**: 2026-11-10
+**Version**: 4.5.0 | **Ratified**: 2026-11-01 | **Last Amended**: 2026-11-15
