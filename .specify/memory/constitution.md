@@ -1,8 +1,8 @@
 <!--
 Sync Impact Report
-Version change: 4.4.0 -> 4.5.0
-Modified principles: III. Data Access, Async, and Performance (require persisted Audit records to
-  be append-only and immutable)
+Version change: 4.5.0 -> 4.6.0
+Modified principles: III. Data Access, Async, and Performance (require all audit data to be stored
+  in the existing Audit table)
 Added sections: None
 Removed sections: None
 Follow-up TODOs: None
@@ -41,6 +41,9 @@ All application communication with a database MUST use Entity Framework Core; ot
 access mechanisms are prohibited. EF Core operations MUST use asynchronous APIs where available.
 Read-only entity queries MUST use `AsNoTracking()` when tracking is not needed and the query shape
 supports it.
+
+All audit data MUST be stored in the existing `Audit` table. Applications MUST NOT create or use
+another table to store audit data.
 
 Each database-related change MUST receive a second, independent agent review of the SQL queries or
 statements it executes or causes EF Core to generate. The review MUST assess query shape, indexing,
@@ -296,4 +299,4 @@ Exceptions require an explicit amendment; review findings MUST NOT be waived sil
 4. Commit with message format: `docs: amend constitution to vX.Y.Z (description)`.
 5. Tag commit with `constitution-vX.Y.Z`.
 
-**Version**: 4.5.0 | **Ratified**: 2026-11-01 | **Last Amended**: 2026-11-15
+**Version**: 4.6.0 | **Ratified**: 2026-11-01 | **Last Amended**: 2026-11-15
