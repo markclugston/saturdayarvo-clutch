@@ -88,14 +88,22 @@ export function CategoriesPage() {
           You have no groups or categories yet. Create your first group below.
         </p>
       ) : (
-        <ul aria-label="Groups and categories" className="space-y-1">
+        <ul
+          aria-label="Groups and categories"
+          className="space-y-1 overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          tabIndex={0}
+        >
           {nodes.map((node) => {
             const isGroup = node.parentId === null
+            // Reserve room for actions while preserving indentation in the scrollable list.
             return (
               <li
                 key={node.id}
                 className={isGroup ? 'mt-6 first:mt-0' : undefined}
-                style={{ paddingLeft: `${node.depth * 1.5}rem` }}
+                style={{
+                  paddingLeft: `${node.depth * 1.5}rem`,
+                  minWidth: `calc(${node.depth * 1.5}rem + 8rem)`,
+                }}
               >
                 {renamingId === node.id ? (
                   <form
@@ -109,7 +117,7 @@ export function CategoriesPage() {
                       id={`rename-${node.id}`}
                       autoComplete="off"
                       autoFocus
-                      className="rounded-md border border-input bg-background px-3 py-1"
+                      className="max-w-full min-w-0 rounded-md border border-input bg-background px-3 py-1"
                       maxLength={maxNameLength}
                       required
                       value={renameValue}
@@ -138,7 +146,7 @@ export function CategoriesPage() {
                   </form>
                 ) : (
                   <div className="flex flex-wrap items-center gap-3">
-                    <span className={isGroup ? 'text-xl font-semibold' : 'text-base'}>
+                    <span className={isGroup ? 'min-w-0 break-words text-xl font-semibold' : 'min-w-0 break-words text-base'}>
                       {node.name}
                     </span>
                     <button
