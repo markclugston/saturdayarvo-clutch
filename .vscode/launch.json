@@ -15,7 +15,14 @@
       },
       "env": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "ASPNETCORE_URLS": "https://localhost:7180;http://localhost:5041"
+        "ASPNETCORE_URLS": "https://localhost:7180;http://localhost:5041",
+        "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4317",
+        "OTEL_SERVICE_NAME": "Clutch.API"
+      },
+      "serverReadyAction": {
+        "pattern": "Now listening on:\\s+https?://",
+        "uriFormat": "http://localhost:18888/login?t=clutch-local-dev",
+        "action": "openExternally"
       }
     },
     {
