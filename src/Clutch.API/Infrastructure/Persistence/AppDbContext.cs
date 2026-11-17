@@ -21,9 +21,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<AccountImportSettings> AccountImportSettings => Set<AccountImportSettings>();
 
-    public DbSet<ImportReviewMappingSnapshot> ImportReviewMappingSnapshots =>
-        Set<ImportReviewMappingSnapshot>();
-
     public DbSet<ImportRateWindow> ImportRateWindows => Set<ImportRateWindow>();
 
     public DbSet<Transaction> Transactions => Set<Transaction>();
@@ -62,7 +59,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(account => account.LastSuccessfulImportAtUtc)
                 .HasColumnType("datetimeoffset");
             entity.Property(account => account.ActiveImportId);
-            entity.Property(account => account.LastSuccessfulImportReviewId);
             entity.Property(account => account.OwnerUserId)
                 .HasMaxLength(450);
             entity.HasIndex(account => account.OwnerUserId);
@@ -133,28 +129,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasKey(settings => settings.AccountId);
             entity.Property(settings => settings.SchemaVersion).IsRequired();
             entity.Property(settings => settings.SettingsJson).IsRequired();
-            entity.Property(settings => settings.SourceImportReviewId).IsRequired();
             entity.Property(settings => settings.SavedAtUtc)
                 .HasColumnType("datetimeoffset")
                 .IsRequired();
             entity.HasOne<Account>()
                 .WithOne()
                 .HasForeignKey<AccountImportSettings>(settings => settings.AccountId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        builder.Entity<ImportReviewMappingSnapshot>(entity =>
-        {
-            entity.ToTable("ImportReviewMappingSnapshots", table =>
-                table.HasCheckConstraint(
-                    "CK_ImportReviewMappingSnapshots_SchemaVersion",
-                    "[SchemaVersion] > 0"));
-            entity.HasKey(snapshot => snapshot.ReviewId);
-            entity.Property(snapshot => snapshot.SchemaVersion).IsRequired();
-            entity.Property(snapshot => snapshot.MappingJson).IsRequired();
-            entity.HasOne<ImportReview>()
-                .WithOne()
-                .HasForeignKey<ImportReviewMappingSnapshot>(snapshot => snapshot.ReviewId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -245,9 +225,15 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         builder.Entity<ImportReview>(entity =>
         {
             entity.ToTable("ImportReviews", table =>
+            {
                 table.HasCheckConstraint(
                     "CK_ImportReviews_ValidState",
-                    "[State] IN ('Ready', 'Confirmed', 'Cancelled', 'Expired')"));
+                    "[State] IN ('Ready', 'Confirmed', 'Cancelled', 'Expired')");
+                table.HasCheckConstraint(
+                    "CK_ImportReviews_Mapping",
+                    "([SchemaVersion] IS NULL AND [MappingJson] IS NULL) OR ([SchemaVersion] IS NOT NULL AND [SchemaVersion] > 0 AND [MappingJson] IS NOT NULL)");
+            });
+            entity.Property(review => review.MappingJson);
             entity.HasKey(review => review.Id);
             entity.Property(review => review.ActingUserId)
                 .HasMaxLength(450)

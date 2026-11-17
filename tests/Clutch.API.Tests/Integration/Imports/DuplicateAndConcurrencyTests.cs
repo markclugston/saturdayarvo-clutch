@@ -37,12 +37,30 @@ public sealed class DuplicateAndConcurrencyTests(SqlServerFixture fixture)
 
         using var unconfirmedResponse = await ConfirmAsync(client, review.Id, false);
         Assert.Equal(HttpStatusCode.Conflict, unconfirmedResponse.StatusCode);
+        await using (var pendingScope = fixture.Factory.Services.CreateAsyncScope())
+        {
+            var pendingDb = pendingScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert.True(await pendingDb.ImportReviews.AnyAsync(candidate => candidate.Id == review.Id));
+            Assert.Equal(2, await pendingDb.ImportReviewRows.CountAsync(row => row.ReviewId == review.Id));
+            Assert.NotNull(await pendingDb.ImportReviews.Where(candidate => candidate.Id == review.Id)
+                .Select(candidate => candidate.MappingJson).SingleAsync());
+            Assert.Equal(review.Id, await pendingDb.Accounts.Where(account => account.Id == accountId)
+                .Select(account => account.ActiveImportId).SingleAsync());
+        }
 
         using var confirmationResponse = await ConfirmAsync(client, review.Id, true);
         Assert.Equal(HttpStatusCode.OK, confirmationResponse.StatusCode);
         var confirmation = await confirmationResponse.Content.ReadFromJsonAsync<ConfirmResponse>();
         Assert.NotNull(confirmation);
         Assert.Equal(2, confirmation.ImportedCount);
+        await using (var confirmedScope = fixture.Factory.Services.CreateAsyncScope())
+        {
+            var confirmedDb = confirmedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert.False(await confirmedDb.ImportReviews.AnyAsync(candidate => candidate.Id == review.Id));
+            Assert.False(await confirmedDb.ImportReviewRows.AnyAsync(row => row.ReviewId == review.Id));
+            Assert.Null(await confirmedDb.Accounts.Where(account => account.Id == accountId)
+                .Select(account => account.ActiveImportId).SingleAsync());
+        }
 
         using var existingDuplicateResponse = await CreateReviewAsync(client, accountId, duplicateCsv);
         var existingDuplicateReview =
@@ -60,6 +78,14 @@ public sealed class DuplicateAndConcurrencyTests(SqlServerFixture fixture)
 
         var transactionCount = await GetTransactionCountAsync(client, accountId);
         Assert.Equal(2, transactionCount);
+        await using var cancelledScope = fixture.Factory.Services.CreateAsyncScope();
+        var cancelledDb = cancelledScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.False(await cancelledDb.ImportReviews.AnyAsync(
+            candidate => candidate.Id == existingDuplicateReview.Id));
+        Assert.False(await cancelledDb.ImportReviewRows.AnyAsync(
+            row => row.ReviewId == existingDuplicateReview.Id));
+        Assert.Null(await cancelledDb.Accounts.Where(account => account.Id == accountId)
+            .Select(account => account.ActiveImportId).SingleAsync());
     }
 
     [Fact]
@@ -155,24 +181,23 @@ public sealed class DuplicateAndConcurrencyTests(SqlServerFixture fixture)
             SendJsonAsync(client, HttpMethod.Delete, $"/api/accounts/{accountId}/active-import-review", null));
         using var confirmation = results[0];
         using var cancellation = results[1];
-        Assert.Contains(confirmation.StatusCode, new[] { HttpStatusCode.OK, HttpStatusCode.Conflict });
+        Assert.Contains(confirmation.StatusCode, new[] {
+            HttpStatusCode.OK, HttpStatusCode.Conflict, HttpStatusCode.NotFound });
         Assert.Contains(cancellation.StatusCode, new[] { HttpStatusCode.NoContent, HttpStatusCode.Conflict });
 
         await using var scope = fixture.Factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var persistedReview = await db.ImportReviews.SingleAsync(candidate => candidate.Id == review.Id);
         var account = await db.Accounts.SingleAsync(candidate => candidate.Id == accountId);
         Assert.Null(account.ActiveImportId);
+        Assert.Equal(0, await db.ImportReviews.CountAsync(candidate => candidate.Id == review.Id));
         Assert.Equal(0, await db.ImportReviewRows.CountAsync(row => row.ReviewId == review.Id));
         var count = await db.Transactions.CountAsync(transaction => transaction.AccountId == accountId);
         if (confirmation.StatusCode == HttpStatusCode.OK)
         {
-            Assert.Equal(ImportReviewState.Confirmed, persistedReview.State);
             Assert.Equal(1, count);
         }
         else
         {
-            Assert.Equal(ImportReviewState.Cancelled, persistedReview.State);
             Assert.Equal(0, count);
         }
     }
@@ -218,9 +243,8 @@ public sealed class DuplicateAndConcurrencyTests(SqlServerFixture fixture)
 
         await using var verifyScope = fixture.Factory.Services.CreateAsyncScope();
         var verifyDbContext = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var expiredReview = await verifyDbContext.ImportReviews
-            .SingleAsync(review => review.Id == staleReview.Id);
-        Assert.Equal(ImportReviewState.Expired, expiredReview.State);
+        Assert.Equal(0, await verifyDbContext.ImportReviews.CountAsync(
+            review => review.Id == staleReview.Id));
         Assert.Equal(0, await verifyDbContext.ImportReviewRows
             .CountAsync(row => row.ReviewId == staleReview.Id));
         var account = await verifyDbContext.Accounts.SingleAsync(candidate => candidate.Id == accountId);

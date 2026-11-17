@@ -1,8 +1,10 @@
 import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { useQuery } from '@tanstack/react-query'
+import { focusManager, useQuery } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { getAccount, getCurrencies } from '@/features/accounts/api'
 import { getSession, signIn, signOut } from '@/features/auth/api'
+import { confirmImportReview, createImportReview, getAccountImportSettings } from '@/features/imports/api'
 import { ApiError } from '@/lib/api/client'
 import { renderWithQueryClient } from '@/test/renderWithQueryClient'
 import App from './App'
@@ -27,7 +29,7 @@ vi.mock('@/features/preferences/api', () => ({
 }))
 
 vi.mock('@/features/accounts/AccountsPage', () => ({
-  AccountsPage: () => {
+  AccountsPage: ({ onSelectAccount }: { onSelectAccount: (id: string) => void }) => {
     const accountsQuery = useQuery({
       queryKey: ['accounts'],
       queryFn: async (): Promise<Array<{ description: string }>> => [],
@@ -39,6 +41,7 @@ vi.mock('@/features/accounts/AccountsPage', () => ({
     return (
       <>
         <h1>Your accounts</h1>
+        <button onClick={() => onSelectAccount('account-1')} type="button">Open account</button>
         {accountsQuery.data?.map((account) =>
           <p key={account.description}>{account.description}</p>)}
         {importSettingsQuery.data && <p>{importSettingsQuery.data.marker}</p>}
@@ -47,18 +50,100 @@ vi.mock('@/features/accounts/AccountsPage', () => ({
   },
 }))
 
+vi.mock('@/features/accounts/AccountDetails', () => ({
+  AccountDetails: ({ onImport }: { onImport: () => void }) => (
+    <button onClick={onImport} type="button">Import transactions</button>
+  ),
+}))
+
+vi.mock('@/features/accounts/api', () => ({
+  getAccount: vi.fn(),
+  getCurrencies: vi.fn(),
+}))
+
+vi.mock('@/features/imports/api', () => ({
+  createImportReview: vi.fn(),
+  getAccountImportSettings: vi.fn(),
+  confirmImportReview: vi.fn(),
+  cancelImportReview: vi.fn(),
+  cancelActiveImportReview: vi.fn(),
+}))
+
 vi.mock('@/features/categories/CategoriesPage', () => ({
   CategoriesPage: () => <h1>Categories and groups</h1>,
 }))
 
+async function startImportReview(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: 'Open account' }))
+  await user.click(screen.getByRole('button', { name: 'Import transactions' }))
+  await user.upload(
+    await screen.findByLabelText('CSV file'),
+    new File(['Date,Description,Amount\n2025-01-15,Market,10.00'], 'transactions.csv', {
+      type: 'text/csv',
+    }),
+  )
+  await user.click(await screen.findByRole('button', { name: 'Review import with saved settings' }))
+  expect(await screen.findByText('Market')).toBeInTheDocument()
+}
+
 describe('session loading', () => {
   afterEach(() => {
+    focusManager.setFocused(undefined)
     vi.useRealTimers()
     vi.restoreAllMocks()
   })
 
   beforeEach(() => {
     vi.resetAllMocks()
+    vi.mocked(getAccount).mockResolvedValue({
+      id: 'account-1',
+      description: 'Everyday spending',
+      currencyCode: 'AUD',
+      lastSuccessfulImportAtUtc: null,
+    })
+    vi.mocked(getCurrencies).mockResolvedValue([{
+      code: 'AUD',
+      name: 'Australian Dollar',
+      amountFormats: [{
+        id: 'dot-decimal-comma-grouping',
+        decimalSeparator: '.',
+        groupSeparator: ',',
+        reference: 'CLDR',
+        version: '44.0',
+      }],
+    }])
+    vi.mocked(getAccountImportSettings).mockResolvedValue({
+      mapping: {
+        dateColumn: 0,
+        descriptionColumn: 1,
+        dateFormat: 'yyyy-MM-dd',
+        amountMode: 'Signed',
+        signedAmountColumn: 2,
+        incomingSign: 'Positive',
+        numberFormat: 'dot-decimal-comma-grouping',
+      },
+    })
+    vi.mocked(createImportReview).mockResolvedValue({
+      id: '550e8400-e29b-41d4-a716-446655440002',
+      accountId: 'account-1',
+      currencyCode: 'AUD',
+      rowCount: 1,
+      duplicateConfirmationRequired: false,
+      expiresAtUtc: '2025-01-15T14:00:00.000Z',
+      rows: [{
+        sourceRowNumber: 2,
+        transactionDate: '2025-01-15',
+        description: 'Market',
+        amount: '10.00',
+        direction: 'Outgoing',
+        isPossibleDuplicate: false,
+      }],
+    })
+    vi.mocked(confirmImportReview).mockResolvedValue({
+      importedCount: 1,
+      completedAtUtc: '2025-01-15T13:50:00.000Z',
+      settingsSaved: true,
+    })
   })
 
   it('keeps the sign-in page inert behind a blocking status until session discovery completes', async () => {
@@ -176,6 +261,75 @@ describe('session loading', () => {
 
     expect(await screen.findByRole('combobox', { name: 'Theme' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Your accounts' })).toBeInTheDocument()
+  })
+
+  it('keeps the import review mounted while the session refreshes on returning to the browser', async () => {
+    let resolveRefresh: ((value: { id: string; roles: string[] }) => void) | undefined
+    vi.mocked(getSession)
+      .mockResolvedValueOnce({ id: 'user-1', roles: [] })
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        resolveRefresh = resolve
+      }))
+    const user = userEvent.setup()
+
+    renderWithQueryClient(<App />)
+    await startImportReview(user)
+    expect(screen.getByRole('heading', { name: 'Review transactions' })).toBeInTheDocument()
+
+    await act(async () => {
+      focusManager.setFocused(false)
+      focusManager.setFocused(true)
+    })
+    await waitFor(() => expect(getSession).toHaveBeenCalledTimes(2))
+    expect(screen.getByRole('heading', { name: 'Review transactions' })).toBeInTheDocument()
+    expect(screen.queryByText('Checking your session')).not.toBeInTheDocument()
+
+    await act(async () => resolveRefresh?.({ id: 'user-1', roles: [] }))
+    expect(screen.getByRole('heading', { name: 'Review transactions' })).toBeInTheDocument()
+    expect(screen.getByText('Market')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Confirm import' }))
+    await waitFor(() => expect(confirmImportReview).toHaveBeenCalledWith(
+      '550e8400-e29b-41d4-a716-446655440002',
+      false,
+    ))
+  })
+
+  it('keeps the review and reports a failed background session refresh', async () => {
+    vi.mocked(getSession)
+      .mockResolvedValueOnce({ id: 'user-1', roles: [] })
+      .mockRejectedValueOnce(new ApiError(500, { title: 'Server error' }))
+      .mockResolvedValueOnce({ id: 'user-1', roles: [] })
+    const user = userEvent.setup()
+
+    renderWithQueryClient(<App />)
+    await startImportReview(user)
+    await act(async () => {
+      focusManager.setFocused(false)
+      focusManager.setFocused(true)
+    })
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to refresh your session')
+    expect(screen.getByRole('heading', { name: 'Review transactions' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Retry session check' }))
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+    expect(screen.getByRole('heading', { name: 'Review transactions' })).toBeInTheDocument()
+  })
+
+  it('hides the review when a background session refresh returns unauthorized', async () => {
+    vi.mocked(getSession)
+      .mockResolvedValueOnce({ id: 'user-1', roles: [] })
+      .mockRejectedValueOnce(new ApiError(401, { title: 'Authentication required' }))
+    const user = userEvent.setup()
+
+    renderWithQueryClient(<App />)
+    await startImportReview(user)
+    await act(async () => {
+      focusManager.setFocused(false)
+      focusManager.setFocused(true)
+    })
+
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Review transactions' })).not.toBeInTheDocument()
   })
 
   it('exposes application actions as named buttons without hyperlink controls', async () => {

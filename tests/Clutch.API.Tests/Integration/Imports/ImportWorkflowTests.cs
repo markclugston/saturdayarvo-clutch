@@ -8,6 +8,7 @@ using Clutch.API.Application.Imports;
 using Clutch.API.Domain.Imports;
 using Clutch.API.Infrastructure.Imports;
 using Clutch.API.Infrastructure.Persistence;
+using Clutch.API.Infrastructure.Persistence.Entities;
 using Clutch.API.Tests.Integration.Accounts;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -129,8 +130,14 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
         await using (var snapshotScope = fixture.Factory.Services.CreateAsyncScope())
         {
             var snapshotDb = snapshotScope.ServiceProvider.GetRequiredService<AppDbContext>();
-            Assert.Equal(0, await snapshotDb.ImportReviewMappingSnapshots.CountAsync(
-                snapshot => snapshot.ReviewId == review.Id));
+            Assert.Equal(0, await snapshotDb.ImportReviews.CountAsync(
+                candidate => candidate.Id == review.Id));
+            Assert.Equal(0, await snapshotDb.ImportReviewRows.CountAsync(
+                row => row.ReviewId == review.Id));
+            Assert.Null(await snapshotDb.Accounts
+                .Where(candidate => candidate.Id == account.Id)
+                .Select(candidate => candidate.ActiveImportId)
+                .SingleAsync());
         }
 
         using var savedSettingsResponse = await client.GetAsync(
@@ -437,7 +444,7 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
             HttpMethod.Post,
             $"/api/import-reviews/{review.Id}/confirm",
             new { confirmPossibleDuplicates = false });
-        Assert.Equal(HttpStatusCode.Conflict, confirmResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, confirmResponse.StatusCode);
 
         using var transactionsResponse = await client.GetAsync(
             $"/api/accounts/{account.Id}/transactions");
@@ -479,8 +486,7 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
         await using (var scope = fixture.Factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            Assert.Equal(ImportReviewState.Cancelled,
-                (await db.ImportReviews.SingleAsync(candidate => candidate.Id == review.Id)).State);
+            Assert.Equal(0, await db.ImportReviews.CountAsync(candidate => candidate.Id == review.Id));
             Assert.Equal(0, await db.ImportReviewRows.CountAsync(row => row.ReviewId == review.Id));
             Assert.Null((await db.Accounts.SingleAsync(candidate => candidate.Id == account.Id)).ActiveImportId);
             Assert.Equal(otherReview.Id,
@@ -584,9 +590,11 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
             .CountAsync(transaction => transaction.AccountId == account.Id));
     }
 
-    [Fact]
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     [Trait("Category", "SqlServer")]
-    public async Task Unrecoverable_confirmation_failure_cancels_the_review_and_releases_the_lease()
+    public async Task Missing_staged_data_cancels_the_review_and_releases_the_lease(bool removeMapping)
     {
         using var client = CreateClient();
         await RegisterAndSignInAsync(client);
@@ -598,7 +606,17 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
         await using (var scope = fixture.Factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            await db.ImportReviewRows.Where(row => row.ReviewId == review.Id).ExecuteDeleteAsync();
+            if (removeMapping)
+            {
+                await db.ImportReviews.Where(candidate => candidate.Id == review.Id)
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(candidate => candidate.SchemaVersion, (int?)null)
+                        .SetProperty(candidate => candidate.MappingJson, (string?)null));
+            }
+            else
+            {
+                await db.ImportReviewRows.Where(row => row.ReviewId == review.Id).ExecuteDeleteAsync();
+            }
         }
 
         using var confirmation = await SendJsonAsync(
@@ -608,9 +626,10 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
         await using (var scope = fixture.Factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            Assert.Equal(ImportReviewState.Cancelled,
-                (await db.ImportReviews.SingleAsync(candidate => candidate.Id == review.Id)).State);
+            Assert.Equal(0, await db.ImportReviews.CountAsync(candidate => candidate.Id == review.Id));
+            Assert.Equal(0, await db.ImportReviewRows.CountAsync(row => row.ReviewId == review.Id));
             Assert.Null((await db.Accounts.SingleAsync(candidate => candidate.Id == account.Id)).ActiveImportId);
+            Assert.Equal(0, await db.Transactions.CountAsync(candidate => candidate.AccountId == account.Id));
             var ownerUserId = await db.Accounts
                 .Where(candidate => candidate.Id == account.Id)
                 .Select(candidate => candidate.OwnerUserId)
@@ -622,6 +641,56 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
         }
         using var retry = await CreateReviewAsync(client, account.Id, csv, SignedMapping());
         Assert.Equal(HttpStatusCode.Created, retry.StatusCode);
+    }
+
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task Cancellation_failure_rolls_back_cleanup_and_can_be_retried()
+    {
+        using var client = CreateClient();
+        await RegisterAndSignInAsync(client);
+        var account = await CreateAccountAsync(client, "Cancellation failure", "AUD");
+        using var response = await CreateReviewAsync(
+            client,
+            account.Id,
+            "Date,Description,Amount\n2025-01-15,Market,12.34",
+            SignedMapping());
+        var review = await response.Content.ReadFromJsonAsync<ReviewResponse>();
+        Assert.NotNull(review);
+
+        await using var scope = fixture.Factory.Services.CreateAsyncScope();
+        var original = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var ownerId = await original.Accounts.Where(candidate => candidate.Id == account.Id)
+            .Select(candidate => candidate.OwnerUserId).SingleAsync()
+            ?? throw new InvalidOperationException("The account must have an owner.");
+        var interceptor = new FailAuditInsertInterceptor();
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseSqlServer(original.Database.GetConnectionString())
+            .AddInterceptors(interceptor)
+            .Options;
+        await using var db = new AppDbContext(options);
+        var clock = TimeProvider.System;
+        var service = new ImportReviewService(
+            db, new CsvImportParser(), new AccountImportLease(db),
+            new ImportAuditWriter(db, clock), new AllowImportAttempts(), clock);
+
+        await Assert.ThrowsAsync<DbUpdateException>(
+            () => service.CancelAsync(ownerId, review.Id, CancellationToken.None));
+        Assert.True(interceptor.Triggered);
+        Assert.True(await original.ImportReviews.AnyAsync(candidate => candidate.Id == review.Id));
+        Assert.True(await original.ImportReviewRows.AnyAsync(row => row.ReviewId == review.Id));
+        Assert.NotNull(await original.ImportReviews.Where(candidate => candidate.Id == review.Id)
+            .Select(candidate => candidate.MappingJson).SingleAsync());
+        Assert.Equal(review.Id, await original.Accounts.Where(candidate => candidate.Id == account.Id)
+            .Select(candidate => candidate.ActiveImportId).SingleAsync());
+
+        using var retry = await SendJsonAsync(
+            client, HttpMethod.Delete, $"/api/import-reviews/{review.Id}", null);
+        Assert.Equal(HttpStatusCode.NoContent, retry.StatusCode);
+        Assert.False(await original.ImportReviews.AnyAsync(candidate => candidate.Id == review.Id));
+        Assert.False(await original.ImportReviewRows.AnyAsync(row => row.ReviewId == review.Id));
+        Assert.Null(await original.Accounts.Where(candidate => candidate.Id == account.Id)
+            .Select(candidate => candidate.ActiveImportId).SingleAsync());
     }
 
     [Fact]
@@ -738,6 +807,8 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         Assert.Equal(0, await dbContext.ImportReviews
             .CountAsync(review => review.AccountId == account.Id));
+        Assert.Null(await dbContext.Accounts.Where(candidate => candidate.Id == account.Id)
+            .Select(candidate => candidate.ActiveImportId).SingleAsync());
         Assert.Equal(0, await dbContext.ImportReviewRows
             .CountAsync(row => dbContext.ImportReviews.Any(review =>
                 review.Id == row.ReviewId && review.AccountId == account.Id)));
@@ -779,9 +850,8 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
         await using (var scope = fixture.Factory.Services.CreateAsyncScope())
         {
             var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var expiredReview = await dbContext.ImportReviews
-                .SingleAsync(candidate => candidate.Id == review.Id);
-            Assert.Equal(ImportReviewState.Expired, expiredReview.State);
+            Assert.Equal(0, await dbContext.ImportReviews.CountAsync(
+                candidate => candidate.Id == review.Id));
             Assert.Equal(0, await dbContext.ImportReviewRows
                 .CountAsync(row => row.ReviewId == review.Id));
             var accountEntity = await dbContext.Accounts.SingleAsync(
@@ -804,6 +874,15 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
         using var client = CreateClient();
         await RegisterAndSignInAsync(client);
         var account = await CreateAccountAsync(client, "Savings", "AUD");
+        var activeAccount = await CreateAccountAsync(client, "Active review", "AUD");
+        using var activeResponse = await CreateReviewAsync(
+            client,
+            activeAccount.Id,
+            "Date,Description,Amount\n2025-01-15,Market,12.34",
+            SignedMapping());
+        Assert.Equal(HttpStatusCode.Created, activeResponse.StatusCode);
+        var activeReview = await activeResponse.Content.ReadFromJsonAsync<ReviewResponse>();
+        Assert.NotNull(activeReview);
         using var reviewResponse = await CreateReviewAsync(
             client,
             account.Id,
@@ -831,13 +910,20 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
 
         await using var verifyScope = services.CreateAsyncScope();
         var verifyDbContext = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var expiredReview = await verifyDbContext.ImportReviews
-            .SingleAsync(candidate => candidate.Id == review.Id);
-        Assert.Equal(ImportReviewState.Expired, expiredReview.State);
+        Assert.Equal(0, await verifyDbContext.ImportReviews.CountAsync(
+            candidate => candidate.Id == review.Id));
         Assert.Equal(0, await verifyDbContext.ImportReviewRows
             .CountAsync(row => row.ReviewId == review.Id));
-        Assert.Equal(0, await verifyDbContext.ImportReviewMappingSnapshots
-            .CountAsync(snapshot => snapshot.ReviewId == review.Id));
+        Assert.True(await verifyDbContext.ImportReviews.AnyAsync(
+            candidate => candidate.Id == activeReview.Id));
+        Assert.True(await verifyDbContext.ImportReviewRows.AnyAsync(
+            row => row.ReviewId == activeReview.Id));
+        Assert.NotNull(await verifyDbContext.ImportReviews.Where(candidate => candidate.Id == activeReview.Id)
+            .Select(candidate => candidate.MappingJson).SingleAsync());
+        Assert.Equal(activeReview.Id, await verifyDbContext.Accounts
+            .Where(candidate => candidate.Id == activeAccount.Id)
+            .Select(candidate => candidate.ActiveImportId)
+            .SingleAsync());
         var accountEntity = await verifyDbContext.Accounts
             .SingleAsync(candidate => candidate.Id == account.Id);
         Assert.Null(accountEntity.ActiveImportId);
@@ -846,6 +932,92 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
             .CountAsync(audit => audit.EventCode == "ReviewExpired"
                 && audit.ActingUserId == ownerUserId
                 && audit.Description.Contains(account.Description)));
+    }
+
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task Abandoned_review_is_preserved_until_its_deadline_then_completely_removed()
+    {
+        using var client = CreateClient();
+        await RegisterAndSignInAsync(client);
+        var account = await CreateAccountAsync(client, "Abandoned review", "AUD");
+        using var response = await CreateReviewAsync(
+            client,
+            account.Id,
+            "Date,Description,Amount\n2025-01-15,Market,12.34",
+            SignedMapping());
+        var review = await response.Content.ReadFromJsonAsync<ReviewResponse>();
+        Assert.NotNull(review);
+
+        var services = fixture.Factory.Services;
+        var clock = new FixedTimeProvider(review.ExpiresAtUtc.AddTicks(-1));
+        var cleanup = new ImportReviewCleanupService(
+            services.GetRequiredService<IServiceScopeFactory>(),
+            clock,
+            services.GetRequiredService<ILogger<ImportReviewCleanupService>>());
+        await cleanup.RunCleanupOnceAsync(CancellationToken.None);
+
+        await using var verifyScope = services.CreateAsyncScope();
+        var db = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var storedReview = await db.ImportReviews.AsNoTracking().SingleAsync(
+            candidate => candidate.Id == review.Id);
+        Assert.Equal(TimeSpan.FromMinutes(5), storedReview.ExpiresAtUtc - storedReview.CreatedAtUtc);
+        Assert.True(await db.ImportReviewRows.AnyAsync(row => row.ReviewId == review.Id));
+        Assert.Equal(SignedMapping(), ImportMappingSettingsSerializer.Deserialize(
+            storedReview.SchemaVersion!.Value, storedReview.MappingJson!));
+        Assert.Equal(review.Id, await db.Accounts.Where(candidate => candidate.Id == account.Id)
+            .Select(candidate => candidate.ActiveImportId).SingleAsync());
+
+        clock.UtcNow = review.ExpiresAtUtc;
+        await cleanup.RunCleanupOnceAsync(CancellationToken.None);
+
+        Assert.False(await db.ImportReviews.AnyAsync(candidate => candidate.Id == review.Id));
+        Assert.False(await db.ImportReviewRows.AnyAsync(row => row.ReviewId == review.Id));
+        Assert.Null(await db.Accounts.Where(candidate => candidate.Id == account.Id)
+            .Select(candidate => candidate.ActiveImportId).SingleAsync());
+        Assert.Equal(0, await db.Transactions.CountAsync(candidate => candidate.AccountId == account.Id));
+        Assert.Equal(1, await db.Audits.CountAsync(candidate =>
+            candidate.EventCode == "ReviewExpired" && candidate.Description.Contains(account.Description)));
+    }
+
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task Background_cleanup_removes_completed_rate_windows_without_a_new_import()
+    {
+        using var client = CreateClient();
+        await RegisterAndSignInAsync(client);
+        var account = await CreateAccountAsync(client, "Rate cleanup", "AUD");
+        var now = DateTimeOffset.UtcNow.AddMinutes(10);
+        var currentWindow = new DateTimeOffset(
+            now.Year, now.Month, now.Day, now.Hour, now.Minute, 0, TimeSpan.Zero);
+        var expiredWindow = currentWindow.AddMinutes(-1);
+        var services = fixture.Factory.Services;
+        await using (var scope = services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var ownerId = await db.Accounts.Where(candidate => candidate.Id == account.Id)
+                .Select(candidate => candidate.OwnerUserId).SingleAsync()
+                ?? throw new InvalidOperationException("The account must have an owner.");
+            db.ImportRateWindows.Add(new ImportRateWindow(ownerId, expiredWindow));
+            db.ImportRateWindows.Add(new ImportRateWindow(ownerId, currentWindow));
+            await db.SaveChangesAsync();
+        }
+
+        var cleanup = new ImportReviewCleanupService(
+            services.GetRequiredService<IServiceScopeFactory>(),
+            new FixedTimeProvider(currentWindow.AddSeconds(30)),
+            services.GetRequiredService<ILogger<ImportReviewCleanupService>>());
+        await cleanup.RunCleanupOnceAsync(CancellationToken.None);
+
+        await using var verifyScope = services.CreateAsyncScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var ownerUserId = await verifyDb.Accounts.Where(candidate => candidate.Id == account.Id)
+            .Select(candidate => candidate.OwnerUserId).SingleAsync();
+        var windows = await verifyDb.ImportRateWindows
+            .Where(window => window.UserId == ownerUserId)
+            .Select(window => window.WindowStartedAtUtc)
+            .ToListAsync();
+        Assert.Equal(currentWindow, Assert.Single(windows));
     }
 
     private HttpClient CreateClient() =>
@@ -957,6 +1129,13 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
             Task.FromResult(true);
     }
 
+    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        public DateTimeOffset UtcNow { get; set; } = utcNow;
+
+        public override DateTimeOffset GetUtcNow() => UtcNow;
+    }
+
     private sealed class FailReviewInsertInterceptor : DbCommandInterceptor
     {
         public bool Triggered { get; private set; }
@@ -971,6 +1150,26 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
             {
                 Triggered = true;
                 throw new InvalidOperationException("Simulated review persistence failure.");
+            }
+
+            return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
+        }
+    }
+
+    private sealed class FailAuditInsertInterceptor : DbCommandInterceptor
+    {
+        public bool Triggered { get; private set; }
+
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<DbDataReader> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (command.CommandText.Contains("INSERT INTO [Audit]", StringComparison.Ordinal))
+            {
+                Triggered = true;
+                throw new DbUpdateException("Simulated audit persistence failure.");
             }
 
             return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);

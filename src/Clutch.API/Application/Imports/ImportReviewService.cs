@@ -19,7 +19,7 @@ public sealed class ImportReviewService(
     IImportAttemptLimiter attemptLimiter,
     TimeProvider timeProvider)
 {
-    private static readonly TimeSpan ReviewLifetime = TimeSpan.FromMinutes(15);
+    private static readonly TimeSpan ReviewLifetime = TimeSpan.FromMinutes(5);
 
     public async Task<ImportReviewResponse> CreateAsync(
         string ownerUserId,
@@ -128,13 +128,11 @@ public sealed class ImportReviewService(
                 accountId,
                 ownerUserId,
                 createdAt,
-                createdAt.Add(ReviewLifetime));
+                createdAt.Add(ReviewLifetime),
+                ImportMappingSettingsSerializer.CurrentSchemaVersion,
+                ImportMappingSettingsSerializer.Serialize(mapping));
             review.AddRows(await CreateReviewRows(review.Id, parsed.Rows, accountId, cancellationToken));
             dbContext.ImportReviews.Add(review);
-            dbContext.ImportReviewMappingSnapshots.Add(ImportReviewMappingSnapshot.Create(
-                review.Id,
-                ImportMappingSettingsSerializer.CurrentSchemaVersion,
-                ImportMappingSettingsSerializer.Serialize(mapping)));
             auditWriter.Add(account.Description, ownerUserId, "ReviewCreated", createdAt);
             var result = ToResponse(review, account.CurrencyCode);
             await dbContext.SaveChangesAsync(cancellationToken);
@@ -252,13 +250,16 @@ public sealed class ImportReviewService(
                     .Where(review => review.Id == reviewId && review.AccountId == accountId)
                     .Select(review => (ImportReviewState?)review.State)
                     .SingleOrDefaultAsync(cancellationToken);
-                if (currentState is null or ImportReviewState.Ready
-                    || !await importLease.ReleaseAsync(accountId, reviewId, cancellationToken))
+                if (currentState is null or ImportReviewState.Ready)
                 {
                     await transaction.RollbackAsync(cancellationToken);
                     return false;
                 }
 
+                await importLease.ReleaseAsync(accountId, reviewId, cancellationToken);
+                await dbContext.ImportReviews
+                    .Where(candidate => candidate.Id == reviewId)
+                    .ExecuteDeleteAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
                 return true;
             }
@@ -266,11 +267,11 @@ public sealed class ImportReviewService(
             await dbContext.ImportReviewRows
                 .Where(row => row.ReviewId == reviewId)
                 .ExecuteDeleteAsync(cancellationToken);
-            await dbContext.ImportReviewMappingSnapshots
-                .Where(snapshot => snapshot.ReviewId == reviewId)
-                .ExecuteDeleteAsync(cancellationToken);
             await importLease.ReleaseAsync(accountId, reviewId, cancellationToken);
             auditWriter.Add(accountDescription, ownerUserId, eventCode, timeProvider.GetUtcNow());
+            await dbContext.ImportReviews
+                .Where(candidate => candidate.Id == reviewId)
+                .ExecuteDeleteAsync(cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return true;
@@ -342,6 +343,9 @@ public sealed class ImportReviewService(
             if (review.State != ImportReviewState.Ready)
             {
                 await importLease.ReleaseAsync(accountId, activeReviewId, cancellationToken);
+                await dbContext.ImportReviews
+                    .Where(candidate => candidate.Id == activeReviewId)
+                    .ExecuteDeleteAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
                 return false;
             }
@@ -372,6 +376,12 @@ public sealed class ImportReviewService(
                 if (currentState != ImportReviewState.Ready)
                 {
                     await importLease.ReleaseAsync(accountId, activeReviewId, cancellationToken);
+                    if (currentState is not null)
+                    {
+                        await dbContext.ImportReviews
+                            .Where(candidate => candidate.Id == activeReviewId)
+                            .ExecuteDeleteAsync(cancellationToken);
+                    }
                 }
                 await transaction.CommitAsync(cancellationToken);
                 return currentState == ImportReviewState.Ready;
@@ -380,15 +390,15 @@ public sealed class ImportReviewService(
             await dbContext.ImportReviewRows
                 .Where(row => row.ReviewId == activeReviewId)
                 .ExecuteDeleteAsync(cancellationToken);
-            await dbContext.ImportReviewMappingSnapshots
-                .Where(snapshot => snapshot.ReviewId == activeReviewId)
-                .ExecuteDeleteAsync(cancellationToken);
             await importLease.ReleaseAsync(accountId, activeReviewId, cancellationToken);
             auditWriter.Add(
                 accountDescription,
                 review.ActingUserId,
                 "ReviewExpired",
                 now);
+            await dbContext.ImportReviews
+                .Where(candidate => candidate.Id == activeReviewId)
+                .ExecuteDeleteAsync(cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return false;

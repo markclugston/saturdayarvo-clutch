@@ -66,7 +66,7 @@ export default function App() {
     },
   })
 
-  if (sessionQuery.isPending || sessionQuery.isFetching) {
+  if (sessionQuery.isPending || (sessionQuery.isFetching && !sessionQuery.data)) {
     return (
       <>
         <AuthPage inert />
@@ -75,7 +75,8 @@ export default function App() {
     )
   }
 
-  if (sessionQuery.isError) {
+  if (sessionQuery.isError && (!sessionQuery.data
+    || sessionQuery.error instanceof ApiError && sessionQuery.error.status === 401)) {
     if (sessionQuery.error instanceof ApiError && sessionQuery.error.status === 401) {
       return <AuthPage />
     }
@@ -155,6 +156,18 @@ export default function App() {
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-5 py-8">
+        {sessionQuery.isError && (
+          <div className="mb-5" role="alert">
+            Unable to refresh your session. Please try again.
+            <button
+              className="ml-3 rounded-md border border-border px-3 py-1"
+              onClick={() => void sessionQuery.refetch()}
+              type="button"
+            >
+              Retry session check
+            </button>
+          </div>
+        )}
         {signOutMutation.isError && (
           <p className="mb-5" role="alert">Unable to sign out. Please try again.</p>
         )}

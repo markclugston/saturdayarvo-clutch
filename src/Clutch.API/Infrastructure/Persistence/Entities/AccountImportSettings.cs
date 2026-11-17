@@ -10,13 +10,11 @@ public sealed class AccountImportSettings
         Guid accountId,
         int schemaVersion,
         string settingsJson,
-        Guid sourceImportReviewId,
         DateTimeOffset savedAtUtc)
     {
         AccountId = accountId;
         SchemaVersion = schemaVersion;
         SettingsJson = settingsJson;
-        SourceImportReviewId = sourceImportReviewId;
         SavedAtUtc = savedAtUtc;
     }
 
@@ -26,27 +24,22 @@ public sealed class AccountImportSettings
 
     public string SettingsJson { get; private set; } = string.Empty;
 
-    public Guid SourceImportReviewId { get; private set; }
-
     public DateTimeOffset SavedAtUtc { get; private set; }
 
     public static AccountImportSettings Create(
         Guid accountId,
         int schemaVersion,
         string settingsJson,
-        Guid sourceImportReviewId,
         DateTimeOffset savedAtUtc) =>
-        new(accountId, schemaVersion, settingsJson, sourceImportReviewId, savedAtUtc);
+        new(accountId, schemaVersion, settingsJson, savedAtUtc);
 
     public void Update(
         int schemaVersion,
         string settingsJson,
-        Guid sourceImportReviewId,
         DateTimeOffset savedAtUtc)
     {
         SchemaVersion = schemaVersion;
         SettingsJson = settingsJson;
-        SourceImportReviewId = sourceImportReviewId;
         SavedAtUtc = savedAtUtc;
     }
 }

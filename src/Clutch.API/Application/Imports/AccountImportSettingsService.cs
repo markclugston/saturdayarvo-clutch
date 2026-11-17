@@ -1,4 +1,3 @@
-using System.Data;
 using Clutch.API.Api.ProblemDetails;
 using Clutch.API.Domain.Accounts;
 using Clutch.API.Infrastructure.Persistence;
@@ -49,75 +48,60 @@ public sealed class AccountImportSettingsService(
                 ownedAccount.SettingsJson));
     }
 
-    public async Task<bool> SaveAfterConfirmationAsync(
+    public async Task SaveAsync(
         Guid accountId,
-        Guid reviewId,
         ImportMapping mapping,
         CancellationToken cancellationToken)
     {
         var startedAtTimestamp = ImportMetrics.StartSettingsSave();
         var settingsJson = ImportMappingSettingsSerializer.Serialize(mapping);
-        var strategy = dbContext.Database.CreateExecutionStrategy();
         try
         {
-            return await strategy.ExecuteAsync(async () =>
+            var currentState = await (
+                from account in dbContext.Accounts
+                join storedSettings in dbContext.AccountImportSettings
+                    on account.Id equals storedSettings.AccountId into accountSettings
+                from storedSettings in accountSettings.DefaultIfEmpty()
+                where account.Id == accountId
+                select new
+                {
+                    Settings = storedSettings,
+                })
+                .SingleOrDefaultAsync(cancellationToken);
+            if (currentState is null)
             {
-                dbContext.ChangeTracker.Clear();
-                await using var transaction = await dbContext.Database.BeginTransactionAsync(
-                    IsolationLevel.Serializable,
-                    cancellationToken);
+                throw new ApiProblemException(
+                    StatusCodes.Status404NotFound,
+                    "Account not found.",
+                    "The account does not exist or is not available.");
+            }
 
-                var currentState = await (
-                    from account in dbContext.Accounts
-                    join storedSettings in dbContext.AccountImportSettings
-                        on account.Id equals storedSettings.AccountId into accountSettings
-                    from storedSettings in accountSettings.DefaultIfEmpty()
-                    where account.Id == accountId
-                    select new
-                    {
-                        account.LastSuccessfulImportReviewId,
-                        Settings = storedSettings,
-                    })
-                    .SingleOrDefaultAsync(cancellationToken);
-                if (currentState is null || currentState.LastSuccessfulImportReviewId != reviewId)
-                {
-                    await transaction.RollbackAsync(cancellationToken);
-                    ImportMetrics.RecordSettingsSave("stale", startedAtTimestamp);
-                    return false;
-                }
+            var settings = currentState.Settings;
+            if (settings is null)
+            {
+                settings = AccountImportSettings.Create(
+                    accountId,
+                    ImportMappingSettingsSerializer.CurrentSchemaVersion,
+                    settingsJson,
+                    timeProvider.GetUtcNow());
+                dbContext.AccountImportSettings.Add(settings);
+            }
+            else
+            {
+                settings.Update(
+                    ImportMappingSettingsSerializer.CurrentSchemaVersion,
+                    settingsJson,
+                    timeProvider.GetUtcNow());
+            }
 
-                var settings = currentState.Settings;
-                if (settings is null)
-                {
-                    settings = AccountImportSettings.Create(
-                        accountId,
-                        ImportMappingSettingsSerializer.CurrentSchemaVersion,
-                        settingsJson,
-                        reviewId,
-                        timeProvider.GetUtcNow());
-                    dbContext.AccountImportSettings.Add(settings);
-                }
-                else
-                {
-                    settings.Update(
-                        ImportMappingSettingsSerializer.CurrentSchemaVersion,
-                        settingsJson,
-                        reviewId,
-                        timeProvider.GetUtcNow());
-                }
-
-                await dbContext.SaveChangesAsync(cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
-                ImportMetrics.RecordSettingsSave("success", startedAtTimestamp);
-                return true;
-            });
+            await dbContext.SaveChangesAsync(cancellationToken);
+            ImportMetrics.RecordSettingsSave("success", startedAtTimestamp);
         }
         catch (Exception exception) when (exception is DbUpdateException or SqlException)
         {
-            dbContext.ChangeTracker.Clear();
-            logger.LogWarning("Import settings could not be saved after a successful transaction import.");
+            logger.LogWarning("Import settings could not be saved as part of the import transaction.");
             ImportMetrics.RecordSettingsSave("failed", startedAtTimestamp);
-            return false;
+            throw;
         }
     }
 

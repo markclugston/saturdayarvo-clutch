@@ -55,6 +55,8 @@ public sealed class SinglePersonAccountOwnershipMigrationTests(SqlServerFixture 
                 secondUserId,
                 secondAccountId,
                 secondTransactionId);
+            await dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE ImportReviews SET ExpiresAtUtc = DATEADD(minute, 3, CreatedAtUtc) WHERE Id = {secondReviewId}");
 
             await dbContext.Database.MigrateAsync();
 
@@ -68,8 +70,16 @@ public sealed class SinglePersonAccountOwnershipMigrationTests(SqlServerFixture 
             Assert.Equal(2, await dbContext.AccountImportSettings.CountAsync());
             Assert.Equal(2, await dbContext.ImportReviews.CountAsync());
             Assert.Equal(2, await dbContext.ImportReviewRows.CountAsync());
-            Assert.Equal(2, await dbContext.ImportReviewMappingSnapshots.CountAsync());
+            Assert.Equal(0, await dbContext.Database.SqlQuery<int>(
+                $"SELECT COUNT(*) AS [Value] FROM sys.tables WHERE [name] = 'ImportReviewMappingSnapshots'")
+                .SingleAsync());
             Assert.Equal(2, await dbContext.Audits.CountAsync());
+            var firstReview = await dbContext.ImportReviews.AsNoTracking().SingleAsync(
+                review => review.Id == firstReviewId);
+            var secondReview = await dbContext.ImportReviews.AsNoTracking().SingleAsync(
+                review => review.Id == secondReviewId);
+            Assert.Equal(TimeSpan.FromMinutes(5), firstReview.ExpiresAtUtc - firstReview.CreatedAtUtc);
+            Assert.Equal(TimeSpan.FromMinutes(3), secondReview.ExpiresAtUtc - secondReview.CreatedAtUtc);
             await AssertImportRecordsPreservedAsync(
                 dbContext,
                 firstAccountId,
@@ -152,6 +162,8 @@ public sealed class SinglePersonAccountOwnershipMigrationTests(SqlServerFixture 
             {
                 await Assert.ThrowsAsync<NotSupportedException>(
                     () => dbContext.Database.MigrateAsync(PrecedingMigration));
+                // Later reversible migrations may have rolled back before the ownership downgrade fails.
+                await dbContext.Database.MigrateAsync();
                 Assert.Null(await dbContext.Accounts
                     .AsNoTracking()
                     .Where(account => account.Id == accountId)
@@ -195,23 +207,16 @@ public sealed class SinglePersonAccountOwnershipMigrationTests(SqlServerFixture 
                 Assert.Single(await dbContext.ImportReviewRows
                     .Where(row => row.ReviewId == reviewId)
                     .ToListAsync());
-                Assert.True(await dbContext.ImportReviewMappingSnapshots
-                    .AnyAsync(snapshot => snapshot.ReviewId == reviewId));
+                Assert.NotNull(await dbContext.ImportReviews.Where(review => review.Id == reviewId)
+                    .Select(review => review.MappingJson).SingleAsync());
                 await importReviewService.CancelAsync(
                     ownerUserId,
                     reviewId,
                     CancellationToken.None);
-                Assert.Equal(
-                    ImportReviewState.Cancelled,
-                    await dbContext.ImportReviews
-                        .Where(review => review.Id == reviewId)
-                        .Select(review => review.State)
-                        .SingleAsync());
+                Assert.Equal(0, await dbContext.ImportReviews
+                    .CountAsync(review => review.Id == reviewId));
                 Assert.Empty(await dbContext.ImportReviewRows
                     .Where(row => row.ReviewId == reviewId)
-                    .ToListAsync());
-                Assert.Empty(await dbContext.ImportReviewMappingSnapshots
-                    .Where(snapshot => snapshot.ReviewId == reviewId)
                     .ToListAsync());
                 Assert.Contains(await dbContext.Audits
                     .Where(audit => audit.Description.Contains("Legacy account"))
@@ -274,13 +279,17 @@ public sealed class SinglePersonAccountOwnershipMigrationTests(SqlServerFixture 
         Assert.Equal(actingUserId, review.ActingUserId);
         Assert.Single(review.Rows);
         Assert.Equal("Legacy imported row", review.Rows.Single().Description);
-        Assert.True(await dbContext.AccountImportSettings
+        var savedSettings = await dbContext.AccountImportSettings
             .AsNoTracking()
-            .AnyAsync(settings => settings.AccountId == accountId
-                && settings.SourceImportReviewId == reviewId));
-        Assert.True(await dbContext.ImportReviewMappingSnapshots
-            .AsNoTracking()
-            .AnyAsync(snapshot => snapshot.ReviewId == reviewId));
+            .SingleAsync(settings => settings.AccountId == accountId);
+        Assert.Equal(ImportMappingSettingsSerializer.CurrentSchemaVersion, savedSettings.SchemaVersion);
+        Assert.NotNull(review.MappingJson);
+        Assert.NotNull(review.SchemaVersion);
+        Assert.Equal(savedSettings.SchemaVersion, review.SchemaVersion);
+        Assert.Equal(savedSettings.SettingsJson, review.MappingJson);
+        var mapping = ImportMappingSettingsSerializer.Deserialize(review.SchemaVersion.Value, review.MappingJson);
+        Assert.Equal(2, mapping.SignedAmountColumn);
+        Assert.Equal("yyyy-MM-dd", mapping.DateFormat);
         Assert.True(await dbContext.Audits
             .AsNoTracking()
             .AnyAsync(audit => audit.Description.Contains("Legacy account")
@@ -327,12 +336,6 @@ public sealed class SinglePersonAccountOwnershipMigrationTests(SqlServerFixture 
             $"INSERT INTO Transactions (Id, AccountId, TransactionDate, Description, Amount, Direction, CreatedAtUtc) VALUES ({transactionId}, {accountId}, {new DateOnly(2026, 1, 2)}, {"Legacy transaction"}, {12.34m}, {"Outgoing"}, {DateTimeOffset.UtcNow})");
         var reviewId = Guid.NewGuid();
         var now = DateTimeOffset.UtcNow;
-        var review = new ImportReview(
-            reviewId,
-            accountId,
-            familyOwnerUserId,
-            now,
-            now.AddMinutes(15));
         var mapping = new ImportMapping(
             0,
             1,
@@ -341,12 +344,10 @@ public sealed class SinglePersonAccountOwnershipMigrationTests(SqlServerFixture 
             SignedAmountColumn: 2,
             IncomingSign: IncomingSign.Positive,
             NumberFormat: "dot-decimal-comma-grouping");
-        dbContext.ImportReviews.Add(review);
-        dbContext.ImportReviewMappingSnapshots.Add(ImportReviewMappingSnapshot.Create(
-            reviewId,
-            ImportMappingSettingsSerializer.CurrentSchemaVersion,
-            ImportMappingSettingsSerializer.Serialize(mapping)));
-        await dbContext.SaveChangesAsync();
+        await dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"INSERT INTO ImportReviews (Id, AccountId, ActingUserId, State, CreatedAtUtc, ExpiresAtUtc, DuplicateConfirmationRequired) VALUES ({reviewId}, {accountId}, {familyOwnerUserId}, {"Ready"}, {now}, {now.AddMinutes(15)}, {false})");
+        await dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"INSERT INTO ImportReviewMappingSnapshots (ReviewId, SchemaVersion, MappingJson) VALUES ({reviewId}, {ImportMappingSettingsSerializer.CurrentSchemaVersion}, {ImportMappingSettingsSerializer.Serialize(mapping)})");
         await dbContext.Database.ExecuteSqlInterpolatedAsync(
             $"INSERT INTO ImportAuditEvents (Id, ReviewId, AccountId, ActingUserId, EventCode, OccurredAtUtc) VALUES ({Guid.NewGuid()}, {reviewId}, {accountId}, {familyOwnerUserId}, {"ReviewCreated"}, {now})");
         // Raw SQL keeps this seed valid against the pre-Balance legacy schema.

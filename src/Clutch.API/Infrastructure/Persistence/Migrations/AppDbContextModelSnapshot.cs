@@ -45,9 +45,6 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("LastSuccessfulImportAtUtc")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<Guid?>("LastSuccessfulImportReviewId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<string>("OwnerUserId")
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
@@ -168,6 +165,12 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("ExpiresAtUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("MappingJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("SchemaVersion")
+                        .HasColumnType("int");
+
                     b.Property<string>("State")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -182,6 +185,8 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
 
                     b.ToTable("ImportReviews", null, t =>
                         {
+                            t.HasCheckConstraint("CK_ImportReviews_Mapping", "([SchemaVersion] IS NULL AND [MappingJson] IS NULL) OR ([SchemaVersion] IS NOT NULL AND [SchemaVersion] > 0 AND [MappingJson] IS NOT NULL)");
+
                             t.HasCheckConstraint("CK_ImportReviews_ValidState", "[State] IN ('Ready', 'Confirmed', 'Cancelled', 'Expired')");
                         });
                 });
@@ -359,9 +364,6 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<Guid>("SourceImportReviewId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.HasKey("AccountId");
 
                     b.ToTable("AccountImportSettings", null, t =>
@@ -421,26 +423,6 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                     b.ToTable("ImportRateWindows", t =>
                         {
                             t.HasCheckConstraint("CK_ImportRateWindows_PositiveAttemptCount", "[AttemptCount] > 0");
-                        });
-                });
-
-            modelBuilder.Entity("Clutch.API.Infrastructure.Persistence.Entities.ImportReviewMappingSnapshot", b =>
-                {
-                    b.Property<Guid>("ReviewId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("MappingJson")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("SchemaVersion")
-                        .HasColumnType("int");
-
-                    b.HasKey("ReviewId");
-
-                    b.ToTable("ImportReviewMappingSnapshots", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_ImportReviewMappingSnapshots_SchemaVersion", "[SchemaVersion] > 0");
                         });
                 });
 
@@ -663,15 +645,6 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                     b.HasOne("Clutch.API.Infrastructure.Identity.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Clutch.API.Infrastructure.Persistence.Entities.ImportReviewMappingSnapshot", b =>
-                {
-                    b.HasOne("Clutch.API.Domain.Imports.ImportReview", null)
-                        .WithOne()
-                        .HasForeignKey("Clutch.API.Infrastructure.Persistence.Entities.ImportReviewMappingSnapshot", "ReviewId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

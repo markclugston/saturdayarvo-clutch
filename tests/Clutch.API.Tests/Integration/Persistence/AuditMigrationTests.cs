@@ -29,13 +29,10 @@ public sealed class AuditMigrationTests(SqlServerFixture fixture)
             var reviewId = Guid.NewGuid();
             var importOccurredAt = new DateTimeOffset(2026, 11, 1, 2, 3, 4, TimeSpan.Zero);
             var deletionOccurredAt = new DateTimeOffset(2026, 11, 2, 3, 4, 5, TimeSpan.Zero);
-            dbContext.ImportReviews.Add(new ImportReview(
-                reviewId,
-                account.Id,
-                ownerUserId,
-                importOccurredAt.AddMinutes(-1),
-                importOccurredAt.AddMinutes(15)));
+            Assert.True(account.TryAcquireImport(reviewId));
             await dbContext.SaveChangesAsync();
+            await dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"INSERT INTO ImportReviews (Id, AccountId, ActingUserId, State, CreatedAtUtc, ExpiresAtUtc, DuplicateConfirmationRequired) VALUES ({reviewId}, {account.Id}, {ownerUserId}, {"Cancelled"}, {importOccurredAt.AddMinutes(-1)}, {importOccurredAt.AddMinutes(15)}, {false})");
 
             await InsertImportEventAsync(
                 dbContext,
@@ -54,9 +51,16 @@ public sealed class AuditMigrationTests(SqlServerFixture fixture)
                 deletionOccurredAt);
 
             await dbContext.Database.MigrateAsync();
+            dbContext.ChangeTracker.Clear();
 
             var audits = await dbContext.Audits.AsNoTracking().ToListAsync();
             Assert.Equal(2, audits.Count);
+            Assert.Equal(0, await dbContext.ImportReviews.CountAsync(
+                candidate => candidate.Id == reviewId));
+            Assert.Null(await dbContext.Accounts
+                .Where(candidate => candidate.Id == account.Id)
+                .Select(candidate => candidate.ActiveImportId)
+                .SingleAsync());
             var importAudit = Assert.Single(audits, audit => audit.EventCode == "ReviewCreated");
             Assert.Equal(ownerUserId, importAudit.ActingUserId);
             Assert.Equal(importOccurredAt, importAudit.OccurredAtUtc);
@@ -100,9 +104,6 @@ public sealed class AuditMigrationTests(SqlServerFixture fixture)
             await Assert.ThrowsAsync<SqlException>(() => dbContext.Database.ExecuteSqlInterpolatedAsync(
                 $"INSERT INTO Audit (Id, ActingUserId, OccurredAtUtc, EventCode, Description) VALUES ({Guid.NewGuid()}, {ownerUserId}, {DateTimeOffset.UtcNow}, {"ReviewCreated"}, {" "})"));
 
-            dbContext.ImportReviews.Remove(await dbContext.ImportReviews.SingleAsync(
-                candidate => candidate.Id == reviewId));
-            await dbContext.SaveChangesAsync();
             dbContext.Accounts.Remove(await dbContext.Accounts.SingleAsync(
                 candidate => candidate.Id == account.Id));
             await dbContext.SaveChangesAsync();
@@ -130,13 +131,8 @@ public sealed class AuditMigrationTests(SqlServerFixture fixture)
             var importId = Guid.NewGuid();
             var reviewId = Guid.NewGuid();
             var eventCode = blankImportEventCode ? " " : "ReviewCreated";
-            dbContext.ImportReviews.Add(new ImportReview(
-                reviewId,
-                account.Id,
-                ownerUserId,
-                DateTimeOffset.UtcNow,
-                DateTimeOffset.UtcNow.AddMinutes(15)));
-            await dbContext.SaveChangesAsync();
+            await dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"INSERT INTO ImportReviews (Id, AccountId, ActingUserId, State, CreatedAtUtc, ExpiresAtUtc, DuplicateConfirmationRequired) VALUES ({reviewId}, {account.Id}, {ownerUserId}, {"Ready"}, {DateTimeOffset.UtcNow}, {DateTimeOffset.UtcNow.AddMinutes(15)}, {false})");
             await InsertImportEventAsync(
                 dbContext,
                 importId,

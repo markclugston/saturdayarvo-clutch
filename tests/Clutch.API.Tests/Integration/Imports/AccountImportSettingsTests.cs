@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Clutch.API.Api.ProblemDetails;
 using Clutch.API.Application.Imports;
 using Clutch.API.Domain.Imports;
 using Clutch.API.Infrastructure.Imports;
@@ -37,13 +38,11 @@ public sealed class AccountImportSettingsTests(SqlServerFixture fixture)
                 firstAccount,
                 ImportMappingSettingsSerializer.CurrentSchemaVersion,
                 ImportMappingSettingsSerializer.Serialize(firstMapping),
-                Guid.NewGuid(),
                 DateTimeOffset.UtcNow));
             db.AccountImportSettings.Add(AccountImportSettings.Create(
                 secondAccount,
                 ImportMappingSettingsSerializer.CurrentSchemaVersion,
                 ImportMappingSettingsSerializer.Serialize(secondMapping),
-                Guid.NewGuid(),
                 DateTimeOffset.UtcNow));
             await db.SaveChangesAsync();
         }
@@ -61,41 +60,26 @@ public sealed class AccountImportSettingsTests(SqlServerFixture fixture)
 
     [Fact]
     [Trait("Category", "SqlServer")]
-    public async Task Latest_confirmation_token_wins_for_both_settings_write_orders()
+    public async Task Saving_settings_replaces_the_previous_mapping_for_the_account()
     {
         using var owner = await CreateSignedInUserAsync();
         var accountId = await CreateAccountAsync(owner.Client, "Concurrency account");
-        var olderReviewId = Guid.NewGuid();
-        var newerReviewId = Guid.NewGuid();
         var olderMapping = Mapping();
         var newerMapping = Mapping(dateFormat: "dd/MM/yyyy", incomingSign: IncomingSign.Negative);
         await using var scope = fixture.Factory.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var settings = scope.ServiceProvider.GetRequiredService<AccountImportSettingsService>();
 
-        await SetLatestReviewAsync(db, accountId, olderReviewId);
-        Assert.True(await settings.SaveAfterConfirmationAsync(
-            accountId, olderReviewId, olderMapping, CancellationToken.None));
-
-        await SetLatestReviewAsync(db, accountId, newerReviewId);
-        Assert.True(await settings.SaveAfterConfirmationAsync(
-            accountId, newerReviewId, newerMapping, CancellationToken.None));
-        Assert.False(await settings.SaveAfterConfirmationAsync(
-            accountId, olderReviewId, olderMapping, CancellationToken.None));
+        await settings.SaveAsync(accountId, olderMapping, CancellationToken.None);
+        await settings.SaveAsync(accountId, newerMapping, CancellationToken.None);
         Assert.Equal(newerMapping, (await GetSettingsAsync(owner.Client, accountId)).Mapping);
 
-        await SetLatestReviewAsync(db, accountId, olderReviewId);
-        Assert.True(await settings.SaveAfterConfirmationAsync(
-            accountId, olderReviewId, olderMapping, CancellationToken.None));
-        await SetLatestReviewAsync(db, accountId, newerReviewId);
-        Assert.True(await settings.SaveAfterConfirmationAsync(
-            accountId, newerReviewId, newerMapping, CancellationToken.None));
-        Assert.Equal(newerMapping, (await GetSettingsAsync(owner.Client, accountId)).Mapping);
+        await settings.SaveAsync(accountId, olderMapping, CancellationToken.None);
+        Assert.Equal(olderMapping, (await GetSettingsAsync(owner.Client, accountId)).Mapping);
     }
 
     [Fact]
     [Trait("Category", "SqlServer")]
-    public async Task Defaults_write_failure_preserves_previous_settings_and_imported_transactions()
+    public async Task Settings_write_failure_rolls_back_the_import_and_preserves_previous_settings()
     {
         using var owner = await CreateSignedInUserAsync();
         var accountId = await CreateAccountAsync(owner.Client, "Failure account");
@@ -161,27 +145,27 @@ public sealed class AccountImportSettingsTests(SqlServerFixture fixture)
             settingsService,
             clock);
 
-        var result = await confirmService.ConfirmAsync(
+        await Assert.ThrowsAsync<ApiProblemException>(() => confirmService.ConfirmAsync(
             ownerUserId,
             nextReview.Id,
             confirmPossibleDuplicates: false,
-            CancellationToken.None);
+            CancellationToken.None));
 
         Assert.True(interceptor.Triggered);
-        Assert.Equal(1, result.ImportedCount);
-        Assert.False(result.SettingsSaved);
         Assert.Equal(initialMapping, (await GetSettingsAsync(owner.Client, accountId)).Mapping);
         await using var verifyScope = fixture.Factory.Services.CreateAsyncScope();
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
-        Assert.Equal(2, await verifyDb.Transactions.CountAsync(
+        Assert.Equal(1, await verifyDb.Transactions.CountAsync(
             transaction => transaction.AccountId == accountId));
-        Assert.Equal(0, await verifyDb.ImportReviewMappingSnapshots.CountAsync(
-            snapshot => snapshot.ReviewId == nextReview.Id));
+        Assert.Equal(0, await verifyDb.ImportReviews.CountAsync(review => review.Id == nextReview.Id));
+        Assert.Equal(0, await verifyDb.ImportReviewRows.CountAsync(row => row.ReviewId == nextReview.Id));
+        Assert.Null(await verifyDb.Accounts.Where(account => account.Id == accountId)
+            .Select(account => account.ActiveImportId).SingleAsync());
     }
 
     [Fact]
     [Trait("Category", "SqlServer")]
-    public async Task Cancelling_a_ready_review_deletes_its_mapping_snapshot()
+    public async Task Cancelling_a_ready_review_deletes_its_pending_mapping()
     {
         using var owner = await CreateSignedInUserAsync();
         var accountId = await CreateAccountAsync(owner.Client, "Cancellation account");
@@ -196,8 +180,10 @@ public sealed class AccountImportSettingsTests(SqlServerFixture fixture)
         await using (var scope = fixture.Factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            Assert.Equal(1, await db.ImportReviewMappingSnapshots.CountAsync(
-                snapshot => snapshot.ReviewId == review.Id));
+            var storedReview = await db.ImportReviews.AsNoTracking().SingleAsync(
+                candidate => candidate.Id == review.Id);
+            Assert.Equal(Mapping(), ImportMappingSettingsSerializer.Deserialize(
+                storedReview.SchemaVersion!.Value, storedReview.MappingJson!));
         }
 
         using var cancellation = await SendJsonAsync(
@@ -209,8 +195,9 @@ public sealed class AccountImportSettingsTests(SqlServerFixture fixture)
 
         await using var verifyScope = fixture.Factory.Services.CreateAsyncScope();
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
-        Assert.Equal(0, await verifyDb.ImportReviewMappingSnapshots.CountAsync(
-            snapshot => snapshot.ReviewId == review.Id));
+        Assert.Equal(0, await verifyDb.ImportReviews.CountAsync(candidate => candidate.Id == review.Id));
+        Assert.Equal(0, await verifyDb.ImportReviewRows.CountAsync(row => row.ReviewId == review.Id));
+        Assert.Null((await verifyDb.Accounts.SingleAsync(candidate => candidate.Id == accountId)).ActiveImportId);
     }
 
     [Fact]
@@ -219,10 +206,8 @@ public sealed class AccountImportSettingsTests(SqlServerFixture fixture)
     {
         using var owner = await CreateSignedInUserAsync();
         var accountId = await CreateAccountAsync(owner.Client, "Query account");
-        var reviewId = Guid.NewGuid();
         await using var seedScope = fixture.Factory.Services.CreateAsyncScope();
         var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
-        await SetLatestReviewAsync(seedDb, accountId, reviewId);
         var ownerUserId = await seedDb.Accounts
             .Where(account => account.Id == accountId)
             .Select(account => account.OwnerUserId)
@@ -245,11 +230,7 @@ public sealed class AccountImportSettingsTests(SqlServerFixture fixture)
         Assert.Contains("LEFT JOIN", Assert.Single(interceptor.Commands), StringComparison.OrdinalIgnoreCase);
 
         interceptor.Commands.Clear();
-        Assert.True(await service.SaveAfterConfirmationAsync(
-            accountId,
-            reviewId,
-            Mapping(),
-            CancellationToken.None));
+        await service.SaveAsync(accountId, Mapping(), CancellationToken.None);
         var selectCommand = Assert.Single(
             interceptor.Commands,
             command => command.Contains("SELECT", StringComparison.OrdinalIgnoreCase));
@@ -281,17 +262,6 @@ public sealed class AccountImportSettingsTests(SqlServerFixture fixture)
         Assert.Equal(HttpStatusCode.NoContent, login.StatusCode);
 
         return new SignedInUser(client);
-    }
-
-    private static async Task SetLatestReviewAsync(
-        AppDbContext db,
-        Guid accountId,
-        Guid reviewId)
-    {
-        db.ChangeTracker.Clear();
-        var account = await db.Accounts.SingleAsync(candidate => candidate.Id == accountId);
-        account.MarkSuccessfulImport(DateTimeOffset.UtcNow, reviewId);
-        await db.SaveChangesAsync();
     }
 
     private static async Task<Guid> CreateAccountAsync(HttpClient client, string description)

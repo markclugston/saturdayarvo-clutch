@@ -52,7 +52,7 @@ Currency is inherited from the immutable account currency; imports do not perfor
 
 ### Import review
 
-Short-lived server-side review state. It contains only normalized mapped values, never the original upload or unmapped fields.
+Short-lived server-side review state, persisted only while `Ready` for at most 5 minutes. It contains only normalized mapped values and the serialized mapping, never the original upload or unmapped fields. Delete the review and its rows atomically on confirmation, cancellation, failed processing, or expiry; retain only the audit event. Expired reviews are removed by the next one-minute cleanup pass.
 
 | Field | Type | Rules |
 |---|---|---|
@@ -63,8 +63,9 @@ Short-lived server-side review state. It contains only normalized mapped values,
 | CreatedAtUtc / ExpiresAtUtc | UTC timestamps | Expiry releases the account import lease |
 | DuplicateConfirmationRequired | Boolean | True when any proposed row matches an existing or same-file row |
 | Rows | Review row collection | Valid mapped data only; all-or-nothing validation before review creation |
+| SchemaVersion / MappingJson | Integer / JSON text | Mapping used to validate this review; stored directly on the review and deleted with it |
 
-State transitions: `Ready -> Confirmed`, `Ready -> Cancelled`, or `Ready -> Expired`. Terminal reviews cannot be confirmed again. Confirmation rechecks Family ownership, lease ownership, and duplicates before one atomic transaction insert. Cancellation, expiry, or failed confirmation leaves transactions and `LastSuccessfulImportAtUtc` unchanged.
+State transitions: `Ready -> Confirmed`, `Ready -> Cancelled`, or `Ready -> Expired`. Terminal state is used to coordinate cleanup but is not retained as a review record. Confirmation rechecks Family ownership, lease ownership, and duplicates before one atomic transaction insert. Cancellation, expiry, or failed confirmation leaves transactions and `LastSuccessfulImportAtUtc` unchanged.
 
 ### Import review row
 
@@ -103,7 +104,7 @@ Runtime defaults apply when no persisted administrator setting exists. Validate 
 | WindowStartedAtUtc | UTC timestamp | Fixed one-minute UTC window start |
 | AttemptCount | Integer | Atomically incremented for each import attempt |
 
-Use the shared database as the source of truth so application instances cannot each grant a separate request allowance. Expire completed windows. The configured per-user maximum applies to attempts, including rejected uploads.
+Use the shared database as the source of truth so application instances cannot each grant a separate request allowance. Expire completed windows after one minute. The configured per-user maximum applies to attempts, including rejected uploads.
 
 ### Import audit event
 
@@ -125,4 +126,4 @@ Audit records MUST NOT contain account/transaction descriptions, amounts, upload
 - Enforce one Family per owner with a database uniqueness constraint and prevent clients assigning accounts to another user's Family.
 - Apply maximum description and field lengths before identifier pattern checks to bound processing.
 - Validate every account description at create/update and every mapped transaction description before review or persistence.
-- Review data is short-lived; cleanup must release active account leases and remove staged descriptions on cancel, expiry, success, and failed processing.
+- Review data is short-lived; cleanup must release active account leases and remove review records (including their mapping) and staged descriptions on cancel, expiry, success, and failed processing. Audit events remain; imported transactions, saved import settings, and rate-limit windows are separate data.

@@ -25,7 +25,7 @@ public sealed class ImportAttemptLimiter(
             0,
             TimeSpan.Zero);
         await dbContext.ImportRateWindows
-            .Where(window => window.WindowStartedAtUtc < windowStartedAtUtc.AddMinutes(-1))
+            .Where(window => window.WindowStartedAtUtc < windowStartedAtUtc)
             .ExecuteDeleteAsync(cancellationToken);
 
         var attemptCounts = await dbContext.Database.SqlQuery<int>($"""

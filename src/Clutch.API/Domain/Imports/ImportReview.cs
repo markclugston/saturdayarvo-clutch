@@ -21,12 +21,16 @@ public sealed class ImportReview
         Guid accountId,
         string actingUserId,
         DateTimeOffset createdAtUtc,
-        DateTimeOffset expiresAtUtc)
+        DateTimeOffset expiresAtUtc,
+        int schemaVersion,
+        string mappingJson)
     {
         if (id == Guid.Empty
             || accountId == Guid.Empty
             || string.IsNullOrWhiteSpace(actingUserId)
-            || expiresAtUtc <= createdAtUtc)
+            || expiresAtUtc <= createdAtUtc
+            || schemaVersion <= 0
+            || string.IsNullOrWhiteSpace(mappingJson))
         {
             throw new ArgumentException("The import review is invalid.");
         }
@@ -37,6 +41,8 @@ public sealed class ImportReview
         State = ImportReviewState.Ready;
         CreatedAtUtc = createdAtUtc;
         ExpiresAtUtc = expiresAtUtc;
+        SchemaVersion = schemaVersion;
+        MappingJson = mappingJson;
     }
 
     public Guid Id { get; private set; }
@@ -50,6 +56,10 @@ public sealed class ImportReview
     public DateTimeOffset CreatedAtUtc { get; private set; }
 
     public DateTimeOffset ExpiresAtUtc { get; private set; }
+
+    public int? SchemaVersion { get; private set; }
+
+    public string? MappingJson { get; private set; }
 
     public bool DuplicateConfirmationRequired { get; private set; }
 

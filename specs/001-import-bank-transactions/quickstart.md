@@ -38,13 +38,23 @@ For integration tests, the test fixture starts a disposable SQL Server 2022 cont
 4. Register or sign in with an ordinary user, create their one Family, and create an AUD account in it.
 5. Upload a representative CSV. Map date, description, amount and optional direction fields; confirm the date/number conventions; review all rows and possible-duplicate warnings; confirm the import.
 6. Verify transactions appear only in the selected account and the account page shows the UTC successful-import timestamp localized for the viewing user.
-7. Cancel a review and verify `Accounts.ActiveImportId` is null and its `ImportReviewRows` are gone. For expiry, wait for the cleanup service's next one-minute pass, then verify the same conditions; audit events should contain only safe event metadata.
+7. Cancel a review and verify `Accounts.ActiveImportId` is null and its `ImportReviews` (including the mapping) and `ImportReviewRows` records are gone, while the audit event remains. After confirming an import, verify the same review data is gone while the imported transactions and saved mapping remain in `AccountImportSettings`. For expiry, wait for the cleanup service's next one-minute pass and verify review data is gone and the account lease is released.
 8. Sign in with an administrator and change one import limit. Verify the setting takes effect immediately without restarting the API. Sign in as an ordinary user and verify administrator settings are inaccessible.
 
 If a review response is lost, retrying the import may report an active review. Choose
 **Discard active review** only when the pending review is no longer needed, including in
 other tabs, then retry. Discarding does not delete imported transactions. A ready review
-otherwise holds the account lease until confirmation, cancellation, or its 15-minute expiry.
+otherwise holds the account lease until confirmation, cancellation, or its 5-minute expiry.
+Expiry is server-driven: closing the browser requires no callback, and the next one-minute
+cleanup pass deletes the expired review (including its mapping) and staged rows.
+The inline-mapping migration copies existing mapping snapshots onto their reviews before
+dropping `ImportReviewMappingSnapshots`; account import settings are unchanged.
+Existing pending reviews are shortened to five minutes from creation when the lifetime
+migration is applied. The account's last-successful-import timestamp remains account metadata.
+The cleanup pass also removes
+completed rate-limit windows even if no further import is attempted. Confirmation saves transactions,
+mapping settings, the audit event, and review cleanup in one transaction; a settings-save
+failure rolls back the import and removes the failed review.
 Failures before the review is saved roll back lease acquisition and staged data together.
 
 ## Roll back the import migration

@@ -6,6 +6,7 @@ using Clutch.API.Domain.Shared;
 using Clutch.API.Domain.Transactions;
 using Clutch.API.Infrastructure.Imports;
 using Clutch.API.Infrastructure.Persistence;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 namespace Clutch.API.Application.Imports;
@@ -37,7 +38,7 @@ public sealed class ConfirmImportService(
                     cancellationToken));
             completed = true;
         }
-        catch (DbUpdateException)
+        catch (Exception exception) when (exception is DbUpdateException or SqlException)
         {
             throw new ApiProblemException(
                 StatusCodes.Status500InternalServerError,
@@ -63,18 +64,8 @@ public sealed class ConfirmImportService(
             throw outcome.Problem;
         }
 
-        var settingsSaved = false;
-        if (outcome.Mapping is not null && outcome.AccountId is Guid accountId)
-        {
-            settingsSaved = await accountImportSettingsService.SaveAfterConfirmationAsync(
-                accountId,
-                reviewId,
-                outcome.Mapping,
-                cancellationToken);
-        }
-
         importMeasurement.MarkSucceeded(outcome.Response!.ImportedCount);
-        return outcome.Response with { SettingsSaved = settingsSaved };
+        return outcome.Response;
     }
 
     private async Task<ConfirmOutcome> ConfirmWithinTransactionAsync(
@@ -111,9 +102,7 @@ public sealed class ConfirmImportService(
         {
             review.TryTransition(ImportReviewState.Expired);
             account.TryReleaseImport(review.Id);
-            await dbContext.ImportReviewMappingSnapshots
-                .Where(snapshot => snapshot.ReviewId == review.Id)
-                .ExecuteDeleteAsync(cancellationToken);
+            dbContext.ImportReviews.Remove(review);
             auditWriter.Add(
                 account.Description,
                 ownerUserId,
@@ -205,27 +194,23 @@ public sealed class ConfirmImportService(
             return await RollbackOutcomeAsync(transaction, InvalidStagedData());
         }
 
-        var snapshot = await dbContext.ImportReviewMappingSnapshots
-            .AsNoTracking()
-            .SingleOrDefaultAsync(candidate => candidate.ReviewId == review.Id, cancellationToken);
-        if (snapshot is null)
+        if (review.SchemaVersion is null || review.MappingJson is null)
         {
             return await RollbackOutcomeAsync(transaction, InvalidStagedData());
         }
 
         var mapping = ImportMappingSettingsSerializer.Deserialize(
-            snapshot.SchemaVersion,
-            snapshot.MappingJson);
+            review.SchemaVersion.Value,
+            review.MappingJson);
         dbContext.Transactions.AddRange(transactions);
-        account.MarkSuccessfulImport(now, review.Id);
+        await accountImportSettingsService.SaveAsync(account.Id, mapping, cancellationToken);
+        account.MarkSuccessfulImport(now);
         if (!account.TryReleaseImport(review.Id) || !review.TryTransition(ImportReviewState.Confirmed))
         {
             return await RollbackOutcomeAsync(transaction, LeaseNotOwned());
         }
 
-        await dbContext.ImportReviewMappingSnapshots
-            .Where(candidate => candidate.ReviewId == review.Id)
-            .ExecuteDeleteAsync(cancellationToken);
+        dbContext.ImportReviews.Remove(review);
         auditWriter.Add(
             account.Description,
             ownerUserId,
@@ -235,9 +220,7 @@ public sealed class ConfirmImportService(
         await transaction.CommitAsync(cancellationToken);
 
         return ConfirmOutcome.Succeeded(
-            new ConfirmImportResponse(transactions.Count, now, SettingsSaved: false),
-            account.Id,
-            mapping);
+            new ConfirmImportResponse(transactions.Count, now, SettingsSaved: true));
     }
 
     private async Task<ConfirmOutcome> RollbackOutcomeAsync(
@@ -311,18 +294,13 @@ public sealed class ConfirmImportService(
     private sealed record ConfirmOutcome(
         ConfirmImportResponse? Response,
         ApiProblemException? Problem,
-        bool RetainReview,
-        Guid? AccountId,
-        ImportMapping? Mapping)
+        bool RetainReview)
     {
-        public static ConfirmOutcome Succeeded(
-            ConfirmImportResponse response,
-            Guid accountId,
-            ImportMapping mapping) =>
-            new(response, null, false, accountId, mapping);
+        public static ConfirmOutcome Succeeded(ConfirmImportResponse response) =>
+            new(response, null, false);
 
         public static ConfirmOutcome Failed(ApiProblemException problem, bool retainReview = false) =>
-            new(null, problem, retainReview, null, null);
+            new(null, problem, retainReview);
     }
 }
 

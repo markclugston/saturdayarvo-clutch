@@ -33,6 +33,9 @@ public sealed class ImportReviewCleanupService(
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var auditWriter = scope.ServiceProvider.GetRequiredService<ImportAuditWriter>();
         var now = timeProvider.GetUtcNow();
+        await dbContext.ImportRateWindows
+            .Where(window => window.WindowStartedAtUtc <= now.AddMinutes(-1))
+            .ExecuteDeleteAsync(cancellationToken);
         var strategy = dbContext.Database.CreateExecutionStrategy();
         var expiredCount = await strategy.ExecuteAsync(async () =>
         {
@@ -82,9 +85,6 @@ public sealed class ImportReviewCleanupService(
                 await dbContext.ImportReviewRows
                     .Where(row => row.ReviewId == review.Id)
                     .ExecuteDeleteAsync(cancellationToken);
-                await dbContext.ImportReviewMappingSnapshots
-                    .Where(snapshot => snapshot.ReviewId == review.Id)
-                    .ExecuteDeleteAsync(cancellationToken);
                 await dbContext.Accounts
                     .Where(account =>
                         account.Id == review.AccountId
@@ -94,6 +94,9 @@ public sealed class ImportReviewCleanupService(
                             account => account.ActiveImportId,
                             (Guid?)null),
                         cancellationToken);
+                await dbContext.ImportReviews
+                    .Where(candidate => candidate.Id == review.Id)
+                    .ExecuteDeleteAsync(cancellationToken);
                 auditWriter.Add(
                     review.AccountDescription,
                     review.ActingUserId,
