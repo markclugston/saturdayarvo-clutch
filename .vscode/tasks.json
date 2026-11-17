@@ -4,7 +4,24 @@
     {
       "label": "prepare-api",
       "dependsOrder": "sequence",
-      "dependsOn": ["build-api", "migrate-api"],
+      "dependsOn": ["start-otel-dashboard", "build-api", "migrate-api"],
+      "problemMatcher": []
+    },
+    {
+      "label": "start-otel-dashboard",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/.vscode/start-otel-dashboard.ps1"
+      ],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      },
       "problemMatcher": []
     },
     {

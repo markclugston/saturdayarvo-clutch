@@ -4,12 +4,14 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Clutch.API.Api.ProblemDetails;
 using Clutch.API.Application.Imports;
 using Clutch.API.Domain.Imports;
 using Clutch.API.Infrastructure.Imports;
 using Clutch.API.Infrastructure.Persistence;
 using Clutch.API.Infrastructure.Persistence.Entities;
 using Clutch.API.Tests.Integration.Accounts;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -474,19 +476,28 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
         using var stranger = CreateClient();
         await RegisterAndSignInAsync(stranger);
         using var denied = await SendJsonAsync(
-            stranger, HttpMethod.Delete, $"/api/accounts/{account.Id}/active-import-review", null);
+            stranger,
+            HttpMethod.Delete,
+            $"/api/accounts/{account.Id}/active-import-review?reviewId={review.Id}",
+            null);
         Assert.Equal(HttpStatusCode.NotFound, denied.StatusCode);
-        using var noCsrf = await owner.DeleteAsync($"/api/accounts/{account.Id}/active-import-review");
+        using var noCsrf = await owner.DeleteAsync(
+            $"/api/accounts/{account.Id}/active-import-review?reviewId={review.Id}");
         Assert.Equal(HttpStatusCode.BadRequest, noCsrf.StatusCode);
 
         using var recovery = await SendJsonAsync(
-            owner, HttpMethod.Delete, $"/api/accounts/{account.Id}/active-import-review", null);
+            owner,
+            HttpMethod.Delete,
+            $"/api/accounts/{account.Id}/active-import-review?reviewId={review.Id}",
+            null);
         Assert.Equal(HttpStatusCode.NoContent, recovery.StatusCode);
 
         await using (var scope = fixture.Factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            Assert.Equal(0, await db.ImportReviews.CountAsync(candidate => candidate.Id == review.Id));
+            var ended = await db.ImportReviews.SingleAsync(candidate => candidate.Id == review.Id);
+            Assert.Equal(ImportReviewState.Cancelled, ended.State);
+            Assert.NotNull(ended.EndedAtUtc);
             Assert.Equal(0, await db.ImportReviewRows.CountAsync(row => row.ReviewId == review.Id));
             Assert.Null((await db.Accounts.SingleAsync(candidate => candidate.Id == account.Id)).ActiveImportId);
             Assert.Equal(otherReview.Id,
@@ -496,7 +507,7 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
                 .Select(candidate => candidate.OwnerUserId)
                 .SingleAsync();
             Assert.Equal(1, await db.Audits.CountAsync(
-                audit => audit.EventCode == "ReviewCancelled"
+                audit => audit.EventCode == "ReviewEndedElsewhere"
                     && audit.ActingUserId == ownerUserId
                     && audit.Description.Contains(account.Description)));
             Assert.Equal(0, await db.Transactions.CountAsync(transaction => transaction.AccountId == account.Id));
@@ -508,7 +519,7 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
 
     [Fact]
     [Trait("Category", "SqlServer")]
-    public async Task Cancelling_a_review_that_is_no_longer_ready_still_releases_a_stale_lease()
+    public async Task Cancelling_a_review_that_is_no_longer_ready_does_not_release_a_stale_lease()
     {
         using var owner = CreateClient();
         await RegisterAndSignInAsync(owner);
@@ -529,16 +540,20 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
 
         using var cancel = await SendJsonAsync(
             owner, HttpMethod.Delete, $"/api/import-reviews/{review.Id}", null);
-        Assert.Equal(HttpStatusCode.NoContent, cancel.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, cancel.StatusCode);
 
         await using (var scope = fixture.Factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            Assert.Null((await db.Accounts.SingleAsync(candidate => candidate.Id == account.Id)).ActiveImportId);
+            Assert.Equal(
+                review.Id,
+                (await db.Accounts.SingleAsync(candidate => candidate.Id == account.Id)).ActiveImportId);
+            Assert.True(await db.ImportReviews.AnyAsync(candidate => candidate.Id == review.Id));
+            Assert.True(await db.ImportReviewRows.AnyAsync(row => row.ReviewId == review.Id));
         }
 
         using var next = await CreateReviewAsync(owner, account.Id, csv, SignedMapping());
-        Assert.Equal(HttpStatusCode.Created, next.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, next.StatusCode);
     }
 
     [Fact]
@@ -747,7 +762,10 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
         }
 
         using var recovery = await SendJsonAsync(
-            client, HttpMethod.Delete, $"/api/accounts/{account.Id}/active-import-review", null);
+            client,
+            HttpMethod.Delete,
+            $"/api/accounts/{account.Id}/active-import-review?reviewId={leaseId}",
+            null);
         Assert.Equal(HttpStatusCode.Conflict, recovery.StatusCode);
         using var attempt = await CreateReviewAsync(
             client, account.Id, "Date,Description,Amount\n2025-01-15,Market,12.34", SignedMapping());
@@ -865,6 +883,257 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
             "Date,Description,Amount\n2025-01-16,Groceries,8.00",
             SignedMapping());
         Assert.Equal(HttpStatusCode.Created, nextReview.StatusCode);
+    }
+
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task Confirmation_commits_processing_claim_before_it_can_be_cancelled_or_written()
+    {
+        using var client = CreateClient();
+        await RegisterAndSignInAsync(client);
+        var account = await CreateAccountAsync(client, "Claim barrier", "AUD");
+        using var response = await CreateReviewAsync(
+            client,
+            account.Id,
+            "Date,Description,Amount\n2025-01-15,Claim barrier transaction,12.34",
+            SignedMapping());
+        var review = await response.Content.ReadFromJsonAsync<ReviewResponse>();
+        Assert.NotNull(review);
+        string ownerUserId;
+        await using (var ownerScope = fixture.Factory.Services.CreateAsyncScope())
+        {
+            var ownerDb = ownerScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            ownerUserId = await ownerDb.Accounts
+                .Where(candidate => candidate.Id == account.Id)
+                .Select(candidate => candidate.OwnerUserId)
+                .SingleAsync() ?? throw new InvalidOperationException("The account must have an owner.");
+        }
+
+        var barrier = new SecondReviewUpdateBarrier();
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseSqlServer(fixture.ConnectionString)
+            .AddInterceptors(barrier)
+            .Options;
+        await using var db = new AppDbContext(options);
+        var clock = TimeProvider.System;
+        var auditWriter = new ImportAuditWriter(db, clock);
+        var reviewService = new ImportReviewService(
+            db,
+            new CsvImportParser(),
+            new AccountImportLease(db),
+            auditWriter,
+            new AllowImportAttempts(),
+            clock);
+        var stateService = new ImportStateService(
+            db,
+            clock,
+            fixture.Factory.Services.GetRequiredService<ILogger<ImportStateService>>());
+        var confirmService = new ConfirmImportService(
+            db,
+            auditWriter,
+            reviewService,
+            stateService,
+            new AccountImportSettingsService(
+                db,
+                clock,
+                fixture.Factory.Services.GetRequiredService<ILogger<AccountImportSettingsService>>()),
+            clock);
+
+        var confirmationTask = confirmService.ConfirmAsync(
+            ownerUserId,
+            review.Id,
+            confirmPossibleDuplicates: false,
+            CancellationToken.None);
+        await barrier.SecondUpdateStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        await using (var verifyScope = fixture.Factory.Services.CreateAsyncScope())
+        {
+            var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var claimed = await verifyDb.ImportReviews.AsNoTracking()
+                .SingleAsync(candidate => candidate.Id == review.Id);
+            Assert.Equal(ImportReviewState.Processing, claimed.State);
+            Assert.NotNull(claimed.ConfirmationAttemptId);
+            Assert.NotNull(claimed.ProcessingStartedAtUtc);
+            Assert.Single(await verifyDb.ImportReviewRows
+                .Where(row => row.ReviewId == review.Id)
+                .ToListAsync());
+        }
+
+        using var rejectedCancel = await SendJsonAsync(
+            client,
+            HttpMethod.Delete,
+            $"/api/import-reviews/{review.Id}",
+            content: null);
+        Assert.Equal(HttpStatusCode.Conflict, rejectedCancel.StatusCode);
+
+        barrier.Continue();
+        var confirmation = await confirmationTask.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal(1, confirmation.ImportedCount);
+        await using var completedScope = fixture.Factory.Services.CreateAsyncScope();
+        var completedDb = completedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(1, await completedDb.Transactions.CountAsync(
+            candidate => candidate.AccountId == account.Id));
+    }
+
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task Lost_commit_acknowledgement_is_reported_as_unknown_without_replaying_financial_writes()
+    {
+        using var client = CreateClient();
+        await RegisterAndSignInAsync(client);
+        var account = await CreateAccountAsync(client, "Unknown commit", "AUD");
+        using var response = await CreateReviewAsync(
+            client,
+            account.Id,
+            "Date,Description,Amount\n2025-01-15,Unknown commit transaction,12.34",
+            SignedMapping());
+        var review = await response.Content.ReadFromJsonAsync<ReviewResponse>();
+        Assert.NotNull(review);
+        var ownerUserId = await GetOwnerUserIdAsync(account.Id);
+        var commitInterceptor = new LostCommitAcknowledgementInterceptor();
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseSqlServer(fixture.ConnectionString)
+            .AddInterceptors(commitInterceptor)
+            .Options;
+        await using var db = new AppDbContext(options);
+        var clock = TimeProvider.System;
+        var auditWriter = new ImportAuditWriter(db, clock);
+        var reviewService = new ImportReviewService(
+            db,
+            new CsvImportParser(),
+            new AccountImportLease(db),
+            auditWriter,
+            new AllowImportAttempts(),
+            clock);
+        var confirmService = new ConfirmImportService(
+            db,
+            auditWriter,
+            reviewService,
+            new ImportStateService(
+                db,
+                clock,
+                fixture.Factory.Services.GetRequiredService<ILogger<ImportStateService>>()),
+            new AccountImportSettingsService(
+                db,
+                clock,
+                fixture.Factory.Services.GetRequiredService<ILogger<AccountImportSettingsService>>()),
+            clock);
+
+        var problem = await Assert.ThrowsAsync<ApiProblemException>(() => confirmService.ConfirmAsync(
+            ownerUserId,
+            review.Id,
+            confirmPossibleDuplicates: false,
+            CancellationToken.None));
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, problem.StatusCode);
+        Assert.Contains("ImportOutcomeUnknown", problem.Errors!["code"]);
+        Assert.True(commitInterceptor.Triggered);
+        await using var verifyScope = fixture.Factory.Services.CreateAsyncScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(1, await verifyDb.Transactions.CountAsync(
+            candidate => candidate.AccountId == account.Id));
+        Assert.False(await verifyDb.ImportReviews.AnyAsync(candidate => candidate.Id == review.Id));
+        Assert.Null(await verifyDb.Accounts.Where(candidate => candidate.Id == account.Id)
+            .Select(candidate => candidate.ActiveImportId).SingleAsync());
+        Assert.Equal(1, await verifyDb.Audits.CountAsync(candidate =>
+            candidate.EventCode == "ImportConfirmed"
+            && candidate.ActingUserId == ownerUserId
+            && candidate.Description.Contains(account.Description)));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    [Trait("Category", "SqlServer")]
+    public async Task Abandoned_claim_recovery_waits_for_the_guarded_write_transaction(bool writeCommits)
+    {
+        using var client = CreateClient();
+        await RegisterAndSignInAsync(client);
+        var account = await CreateAccountAsync(client, "Recovery lock", "AUD");
+        using var response = await CreateReviewAsync(
+            client,
+            account.Id,
+            "Date,Description,Amount\n2025-01-15,Recovery lock transaction,12.34",
+            SignedMapping());
+        var review = await response.Content.ReadFromJsonAsync<ReviewResponse>();
+        Assert.NotNull(review);
+
+        var now = DateTimeOffset.UtcNow;
+        var attemptId = Guid.NewGuid();
+        await using (var setupScope = fixture.Factory.Services.CreateAsyncScope())
+        {
+            var setupDb = setupScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await setupDb.ImportReviews
+                .Where(candidate => candidate.Id == review.Id)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(candidate => candidate.State, ImportReviewState.Processing)
+                    .SetProperty(candidate => candidate.ConfirmationAttemptId, attemptId)
+                    .SetProperty(candidate => candidate.ProcessingStartedAtUtc, now.AddMinutes(-6)));
+        }
+
+        var barrier = new ProcessingRecoveryQueryBarrier();
+        var recoveryClock = new FixedTimeProvider(now);
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<TimeProvider>(recoveryClock);
+        services.AddDbContext<AppDbContext>(options => options
+            .UseSqlServer(fixture.ConnectionString)
+            .AddInterceptors(barrier));
+        services.AddScoped<ImportAuditWriter>();
+        await using var provider = services.BuildServiceProvider();
+        var cleanup = new ImportReviewCleanupService(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            recoveryClock,
+            provider.GetRequiredService<ILogger<ImportReviewCleanupService>>());
+
+        await using var writeDb = new AppDbContext(
+            new DbContextOptionsBuilder<AppDbContext>()
+                .UseSqlServer(fixture.ConnectionString)
+                .Options);
+        await using var writeTransaction = await writeDb.Database.BeginTransactionAsync();
+        await writeDb.ImportReviews
+            .Where(candidate => candidate.Id == review.Id
+                && candidate.State == ImportReviewState.Processing
+                && candidate.ConfirmationAttemptId == attemptId)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(
+                candidate => candidate.ConfirmationAttemptId,
+                attemptId));
+
+        var cleanupTask = cleanup.RunCleanupOnceAsync(CancellationToken.None);
+        await barrier.StaleCandidateQueryStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(cleanupTask.IsCompleted);
+
+        if (writeCommits)
+        {
+            await writeDb.ImportReviews
+                .Where(candidate => candidate.Id == review.Id)
+                .ExecuteDeleteAsync();
+            await writeDb.Accounts
+                .Where(candidate => candidate.Id == account.Id && candidate.ActiveImportId == review.Id)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(
+                    candidate => candidate.ActiveImportId,
+                    (Guid?)null));
+            await writeTransaction.CommitAsync();
+        }
+        else
+        {
+            await writeTransaction.RollbackAsync();
+        }
+
+        await cleanupTask.WaitAsync(TimeSpan.FromSeconds(10));
+        await using var verifyScope = fixture.Factory.Services.CreateAsyncScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.False(await verifyDb.ImportReviews.AnyAsync(candidate => candidate.Id == review.Id));
+        Assert.Null(await verifyDb.Accounts.Where(candidate => candidate.Id == account.Id)
+            .Select(candidate => candidate.ActiveImportId).SingleAsync());
+        var ownerUserId = await verifyDb.Accounts
+            .Where(candidate => candidate.Id == account.Id)
+            .Select(candidate => candidate.OwnerUserId)
+            .SingleAsync();
+        Assert.Equal(writeCommits ? 0 : 1, await verifyDb.Audits.CountAsync(
+            audit => audit.ActingUserId == ownerUserId
+                && audit.EventCode == "ConfirmationFailed"
+                && audit.Description.Contains(account.Description)));
     }
 
     [Fact]
@@ -1061,6 +1330,16 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
         return account;
     }
 
+    private async Task<string> GetOwnerUserIdAsync(Guid accountId)
+    {
+        await using var scope = fixture.Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await db.Accounts
+            .Where(candidate => candidate.Id == accountId)
+            .Select(candidate => candidate.OwnerUserId)
+            .SingleAsync() ?? throw new InvalidOperationException("The account must have an owner.");
+    }
+
     private static async Task<HttpResponseMessage> CreateReviewAsync(
         HttpClient client,
         Guid accountId,
@@ -1173,6 +1452,90 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
             }
 
             return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
+        }
+    }
+
+    private sealed class SecondReviewUpdateBarrier : DbCommandInterceptor
+    {
+        private readonly TaskCompletionSource<bool> secondUpdateStarted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<bool> continueExecution =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int reviewUpdateCount;
+
+        public TaskCompletionSource<bool> SecondUpdateStarted => secondUpdateStarted;
+
+        public void Continue() => continueExecution.TrySetResult(true);
+
+        public override async ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<DbDataReader> result,
+            CancellationToken cancellationToken = default)
+        {
+            await PauseSecondReviewUpdateAsync(command, cancellationToken);
+            return result;
+        }
+
+        public override async ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            await PauseSecondReviewUpdateAsync(command, cancellationToken);
+            return result;
+        }
+
+        private async Task PauseSecondReviewUpdateAsync(
+            DbCommand command,
+            CancellationToken cancellationToken)
+        {
+            if (!command.CommandText.Contains("UPDATE", StringComparison.OrdinalIgnoreCase)
+                || !command.CommandText.Contains("ImportReviews", StringComparison.OrdinalIgnoreCase)
+                || Interlocked.Increment(ref reviewUpdateCount) != 2)
+            {
+                return;
+            }
+
+            secondUpdateStarted.TrySetResult(true);
+            await continueExecution.Task.WaitAsync(cancellationToken);
+        }
+    }
+
+    private sealed class ProcessingRecoveryQueryBarrier : DbCommandInterceptor
+    {
+        public TaskCompletionSource<bool> StaleCandidateQueryStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<DbDataReader> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (command.CommandText.Contains("SELECT", StringComparison.OrdinalIgnoreCase)
+                && command.CommandText.Contains("ImportReviews", StringComparison.OrdinalIgnoreCase)
+                && command.CommandText.Contains("ProcessingStartedAtUtc", StringComparison.OrdinalIgnoreCase))
+            {
+                StaleCandidateQueryStarted.TrySetResult(true);
+            }
+
+            return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
+        }
+    }
+
+    private sealed class LostCommitAcknowledgementInterceptor : DbTransactionInterceptor
+    {
+        public bool Triggered { get; private set; }
+
+        public override Task TransactionCommittedAsync(
+            DbTransaction transaction,
+            TransactionEndEventData eventData,
+            CancellationToken cancellationToken = default)
+        {
+            Triggered = true;
+            throw new InvalidOperationException("Simulated lost commit acknowledgement.");
         }
     }
 

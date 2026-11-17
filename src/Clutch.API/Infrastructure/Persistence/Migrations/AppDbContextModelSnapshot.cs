@@ -156,17 +156,30 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<Guid?>("ConfirmationAttemptId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<bool>("DuplicateConfirmationRequired")
                         .HasColumnType("bit");
 
+                    b.Property<DateTimeOffset?>("EndedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("EndedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
                     b.Property<DateTimeOffset>("ExpiresAtUtc")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("MappingJson")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("ProcessingStartedAtUtc")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<int?>("SchemaVersion")
                         .HasColumnType("int");
@@ -183,11 +196,18 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("AccountId", "State");
 
+                    b.HasIndex("ProcessingStartedAtUtc", "Id")
+                        .HasFilter("[State] = 'Processing'");
+
                     b.ToTable("ImportReviews", null, t =>
                         {
+                            t.HasCheckConstraint("CK_ImportReviews_EndedMetadata", "(([EndedByUserId] IS NULL AND [EndedAtUtc] IS NULL) OR ([State] = 'Cancelled' AND [EndedByUserId] IS NOT NULL AND LEN(LTRIM(RTRIM([EndedByUserId]))) > 0 AND [EndedAtUtc] IS NOT NULL AND [ConfirmationAttemptId] IS NULL AND [ProcessingStartedAtUtc] IS NULL))");
+
                             t.HasCheckConstraint("CK_ImportReviews_Mapping", "([SchemaVersion] IS NULL AND [MappingJson] IS NULL) OR ([SchemaVersion] IS NOT NULL AND [SchemaVersion] > 0 AND [MappingJson] IS NOT NULL)");
 
-                            t.HasCheckConstraint("CK_ImportReviews_ValidState", "[State] IN ('Ready', 'Confirmed', 'Cancelled', 'Expired')");
+                            t.HasCheckConstraint("CK_ImportReviews_ProcessingMetadata", "(([State] = 'Processing' AND [ConfirmationAttemptId] IS NOT NULL AND [ProcessingStartedAtUtc] IS NOT NULL AND [EndedByUserId] IS NULL AND [EndedAtUtc] IS NULL) OR ([State] <> 'Processing' AND [ConfirmationAttemptId] IS NULL AND [ProcessingStartedAtUtc] IS NULL))");
+
+                            t.HasCheckConstraint("CK_ImportReviews_ValidState", "[State] IN ('Ready', 'Processing', 'Confirmed', 'Cancelled', 'Expired')");
                         });
                 });
 

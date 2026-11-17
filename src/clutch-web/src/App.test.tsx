@@ -4,7 +4,7 @@ import { focusManager, useQuery } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getAccount, getCurrencies } from '@/features/accounts/api'
 import { getSession, signIn, signOut } from '@/features/auth/api'
-import { confirmImportReview, createImportReview, getAccountImportSettings } from '@/features/imports/api'
+import { confirmImportReview, createImportReview, getAccountImportSettings, getImportStatus } from '@/features/imports/api'
 import { ApiError } from '@/lib/api/client'
 import { renderWithQueryClient } from '@/test/renderWithQueryClient'
 import App from './App'
@@ -64,6 +64,7 @@ vi.mock('@/features/accounts/api', () => ({
 vi.mock('@/features/imports/api', () => ({
   createImportReview: vi.fn(),
   getAccountImportSettings: vi.fn(),
+  getImportStatus: vi.fn(),
   confirmImportReview: vi.fn(),
   cancelImportReview: vi.fn(),
   cancelActiveImportReview: vi.fn(),
@@ -95,6 +96,13 @@ describe('session loading', () => {
 
   beforeEach(() => {
     vi.resetAllMocks()
+    vi.mocked(getImportStatus).mockImplementation(async (accountId, reviewId) => reviewId ? ({
+      accountId, availability: 'Blocked',
+      activeImport: { id: reviewId, stage: 'Preview', canEnd: true, expiresAtUtc: '2027-01-15T14:00:00Z' },
+      watchedImport: { id: reviewId, state: 'Ready', expiresAtUtc: '2027-01-15T14:00:00Z' },
+    }) : ({
+      accountId, availability: 'Available', activeImport: null, watchedImport: null,
+    }))
     vi.mocked(getAccount).mockResolvedValue({
       id: 'account-1',
       description: 'Everyday spending',

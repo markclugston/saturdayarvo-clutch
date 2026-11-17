@@ -81,6 +81,7 @@ public static class DependencyInjection
         services.AddScoped<CsvImportParser>();
         services.AddScoped<AccountImportLease>();
         services.AddScoped<ImportAuditWriter>();
+        services.AddScoped<ImportStateService>();
         services.AddScoped<ImportReviewService>();
         services.AddScoped<ConfirmImportService>();
         services.AddScoped<AccountImportSettingsService>();
