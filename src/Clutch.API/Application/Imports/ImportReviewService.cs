@@ -182,12 +182,19 @@ public sealed class ImportReviewService(
             throw ReviewNotFound();
         }
 
-        await CancelReadyAsync(
+        if (!await CancelReadyAsync(
             ownerUserId,
             review.AccountId,
             reviewId,
             review.AccountDescription,
-            cancellationToken);
+            cancellationToken))
+        {
+            throw Problem(
+                StatusCodes.Status409Conflict,
+                "The import has changed.",
+                "Recheck the account import status before continuing.",
+                "ImportChanged");
+        }
     }
 
     public async Task CancelActiveAsync(
@@ -216,8 +223,154 @@ public sealed class ImportReviewService(
             throw Problem(
                 StatusCodes.Status409Conflict,
                 "The active import is still processing or has already changed. Try again shortly.",
-                "ConcurrentImport");
+                "ImportNotEndable");
         }
+    }
+
+    public async Task<ImportCoordinationOutcome<bool>> EndReviewElsewhereAsync(
+        string ownerUserId,
+        Guid accountId,
+        Guid reviewId,
+        CancellationToken cancellationToken)
+    {
+        using var measurement = ImportMetrics.StartCoordination(ImportCoordinationOperation.End);
+        var now = timeProvider.GetUtcNow();
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        var outcome = await strategy.ExecuteAsync(async () =>
+        {
+            dbContext.ChangeTracker.Clear();
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(
+                IsolationLevel.ReadCommitted,
+                cancellationToken);
+            var account = await OwnedAccounts(ownerUserId)
+                .AsNoTracking()
+                .Where(candidate => candidate.Id == accountId)
+                .Select(candidate => candidate.Description)
+                .SingleOrDefaultAsync(cancellationToken);
+            if (account is null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return ImportCoordinationOutcome<bool>.Failed(ImportCoordinationError.AccountNotFound);
+            }
+
+            var review = await OwnedReviews(ownerUserId)
+                .AsNoTracking()
+                .Where(candidate => candidate.Id == reviewId && candidate.AccountId == accountId)
+                .Select(candidate => new
+                {
+                    candidate.State,
+                    candidate.ExpiresAtUtc,
+                    candidate.EndedByUserId,
+                    candidate.EndedAtUtc,
+                })
+                .SingleOrDefaultAsync(cancellationToken);
+            if (review is null)
+            {
+                var existsInAnotherAccount = await dbContext.ImportReviews
+                    .AsNoTracking()
+                    .AnyAsync(candidate => candidate.Id == reviewId, cancellationToken);
+                await transaction.RollbackAsync(cancellationToken);
+                return ImportCoordinationOutcome<bool>.Failed(
+                    existsInAnotherAccount
+                        ? ImportCoordinationError.ReviewNotFound
+                        : ImportCoordinationError.ImportChanged);
+            }
+
+            if (IsExternallyEnded(review.State, review.EndedByUserId, review.EndedAtUtc))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return ImportCoordinationOutcome<bool>.Succeeded(true);
+            }
+
+            if (review.State == ImportReviewState.Processing)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return ImportCoordinationOutcome<bool>.Failed(ImportCoordinationError.ImportNotEndable);
+            }
+
+            if (review.State != ImportReviewState.Ready || review.ExpiresAtUtc <= now)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return ImportCoordinationOutcome<bool>.Failed(ImportCoordinationError.ImportChanged);
+            }
+
+            var locked = await OwnedReviews(ownerUserId)
+                .Where(candidate =>
+                    candidate.Id == reviewId
+                    && candidate.AccountId == accountId
+                    && candidate.State == ImportReviewState.Ready
+                    && candidate.ExpiresAtUtc > now
+                    && dbContext.Accounts.Any(ownedAccount =>
+                        ownedAccount.Id == accountId
+                        && ownedAccount.OwnerUserId == ownerUserId
+                        && ownedAccount.ActiveImportId == candidate.Id))
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(candidate => candidate.State, candidate => candidate.State),
+                    cancellationToken);
+
+            if (locked != 1)
+            {
+                var latest = await OwnedReviews(ownerUserId)
+                    .AsNoTracking()
+                    .Where(candidate => candidate.Id == reviewId && candidate.AccountId == accountId)
+                    .Select(candidate => new
+                    {
+                        candidate.State,
+                        candidate.EndedByUserId,
+                        candidate.EndedAtUtc,
+                    })
+                    .SingleOrDefaultAsync(cancellationToken);
+                await transaction.RollbackAsync(cancellationToken);
+                if (latest is not null
+                    && IsExternallyEnded(latest.State, latest.EndedByUserId, latest.EndedAtUtc))
+                {
+                    return ImportCoordinationOutcome<bool>.Succeeded(true);
+                }
+
+                if (latest?.State == ImportReviewState.Processing)
+                {
+                    return ImportCoordinationOutcome<bool>.Failed(ImportCoordinationError.ImportNotEndable);
+                }
+
+                return ImportCoordinationOutcome<bool>.Failed(ImportCoordinationError.ImportChanged);
+            }
+
+            dbContext.ChangeTracker.Clear();
+            var reviewToEnd = await OwnedReviews(ownerUserId)
+                .SingleOrDefaultAsync(
+                    candidate => candidate.Id == reviewId && candidate.AccountId == accountId,
+                    cancellationToken);
+            if (reviewToEnd is null || !reviewToEnd.TryEndElsewhere(ownerUserId, now))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return ImportCoordinationOutcome<bool>.Failed(ImportCoordinationError.ImportChanged);
+            }
+
+            await dbContext.ImportReviewRows
+                .Where(row => row.ReviewId == reviewId)
+                .ExecuteDeleteAsync(cancellationToken);
+            if (!await importLease.ReleaseAsync(accountId, reviewId, cancellationToken))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return ImportCoordinationOutcome<bool>.Failed(ImportCoordinationError.ImportChanged);
+            }
+
+            auditWriter.Add(account, ownerUserId, "ReviewEndedElsewhere", now);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return ImportCoordinationOutcome<bool>.Succeeded(true);
+        });
+
+        if (outcome.IsSuccess)
+        {
+            measurement.MarkSucceeded();
+        }
+        else
+        {
+            measurement.MarkFailed(outcome.Error!.Value);
+        }
+
+        return outcome;
     }
 
     private async Task<bool> CancelReadyAsync(
@@ -244,30 +397,44 @@ public sealed class ImportReviewService(
                     cancellationToken);
             if (transitioned == 0)
             {
-                // A review that is no longer Ready is terminal, so any lease it still holds is stale.
                 var currentState = await OwnedReviews(ownerUserId)
                     .AsNoTracking()
                     .Where(review => review.Id == reviewId && review.AccountId == accountId)
-                    .Select(review => (ImportReviewState?)review.State)
+                    .Select(review => new { review.State, review.EndedAtUtc })
                     .SingleOrDefaultAsync(cancellationToken);
-                if (currentState is null or ImportReviewState.Ready)
+                await transaction.RollbackAsync(cancellationToken);
+                if (currentState?.State == ImportReviewState.Processing)
                 {
-                    await transaction.RollbackAsync(cancellationToken);
+                    throw Problem(
+                        StatusCodes.Status409Conflict,
+                        "The import is already being processed.",
+                        "Once confirmation has been accepted, an import cannot be ended.",
+                        "ImportNotEndable");
+                }
+
+                if (currentState?.State == ImportReviewState.Cancelled
+                    && currentState.EndedAtUtc is not null)
+                {
+                    throw Problem(
+                        StatusCodes.Status409Conflict,
+                        "The import was ended elsewhere.",
+                        "Return to the account's transactions before continuing.",
+                        "ImportEndedElsewhere");
+                }
+
+                if (currentState is null || currentState.State != ImportReviewState.Ready)
+                {
                     return false;
                 }
 
-                await importLease.ReleaseAsync(accountId, reviewId, cancellationToken);
-                await dbContext.ImportReviews
-                    .Where(candidate => candidate.Id == reviewId)
-                    .ExecuteDeleteAsync(cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
-                return true;
+                return false;
             }
 
             await dbContext.ImportReviewRows
                 .Where(row => row.ReviewId == reviewId)
                 .ExecuteDeleteAsync(cancellationToken);
             await importLease.ReleaseAsync(accountId, reviewId, cancellationToken);
+
             auditWriter.Add(accountDescription, ownerUserId, eventCode, timeProvider.GetUtcNow());
             await dbContext.ImportReviews
                 .Where(candidate => candidate.Id == reviewId)
@@ -278,36 +445,154 @@ public sealed class ImportReviewService(
         });
     }
 
-    internal async Task CancelAfterFailureAsync(
+    internal async Task<bool> FailProcessingAttemptAsync(
         string ownerUserId,
         Guid reviewId,
+        Guid attemptId,
         CancellationToken cancellationToken)
     {
-        var review = await dbContext.ImportReviews
-            .AsNoTracking()
-            .Where(review => review.Id == reviewId)
-            .Join(
-                dbContext.Accounts
-                    .AsNoTracking()
-                    .Where(account => account.OwnerUserId == ownerUserId),
-                candidate => candidate.AccountId,
-                account => account.Id,
-                (candidate, account) => new
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            dbContext.ChangeTracker.Clear();
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(
+                IsolationLevel.ReadCommitted,
+                cancellationToken);
+            var review = await OwnedReviews(ownerUserId)
+                .Where(candidate => candidate.Id == reviewId)
+                .Select(candidate => new
                 {
                     candidate.AccountId,
-                    AccountDescription = account.Description,
+                    candidate.ActingUserId,
+                    AccountDescription = dbContext.Accounts
+                        .Where(account => account.Id == candidate.AccountId)
+                        .Select(account => account.Description)
+                        .FirstOrDefault(),
                 })
-            .SingleOrDefaultAsync(cancellationToken);
-        if (review is not null)
+                .SingleOrDefaultAsync(cancellationToken);
+            if (review is null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return false;
+            }
+
+            var locked = await dbContext.ImportReviews
+                .Where(candidate =>
+                    candidate.Id == reviewId
+                    && candidate.AccountId == review.AccountId
+                    && candidate.State == ImportReviewState.Processing
+                    && candidate.ConfirmationAttemptId == attemptId
+                    && dbContext.Accounts.Any(account =>
+                        account.Id == candidate.AccountId
+                        && account.OwnerUserId == ownerUserId
+                        && account.ActiveImportId == candidate.Id))
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(candidate => candidate.ConfirmationAttemptId, attemptId),
+                    cancellationToken);
+            if (locked != 1)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return false;
+            }
+
+            await dbContext.ImportReviewRows
+                .Where(row => row.ReviewId == reviewId)
+                .ExecuteDeleteAsync(cancellationToken);
+            if (!await importLease.ReleaseAsync(review.AccountId, reviewId, cancellationToken))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return false;
+            }
+
+            auditWriter.Add(
+                review.AccountDescription!,
+                review.ActingUserId,
+                "ConfirmationFailed",
+                timeProvider.GetUtcNow());
+            await dbContext.ImportReviews
+                .Where(candidate => candidate.Id == reviewId
+                    && candidate.State == ImportReviewState.Processing
+                    && candidate.ConfirmationAttemptId == attemptId)
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return true;
+        });
+    }
+
+    internal async Task<bool> ExpireReadyReviewAsync(
+        string ownerUserId,
+        Guid reviewId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            await CancelReadyAsync(
-                ownerUserId,
-                review.AccountId,
-                reviewId,
-                review.AccountDescription,
-                cancellationToken,
-                "ConfirmationFailed");
-        }
+            dbContext.ChangeTracker.Clear();
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(
+                IsolationLevel.ReadCommitted,
+                cancellationToken);
+            var review = await OwnedReviews(ownerUserId)
+                .AsNoTracking()
+                .Where(candidate => candidate.Id == reviewId)
+                .Select(candidate => new
+                {
+                    candidate.AccountId,
+                    candidate.ActingUserId,
+                    AccountDescription = dbContext.Accounts
+                        .Where(account => account.Id == candidate.AccountId)
+                        .Select(account => account.Description)
+                        .FirstOrDefault(),
+                })
+                .SingleOrDefaultAsync(cancellationToken);
+            if (review is null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return false;
+            }
+
+            var expired = await dbContext.ImportReviews
+                .Where(candidate =>
+                    candidate.Id == reviewId
+                    && candidate.AccountId == review.AccountId
+                    && candidate.State == ImportReviewState.Ready
+                    && candidate.ExpiresAtUtc <= now
+                    && dbContext.Accounts.Any(account =>
+                        account.Id == candidate.AccountId
+                        && account.OwnerUserId == ownerUserId
+                        && account.ActiveImportId == candidate.Id))
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(candidate => candidate.State, ImportReviewState.Expired),
+                    cancellationToken);
+            if (expired != 1)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return false;
+            }
+
+            await dbContext.ImportReviewRows
+                .Where(row => row.ReviewId == reviewId)
+                .ExecuteDeleteAsync(cancellationToken);
+            if (!await importLease.ReleaseAsync(review.AccountId, reviewId, cancellationToken))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return false;
+            }
+
+            auditWriter.Add(
+                review.AccountDescription!,
+                review.ActingUserId,
+                "ReviewExpired",
+                now);
+            await dbContext.ImportReviews
+                .Where(candidate => candidate.Id == reviewId
+                    && candidate.State == ImportReviewState.Expired)
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return true;
+        });
     }
 
     private async Task ExpireStaleReviewAsync(
@@ -320,12 +605,15 @@ public sealed class ImportReviewService(
         var strategy = dbContext.Database.CreateExecutionStrategy();
         var activeReviewIsUnexpired = await strategy.ExecuteAsync(async () =>
         {
+            dbContext.ChangeTracker.Clear();
             await using var transaction = await dbContext.Database.BeginTransactionAsync(
                 IsolationLevel.ReadCommitted,
                 cancellationToken);
             var review = await dbContext.ImportReviews
                 .AsNoTracking()
-                .Where(candidate => candidate.Id == activeReviewId)
+                .Where(candidate =>
+                    candidate.Id == activeReviewId
+                    && candidate.AccountId == accountId)
                 .Select(candidate => new
                 {
                     candidate.State,
@@ -340,17 +628,8 @@ public sealed class ImportReviewService(
                 return true;
             }
 
-            if (review.State != ImportReviewState.Ready)
-            {
-                await importLease.ReleaseAsync(accountId, activeReviewId, cancellationToken);
-                await dbContext.ImportReviews
-                    .Where(candidate => candidate.Id == activeReviewId)
-                    .ExecuteDeleteAsync(cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
-                return false;
-            }
-
-            if (review.ExpiresAtUtc > now)
+            if (review.State != ImportReviewState.Ready
+                || ImportStateService.IsActive(review.State, review.ExpiresAtUtc, now))
             {
                 await transaction.RollbackAsync(cancellationToken);
                 return true;
@@ -360,7 +639,10 @@ public sealed class ImportReviewService(
                 .Where(candidate =>
                     candidate.Id == activeReviewId
                     && candidate.State == ImportReviewState.Ready
-                    && candidate.ExpiresAtUtc <= now)
+                    && candidate.ExpiresAtUtc <= now
+                    && dbContext.Accounts.Any(account =>
+                        account.Id == accountId
+                        && account.ActiveImportId == activeReviewId))
                 .ExecuteUpdateAsync(
                     setters => setters.SetProperty(
                         candidate => candidate.State,
@@ -368,29 +650,19 @@ public sealed class ImportReviewService(
                     cancellationToken);
             if (transitioned == 0)
             {
-                var currentState = await dbContext.ImportReviews
-                    .AsNoTracking()
-                    .Where(candidate => candidate.Id == activeReviewId)
-                    .Select(candidate => (ImportReviewState?)candidate.State)
-                    .SingleOrDefaultAsync(cancellationToken);
-                if (currentState != ImportReviewState.Ready)
-                {
-                    await importLease.ReleaseAsync(accountId, activeReviewId, cancellationToken);
-                    if (currentState is not null)
-                    {
-                        await dbContext.ImportReviews
-                            .Where(candidate => candidate.Id == activeReviewId)
-                            .ExecuteDeleteAsync(cancellationToken);
-                    }
-                }
-                await transaction.CommitAsync(cancellationToken);
-                return currentState == ImportReviewState.Ready;
+                await transaction.RollbackAsync(cancellationToken);
+                return true;
             }
 
             await dbContext.ImportReviewRows
                 .Where(row => row.ReviewId == activeReviewId)
                 .ExecuteDeleteAsync(cancellationToken);
-            await importLease.ReleaseAsync(accountId, activeReviewId, cancellationToken);
+            if (!await importLease.ReleaseAsync(accountId, activeReviewId, cancellationToken))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return true;
+            }
+
             auditWriter.Add(
                 accountDescription,
                 review.ActingUserId,
@@ -520,6 +792,21 @@ public sealed class ImportReviewService(
             "The import could not be started.",
             detail,
             new Dictionary<string, string[]> { ["code"] = [code] });
+
+    private static ApiProblemException Problem(int statusCode, string title, string detail, string code) =>
+        new(
+            statusCode,
+            title,
+            detail,
+            new Dictionary<string, string[]> { ["code"] = [code] });
+
+    private static bool IsExternallyEnded(
+        ImportReviewState state,
+        string? endedByUserId,
+        DateTimeOffset? endedAtUtc) =>
+        state == ImportReviewState.Cancelled
+        && !string.IsNullOrWhiteSpace(endedByUserId)
+        && endedAtUtc is not null;
 
     private static ApiProblemException AccountNotFound() =>
         new(

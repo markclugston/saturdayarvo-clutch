@@ -25,3 +25,29 @@ the standard **Start Debugging** shortcut can launch the selected configuration.
 
 The frontend requires port 5173 to be free; it reports an error instead of
 silently switching ports. Stop the debug session to stop both projects.
+
+## Coordinated transaction imports
+
+The import screen checks account availability before a new upload and refreshes while
+waiting. Only an unconfirmed competing preview can be ended. Once confirmation is
+accepted, preparation and transaction writing are protected. A session whose preview
+was ended shows a blocking notice naming the ending user; acknowledgement returns to
+that account's transactions.
+
+Run the isolated, real-API browser checks from `src/clutch-web`:
+
+```powershell
+npm exec playwright test -- --config playwright.active-import.config.ts
+```
+
+This provisions disposable SQL Server and HTTPS API instances with unique test-owned
+resources and free loopback ports. See the [validation guide](specs/011-validate-active-import/quickstart.md)
+for focused backend/frontend checks, prerequisites and release gates.
+
+Before deploying the additive `ActiveImportCoordination` migration, block import routes
+briefly and drain in-flight requests. Apply the migration, deploy the coordinated
+backend, then the frontend. Never run old cleanup workers alongside `Processing`
+reviews. Old account-only end requests now fail explicitly: an exact review target
+is required. Prefer forward recovery; binary rollback requires draining/recovering
+processing attempts first and must preserve retained ending metadata and immutable
+Audit records. See the [data model and rollout procedure](specs/011-validate-active-import/data-model.md).

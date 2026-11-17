@@ -3,6 +3,7 @@ namespace Clutch.API.Domain.Imports;
 public enum ImportReviewState
 {
     Ready,
+    Processing,
     Confirmed,
     Cancelled,
     Expired,
@@ -63,6 +64,14 @@ public sealed class ImportReview
 
     public bool DuplicateConfirmationRequired { get; private set; }
 
+    public Guid? ConfirmationAttemptId { get; private set; }
+
+    public DateTimeOffset? ProcessingStartedAtUtc { get; private set; }
+
+    public string? EndedByUserId { get; private set; }
+
+    public DateTimeOffset? EndedAtUtc { get; private set; }
+
     public IReadOnlyCollection<ImportReviewRow> Rows => rows;
 
     public void AddRows(IEnumerable<ImportReviewRow> reviewRows)
@@ -97,6 +106,60 @@ public sealed class ImportReview
         return true;
     }
 
+    public bool TryClaimProcessing(Guid attemptId, DateTimeOffset startedAtUtc)
+    {
+        if (State != ImportReviewState.Ready
+            || attemptId == Guid.Empty
+            || startedAtUtc.Offset != TimeSpan.Zero
+            || rows.Count == 0
+            || SchemaVersion is null
+            || MappingJson is null)
+        {
+            return false;
+        }
+
+        State = ImportReviewState.Processing;
+        ConfirmationAttemptId = attemptId;
+        ProcessingStartedAtUtc = startedAtUtc;
+        return true;
+    }
+
+    public bool TryRejectProcessing(Guid attemptId, IReadOnlySet<int> duplicateRowNumbers)
+    {
+        ArgumentNullException.ThrowIfNull(duplicateRowNumbers);
+        if (State != ImportReviewState.Processing
+            || attemptId == Guid.Empty
+            || ConfirmationAttemptId != attemptId)
+        {
+            return false;
+        }
+
+        UpdateDuplicateWarningsCore(duplicateRowNumbers);
+        State = ImportReviewState.Ready;
+        ConfirmationAttemptId = null;
+        ProcessingStartedAtUtc = null;
+        return true;
+    }
+
+    public bool TryEndElsewhere(string endedByUserId, DateTimeOffset endedAtUtc)
+    {
+        if (State != ImportReviewState.Ready
+            || string.IsNullOrWhiteSpace(endedByUserId)
+            || endedAtUtc.Offset != TimeSpan.Zero)
+        {
+            return false;
+        }
+
+        State = ImportReviewState.Cancelled;
+        EndedByUserId = endedByUserId;
+        EndedAtUtc = endedAtUtc;
+        SchemaVersion = null;
+        MappingJson = null;
+        DuplicateConfirmationRequired = false;
+        rows.Clear();
+        return true;
+    }
+
     public void UpdateDuplicateWarnings(IReadOnlySet<int> duplicateRowNumbers)
     {
         if (State != ImportReviewState.Ready)
@@ -104,6 +167,11 @@ public sealed class ImportReview
             throw new InvalidOperationException("Only a ready review can update duplicate warnings.");
         }
 
+        UpdateDuplicateWarningsCore(duplicateRowNumbers);
+    }
+
+    private void UpdateDuplicateWarningsCore(IReadOnlySet<int> duplicateRowNumbers)
+    {
         foreach (var row in rows.Where(row => duplicateRowNumbers.Contains(row.SourceRowNumber)))
         {
             row.MarkPossibleDuplicate();

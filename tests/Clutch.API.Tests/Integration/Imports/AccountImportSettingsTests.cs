@@ -142,6 +142,10 @@ public sealed class AccountImportSettingsTests(SqlServerFixture fixture)
             db,
             auditWriter,
             reviewService,
+            new ImportStateService(
+                db,
+                clock,
+                fixture.Factory.Services.GetRequiredService<ILogger<ImportStateService>>()),
             settingsService,
             clock);
 

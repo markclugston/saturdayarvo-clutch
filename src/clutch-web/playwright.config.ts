@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
+const webPort = process.env.CLUTCH_E2E_WEB_PORT ?? '5173'
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -7,7 +9,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: 'list',
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:5173',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${webPort}`,
     storageState: process.env.PLAYWRIGHT_STORAGE_STATE,
     trace: 'retain-on-failure',
   },
@@ -18,8 +20,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev -- --host 127.0.0.1 --port 5173',
-    url: 'http://127.0.0.1:5173',
-    reuseExistingServer: !process.env.CI,
+    command: `npm run dev -- --host 127.0.0.1 --port ${webPort}`,
+    url: `http://127.0.0.1:${webPort}`,
+    reuseExistingServer: !process.env.CI && !process.env.CLUTCH_E2E_WEB_PORT,
   },
 })

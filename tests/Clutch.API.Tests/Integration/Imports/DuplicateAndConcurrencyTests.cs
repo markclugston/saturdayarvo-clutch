@@ -178,7 +178,11 @@ public sealed class DuplicateAndConcurrencyTests(SqlServerFixture fixture)
 
         var results = await Task.WhenAll(
             ConfirmAsync(client, review.Id, false),
-            SendJsonAsync(client, HttpMethod.Delete, $"/api/accounts/{accountId}/active-import-review", null));
+            SendJsonAsync(
+                client,
+                HttpMethod.Delete,
+                $"/api/accounts/{accountId}/active-import-review?reviewId={review.Id}",
+                null));
         using var confirmation = results[0];
         using var cancellation = results[1];
         Assert.Contains(confirmation.StatusCode, new[] {

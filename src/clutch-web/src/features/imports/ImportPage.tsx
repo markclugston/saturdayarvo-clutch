@@ -15,6 +15,8 @@ import {
 import { ImportMappingForm } from './ImportMappingForm'
 import { ImportReviewTable } from './ImportReviewTable'
 import { readCsvHeaders } from './readCsvHeaders'
+import { useImportStatus } from './useImportStatus'
+import { ImportEndedDialog } from './ImportEndedDialog'
 
 type ImportPageProps = {
   accountId: string
@@ -35,6 +37,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
   const [settingsSaved, setSettingsSaved] = useState<boolean | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [savedMappingError, setSavedMappingError] = useState(false)
+  const pauseStatus = () => queryClient.cancelQueries({ queryKey: ['importStatus', accountId] })
 
   const accountQuery = useQuery({
     queryKey: ['account', accountId],
@@ -49,6 +52,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
     queryFn: () => getAccountImportSettings(accountId),
   })
   const createReviewMutation = useMutation({
+    onMutate: pauseStatus,
     mutationFn: (mapping: ImportMapping) => {
       if (!file) {
         throw new Error('Choose a CSV file before creating a review.')
@@ -67,6 +71,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
       }
     },
     onError: () => {
+      void statusQuery.refetch()
       if (usedSavedSettings.current) {
         setSavedMappingError(true)
         setShowSettings(true)
@@ -74,6 +79,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
     },
   })
   const confirmMutation = useMutation({
+    onMutate: pauseStatus,
     mutationFn: (confirmPossibleDuplicates: boolean) => {
       if (!review) {
         throw new Error('The import review is no longer available.')
@@ -94,6 +100,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
       ])
     },
     onError: (error) => {
+      void statusQuery.refetch()
       if (!(error instanceof ApiError)
         || error.problem.errors?.code?.[0] !== 'DuplicateConfirmationRequired') {
         return
@@ -117,6 +124,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
     },
   })
   const cancelMutation = useMutation({
+    onMutate: pauseStatus,
     mutationFn: () => {
       if (!review) {
         throw new Error('The import review is no longer available.')
@@ -130,13 +138,60 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
       setFileError(null)
       onBack()
     },
+    onError: () => { void statusQuery.refetch() },
   })
   const recoverMutation = useMutation({
-    mutationFn: () => cancelActiveImportReview(accountId),
-    onSuccess: () => {
+    onMutate: pauseStatus,
+    mutationFn: (targetId: string) => cancelActiveImportReview(accountId, targetId),
+    onSuccess: async () => {
+      await statusQuery.refetch()
       createReviewMutation.reset()
     },
+    onError: () => { void statusQuery.refetch() },
   })
+  const busy = createReviewMutation.isPending || confirmMutation.isPending
+    || cancelMutation.isPending || recoverMutation.isPending
+  const statusQuery = useImportStatus(accountId, review?.id, importedCount === null && !busy)
+  const canStart = statusQuery.fresh && statusQuery.data?.availability === 'Available' && !busy
+  const canReview = statusQuery.fresh
+    && statusQuery.data?.watchedImport?.state === 'Ready'
+    && statusQuery.data.activeImport?.id === review?.id
+    && statusQuery.data.activeImport?.stage === 'Preview'
+    && !busy
+  const returnMutation = useMutation({
+    mutationFn: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['account', accountId] }),
+        queryClient.invalidateQueries({ queryKey: ['accounts'] }),
+        queryClient.invalidateQueries({ queryKey: ['transactions', accountId] }),
+      ])
+      onBack()
+    },
+  })
+
+  const watched = statusQuery.data?.watchedImport
+  if (watched?.state === 'Ended') {
+    return <ImportEndedDialog userName={watched.endedBy.userName}
+      busy={returnMutation.isPending}
+      error={returnMutation.isError ? getErrorMessage(returnMutation.error) : undefined}
+      onAcknowledge={() => returnMutation.mutate()} />
+  }
+  if (watched?.state === 'Expired' || watched?.state === 'Unavailable') {
+    return (
+      <section className="space-y-4" aria-labelledby="import-heading">
+        <PageHeading id="import-heading" className="text-2xl font-semibold">Import transactions</PageHeading>
+        <p role="status">{watched.state === 'Expired'
+          ? 'This import preview has expired.' : 'This import preview is no longer available.'}</p>
+        {confirmMutation.isError && <p role="alert">{getErrorMessage(confirmMutation.error)}</p>}
+        {cancelMutation.isError && <p role="alert">{getErrorMessage(cancelMutation.error)}</p>}
+        {returnMutation.isError && <p role="alert">{getErrorMessage(returnMutation.error)}</p>}
+        <button type="button" className="rounded-md border border-border px-4 py-2"
+          disabled={returnMutation.isPending} onClick={() => returnMutation.mutate()}>
+          {returnMutation.isPending ? 'Returning to transactions…' : 'Return to transactions'}
+        </button>
+      </section>
+    )
+  }
 
   if (accountQuery.isPending || currenciesQuery.isPending || importSettingsQuery.isPending) {
     return <p role="status">Loading import details…</p>
@@ -187,7 +242,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
   }
 
   function startReview(mapping: ImportMapping) {
-    if (file) {
+    if (file && canStart) {
       usedSavedSettings.current = false
       createReviewMutation.mutate(mapping)
     }
@@ -197,7 +252,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
     <section aria-labelledby="import-heading" className="space-y-6">
       <button
         className="rounded-md border border-border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50"
-        disabled={cancelMutation.isPending || confirmMutation.isPending}
+        disabled={busy || (review !== null && !canReview)}
         onClick={() => review ? cancelMutation.mutate() : onBack()}
         type="button"
       >
@@ -212,6 +267,53 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
         </p>
       </div>
 
+      {importedCount === null && statusQuery.isError ? (
+        <div className="space-y-2" role="alert">
+          <p>Import availability could not be checked. {getErrorMessage(statusQuery.error)}</p>
+          <button className="rounded-md border border-border px-3 py-2" type="button"
+            onClick={() => {
+              recoverMutation.reset()
+              void statusQuery.refetch()
+            }} disabled={statusQuery.isFetching}>
+            {statusQuery.isFetching ? 'Checking import availability…' : 'Retry availability check'}
+          </button>
+        </div>
+      ) : importedCount === null && !statusQuery.fresh && !busy ? (
+        <p role="status">Checking import availability…</p>
+      ) : null}
+      {!review && statusQuery.data?.availability === 'Blocked' && (
+        <div className="space-y-2">
+          <p role="status">
+            {statusQuery.data.activeImport.stage === 'Processing'
+              ? 'Another import is processing transactions for this account. Wait for it to finish.'
+              : 'Another import is active for this account. A new import cannot start yet.'}
+          </p>
+          {(statusQuery.fresh || recoverMutation.isPending)
+            && statusQuery.data.activeImport.canEnd && (
+            <button type="button" className="rounded-md border border-border px-4 py-2 disabled:opacity-50"
+              disabled={busy} onClick={() => {
+                if (statusQuery.fresh && statusQuery.data?.activeImport?.canEnd) {
+                  recoverMutation.mutate(statusQuery.data.activeImport.id)
+                }
+              }}>
+              {recoverMutation.isPending ? 'Ending other import…' : 'End other import'}
+            </button>
+          )}
+        </div>
+      )}
+      {review && watched?.state === 'Processing' && (
+        <p role="status">This import is processing transactions. Wait for it to finish.</p>
+      )}
+      {recoverMutation.isError && (
+        <div role="alert" className="space-y-2">
+          <p>{getErrorMessage(recoverMutation.error)}</p>
+          {!statusQuery.isError && <button type="button" className="rounded-md border border-border px-3 py-2"
+            disabled={statusQuery.isFetching} onClick={() => {
+              recoverMutation.reset()
+              void statusQuery.refetch()
+            }}>{statusQuery.isFetching ? 'Checking import availability…' : 'Retry availability check'}</button>}
+        </div>
+      )}
       {importedCount !== null ? (
         <div className="space-y-4">
           <p role="status">{importedCount} transactions imported successfully.</p>
@@ -236,6 +338,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
             <label className="flex items-start gap-2">
               <input
                 checked={confirmDuplicates}
+                disabled={!canReview}
                 onChange={(event) => setConfirmDuplicates(event.currentTarget.checked)}
                 type="checkbox"
               />
@@ -255,7 +358,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
             <button
               className="rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
               disabled={
-                confirmMutation.isPending
+                !canReview
                 || (review.duplicateConfirmationRequired && !confirmDuplicates)
               }
               onClick={() => confirmMutation.mutate(confirmDuplicates)}
@@ -264,7 +367,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
             </button>
             <button
               className="rounded-md border border-border px-4 py-2 disabled:opacity-50"
-              disabled={cancelMutation.isPending || confirmMutation.isPending}
+              disabled={!canReview}
               onClick={() => cancelMutation.mutate()}
             >
               {cancelMutation.isPending ? 'Cancelling…' : 'Cancel review'}
@@ -301,6 +404,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
             </label>
             <button
               className="rounded-md border border-border px-4 py-2 hover:bg-muted"
+              disabled={!canStart}
               onClick={() => fileInput.current?.click()}
               type="button"
             >
@@ -311,6 +415,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
               accept=".csv,text/csv"
               aria-describedby="csv-file-description"
               className="sr-only"
+              disabled={!canStart}
               id="csv-file"
               onChange={(event) => handleFileChange(event.currentTarget.files?.[0])}
               tabIndex={-1}
@@ -338,8 +443,9 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
           {savedMapping && headers && savedMappingCompatible && !showSettings && (
             <button
               className="rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
-              disabled={createReviewMutation.isPending || recoverMutation.isPending}
+              disabled={!canStart}
               onClick={() => {
+                if (!canStart) return
                 setSavedMappingError(false)
                 usedSavedSettings.current = true
                 createReviewMutation.mutate(savedMapping)
@@ -352,7 +458,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
           {((headers && (!savedMapping || !savedMappingCompatible)) || (savedMapping && showSettings)) && (
               <ImportMappingForm
                 amountFormats={currency.amountFormats}
-                disabled={createReviewMutation.isPending || recoverMutation.isPending}
+                disabled={!canStart}
                 headers={headers}
                 initialMapping={savedMapping}
                 onSubmit={startReview}
@@ -361,28 +467,6 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
           {createReviewMutation.isError && (
             <p role="alert">{getErrorMessage(createReviewMutation.error)}</p>
           )}
-          {createReviewMutation.isError
-            && (!(createReviewMutation.error instanceof ApiError)
-              || createReviewMutation.error.status === 409
-              || createReviewMutation.error.status === 201) && (
-              <div className="space-y-2">
-                <p>
-                  A previous review may still be active, including one in another tab.
-                  Discard it only if you no longer need it.
-                </p>
-                <button
-                  className="rounded-md border border-border px-4 py-2 disabled:opacity-50"
-                  disabled={recoverMutation.isPending || createReviewMutation.isPending}
-                  onClick={() => recoverMutation.mutate()}
-                  type="button"
-                >
-                  {recoverMutation.isPending ? 'Discarding…' : 'Discard active review'}
-                </button>
-                {recoverMutation.isError && (
-                  <p role="alert">{getErrorMessage(recoverMutation.error)}</p>
-                )}
-              </div>
-            )}
         </>
       )}
     </section>

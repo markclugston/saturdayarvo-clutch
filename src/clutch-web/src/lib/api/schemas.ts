@@ -56,6 +56,49 @@ export const ConfirmImportResponseSchema = z.object({
   settingsSaved: z.boolean(),
 })
 
+const ActiveImportSchema = z.discriminatedUnion('stage', [
+  z.object({
+    id: z.uuid(), stage: z.literal('Preview'), canEnd: z.literal(true),
+    expiresAtUtc: z.iso.datetime({ offset: true }),
+  }),
+  z.object({
+    id: z.uuid(), stage: z.literal('Processing'), canEnd: z.literal(false),
+    expiresAtUtc: z.null(),
+  }),
+  z.object({
+    id: z.uuid(), stage: z.literal('Unknown'), canEnd: z.literal(false),
+    expiresAtUtc: z.null(),
+  }),
+])
+
+const WatchedImportSchema = z.discriminatedUnion('state', [
+  z.object({
+    id: z.uuid(), state: z.literal('Ready'),
+    expiresAtUtc: z.iso.datetime({ offset: true }),
+  }),
+  z.object({ id: z.uuid(), state: z.literal('Processing') }),
+  z.object({
+    id: z.uuid(), state: z.literal('Ended'),
+    endedAtUtc: z.iso.datetime({ offset: true }),
+    endedBy: z.object({ userId: z.string().trim().min(1), userName: z.string().trim().min(1) }),
+  }),
+  z.object({ id: z.uuid(), state: z.literal('Expired') }),
+  z.object({ id: z.uuid(), state: z.literal('Unavailable') }),
+])
+
+export const ImportStatusSchema = z.discriminatedUnion('availability', [
+  z.object({
+    accountId: z.uuid(), availability: z.literal('Available'),
+    activeImport: z.null(), watchedImport: WatchedImportSchema.nullable(),
+  }),
+  z.object({
+    accountId: z.uuid(), availability: z.literal('Blocked'),
+    activeImport: ActiveImportSchema, watchedImport: WatchedImportSchema.nullable(),
+  }),
+])
+
+export type ImportStatus = z.infer<typeof ImportStatusSchema>
+
 export const ImportMappingSchema = z.object({
   dateColumn: z.number().int().nonnegative(),
   descriptionColumn: z.number().int().nonnegative(),
