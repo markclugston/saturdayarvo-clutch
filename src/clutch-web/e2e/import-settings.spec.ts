@@ -285,6 +285,18 @@ test.describe('account import settings', () => {
         await route.fulfill({ json: { items: [], nextCursor: null } })
       } else if (path === `/api/accounts/${accountId}/import-settings`) {
         await route.fulfill({ json: { mapping: savedMapping } })
+      } else if (path === `/api/accounts/${accountId}/import-status`) {
+        const watchedId = new URL(request.url()).searchParams.get('reviewId')
+        await route.fulfill({ json: {
+          accountId,
+          availability: currentReviewId ? 'Blocked' : 'Available',
+          activeImport: currentReviewId
+            ? { id: currentReviewId, stage: 'Preview', canEnd: true, expiresAtUtc: '2027-01-15T14:00:00Z' }
+            : null,
+          watchedImport: watchedId
+            ? { id: watchedId, state: 'Ready', expiresAtUtc: '2027-01-15T14:00:00Z' }
+            : null,
+        } })
       } else if (path === `/api/accounts/${accountId}/import-reviews`) {
         reviewNumber += 1
         currentReviewId = `550e8400-e29b-41d4-a716-44665544001${reviewNumber}`
@@ -309,6 +321,7 @@ test.describe('account import settings', () => {
         })
       } else if (path === `/api/import-reviews/${currentReviewId}/confirm`) {
         savedMapping = mapping
+        currentReviewId = ''
         await route.fulfill({
           json: {
             importedCount: 1,

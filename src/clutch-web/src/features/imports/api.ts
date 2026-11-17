@@ -4,6 +4,7 @@ import {
   ConfirmImportResponseSchema,
   AccountImportSettingsSchema,
   ImportReviewSchema,
+  ImportStatusSchema,
   TransactionPageSchema,
   type ImportReview,
   type TransactionPage,
@@ -28,6 +29,17 @@ export type ImportMapping = {
 
 const EmptyResponseSchema = z.undefined()
 
+export function getImportStatus(accountId: string, reviewId?: string, signal?: AbortSignal) {
+  const query = reviewId ? `?${new URLSearchParams({ reviewId })}` : ''
+  return apiRequest(
+    `/api/accounts/${encodeURIComponent(accountId)}/import-status${query}`,
+    ImportStatusSchema.refine((status) =>
+      status.accountId === accountId
+      && (reviewId ? status.watchedImport?.id === reviewId : status.watchedImport === null)),
+    { signal, cache: 'no-store' },
+  )
+}
+
 export async function createImportReview(
   accountId: string,
   file: File,
@@ -47,7 +59,8 @@ export async function createImportReview(
       const match = error.location?.match(
         /^\/api\/import-reviews\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
       )
-      const reviewId = match?.[1]
+      const parsedId = z.uuid().safeParse(match?.[1])
+      const reviewId = parsedId.success ? parsedId.data : undefined
       if (reviewId) {
         try {
           await cancelImportReview(reviewId)
@@ -92,9 +105,10 @@ export function cancelImportReview(reviewId: string): Promise<void> {
   )
 }
 
-export function cancelActiveImportReview(accountId: string): Promise<void> {
+export async function cancelActiveImportReview(accountId: string, reviewId: string): Promise<void> {
+  const target = z.uuid().parse(reviewId)
   return apiRequest(
-    `/api/accounts/${encodeURIComponent(accountId)}/active-import-review`,
+    `/api/accounts/${encodeURIComponent(accountId)}/active-import-review?${new URLSearchParams({ reviewId: target })}`,
     EmptyResponseSchema,
     { method: 'DELETE' },
   )

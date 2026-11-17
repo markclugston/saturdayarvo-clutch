@@ -1,8 +1,10 @@
-import { screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
+import { focusManager, onlineManager } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getAccount, getCurrencies } from '@/features/accounts/api'
 import { ApiError } from '@/lib/api/client'
+import type { ImportStatus } from '@/lib/api/schemas'
 import { formatCurrencyAmount } from '@/lib/formatCurrencyAmount'
 import { renderWithQueryClient } from '@/test/renderWithQueryClient'
 import {
@@ -11,6 +13,7 @@ import {
   confirmImportReview,
   createImportReview,
   getAccountImportSettings,
+  getImportStatus,
   type ImportMapping,
 } from './api'
 import { ImportPage } from './ImportPage'
@@ -26,6 +29,7 @@ vi.mock('./api', () => ({
   confirmImportReview: vi.fn(),
   createImportReview: vi.fn(),
   getAccountImportSettings: vi.fn(),
+  getImportStatus: vi.fn(),
 }))
 
 const account = {
@@ -66,12 +70,35 @@ const savedMapping: ImportMapping = {
   numberFormat: 'dot-decimal-comma-grouping',
 }
 
+async function showOwnReview(onBack = vi.fn()) {
+  vi.mocked(getAccountImportSettings).mockResolvedValue({ mapping: savedMapping })
+  const rendered = renderWithQueryClient(<ImportPage accountId={account.id} onBack={onBack} />)
+  const user = userEvent.setup()
+  await user.upload(await screen.findByLabelText('CSV file'),
+    new File(['Date,Description,Amount\n2026-01-15,Market,10.00'], 'transactions.csv', { type: 'text/csv' }))
+  await user.click(await screen.findByRole('button', { name: 'Review import with saved settings' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Confirm import' })).toBeEnabled())
+  return { ...rendered, user }
+}
+
 describe('ImportPage', () => {
+  afterEach(() => {
+    focusManager.setFocused(undefined)
+    onlineManager.setOnline(true)
+  })
+
   beforeEach(() => {
     vi.resetAllMocks()
     vi.mocked(getAccount).mockResolvedValue(account)
     vi.mocked(getCurrencies).mockResolvedValue([currency])
     vi.mocked(getAccountImportSettings).mockResolvedValue({ mapping: null })
+    vi.mocked(getImportStatus).mockImplementation(async (accountId, watchedId) => watchedId ? ({
+      accountId, availability: 'Blocked',
+      activeImport: { id: watchedId, stage: 'Preview', canEnd: true, expiresAtUtc: '2027-01-15T14:00:00Z' },
+      watchedImport: { id: watchedId, state: 'Ready', expiresAtUtc: '2027-01-15T14:00:00Z' },
+    }) : ({
+      accountId, availability: 'Available', activeImport: null, watchedImport: null,
+    }))
     vi.mocked(createImportReview).mockResolvedValue({
       id: '550e8400-e29b-41d4-a716-446655440002',
       accountId: account.id,
@@ -97,30 +124,313 @@ describe('ImportPage', () => {
     })
   })
 
-  it('only discards a conflicting review after the user chooses recovery', async () => {
-    vi.mocked(createImportReview).mockRejectedValue(new ApiError(409, {
-      detail: 'An import is already active for this account.',
-    }))
+  it('checks availability before file selection and never interprets a pending read as available', async () => {
+    vi.mocked(getImportStatus).mockReturnValue(new Promise(() => {}))
+    renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
+    expect(await screen.findByText('Checking import availability…')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeDisabled()
+    expect(createImportReview).not.toHaveBeenCalled()
+  })
+
+  it('shows status errors with Retry and remains blocked until a successful check', async () => {
+    vi.mocked(getImportStatus).mockRejectedValueOnce(new Error('Network failed'))
     const user = userEvent.setup()
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
-    await user.upload(
-      await screen.findByLabelText('CSV file'),
-      new File(['Date,Description,Amount\n2025-01-15,Market,10.00'], 'transactions.csv', {
-        type: 'text/csv',
-      }),
-    )
-    await user.selectOptions(await screen.findByLabelText('Transaction date column'), '0')
-    await user.selectOptions(screen.getByLabelText('Description column'), '1')
-    await user.selectOptions(screen.getByLabelText('Date format'), 'yyyy-MM-dd')
-    await user.selectOptions(screen.getByLabelText('Signed amount column'), '2')
-    await user.selectOptions(screen.getByLabelText('Incoming transactions use'), 'Positive')
-    await user.selectOptions(screen.getByLabelText('Number format used in this file'), 'dot-decimal-comma-grouping')
-    await user.click(screen.getByRole('button', { name: 'Review import' }))
-    const discard = await screen.findByRole('button', { name: 'Discard active review' })
+    const retry = await screen.findByRole('button', { name: 'Retry availability check' })
+    expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeDisabled()
+    await user.click(retry)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeEnabled())
+    expect(createImportReview).not.toHaveBeenCalled()
+  })
+
+  it('surfaces a bounded status timeout without treating it as availability', async () => {
+    vi.mocked(getImportStatus).mockImplementation((_accountId, _reviewId, signal) => new Promise((_resolve, reject) => {
+      signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
+    }))
+    renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
+    expect(await screen.findByText('Checking import availability…')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Retry availability check' }, { timeout: 3500 })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeDisabled()
+    expect(createImportReview).not.toHaveBeenCalled()
+  })
+
+  it('shows checking feedback while retrying a failed refresh with cached availability', async () => {
+    const user = userEvent.setup()
+    const { queryClient } = renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeEnabled())
+    vi.mocked(getImportStatus).mockRejectedValueOnce(new Error('Network failed'))
+      .mockReturnValueOnce(new Promise(() => {}))
+    await act(async () => { await queryClient.invalidateQueries({ queryKey: ['importStatus', account.id] }) })
+    await user.click(await screen.findByRole('button', { name: 'Retry availability check' }))
+    expect(await screen.findByRole('button', { name: 'Checking import availability…' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeDisabled()
+  })
+
+  it('retains a selected file and validated controls while a background recheck is pending', async () => {
+    vi.mocked(getAccountImportSettings).mockResolvedValue({ mapping: savedMapping })
+    const user = userEvent.setup()
+    const { queryClient } = renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeEnabled())
+    let release = () => {}
+    vi.mocked(getImportStatus).mockReturnValueOnce(new Promise((resolve) => {
+      release = () => resolve({ accountId: account.id, availability: 'Available', activeImport: null, watchedImport: null })
+    }))
+    act(() => { void queryClient.invalidateQueries({ queryKey: ['importStatus', account.id] }) })
+    const file = new File(['Date,Description,Amount\n2026-01-15,Market,10.00'], 'selected.csv', { type: 'text/csv' })
+    fireEvent.change(screen.getByLabelText('CSV file'), { target: { files: [file] } })
+    expect(await screen.findByText('Selected file: selected.csv')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Review import with saved settings' })).toBeEnabled()
+    expect(createImportReview).not.toHaveBeenCalled()
+    await act(async () => release())
+    await user.click(screen.getByRole('button', { name: 'Review import with saved settings' }))
+    expect(createImportReview).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([false, true])('leaves the UI unchanged during an identical periodic check (preview: %s)', async (preview) => {
+    const { container, queryClient } = preview
+      ? await showOwnReview()
+      : renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
+    const buttonName = preview ? 'Confirm import' : 'Choose CSV file'
+    const button = await screen.findByRole('button', { name: buttonName })
+    await waitFor(() => expect(button).toBeEnabled())
+    button.focus()
+    const reviewId = '550e8400-e29b-41d4-a716-446655440002'
+    const unchanged: ImportStatus = preview ? {
+      accountId: account.id, availability: 'Blocked',
+      activeImport: { id: reviewId, stage: 'Preview', canEnd: true, expiresAtUtc: '2027-01-15T14:00:00Z' },
+      watchedImport: { id: reviewId, state: 'Ready', expiresAtUtc: '2027-01-15T14:00:00Z' },
+    } : { accountId: account.id, availability: 'Available', activeImport: null, watchedImport: null }
+    let finish = () => {}
+    vi.mocked(getImportStatus).mockReturnValueOnce(new Promise((resolve) => {
+      finish = () => resolve(unchanged)
+    }))
+    const requests = vi.mocked(getImportStatus).mock.calls.length
+    const mutations: MutationRecord[] = []
+    const observer = new MutationObserver((records) => mutations.push(...records))
+    observer.observe(container, { attributes: true, childList: true, characterData: true, subtree: true })
+    try {
+      await waitFor(() => expect(vi.mocked(getImportStatus).mock.calls.length).toBeGreaterThan(requests), { timeout: 3500 })
+      expect(button).toBeEnabled()
+      expect(button).toHaveFocus()
+      expect(screen.queryByText('Checking import availability…')).not.toBeInTheDocument()
+      await act(async () => finish())
+      await waitFor(() => expect(queryClient.isFetching({ queryKey: ['importStatus', account.id] })).toBe(0))
+      expect(mutations).toHaveLength(0)
+    } finally {
+      observer.disconnect()
+    }
+
+    vi.mocked(getImportStatus).mockResolvedValue({
+      accountId: account.id, availability: 'Blocked',
+      activeImport: { id: reviewId, stage: 'Processing', canEnd: false, expiresAtUtc: null },
+      watchedImport: preview ? { id: reviewId, state: 'Processing' } : null,
+    })
+    await act(async () => { await queryClient.invalidateQueries({ queryKey: ['importStatus', account.id] }) })
+    await waitFor(() => expect(button).toBeDisabled())
+    expect(screen.getByText(preview
+      ? 'This import is processing transactions. Wait for it to finish.'
+      : 'Another import is processing transactions for this account. Wait for it to finish.')).toBeInTheDocument()
+    expect(createImportReview).toHaveBeenCalledTimes(preview ? 1 : 0)
+  })
+
+  it.each(['Processing', 'Unknown'] as const)('blocks early without end controls during %s', async (stage) => {
+    vi.mocked(getImportStatus).mockResolvedValue({
+      accountId: account.id, availability: 'Blocked',
+      activeImport: { id: '550e8400-e29b-41d4-a716-446655440002', stage, canEnd: false, expiresAtUtc: null },
+      watchedImport: null,
+    })
+    renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
+    expect(await screen.findByText(/Another import is/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'End other import' })).not.toBeInTheDocument()
     expect(cancelActiveImportReview).not.toHaveBeenCalled()
-    await user.click(discard)
-    await waitFor(() => expect(cancelActiveImportReview).toHaveBeenCalledWith(account.id))
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Discard active review' })).not.toBeInTheDocument())
+    expect(createImportReview).not.toHaveBeenCalled()
+  })
+
+  it('refreshes a blocked screen automatically without automatically creating an import', async () => {
+    vi.mocked(getImportStatus).mockResolvedValueOnce({
+      accountId: account.id, availability: 'Blocked',
+      activeImport: { id: '550e8400-e29b-41d4-a716-446655440002', stage: 'Processing', canEnd: false, expiresAtUtc: null },
+      watchedImport: null,
+    })
+    renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
+    await screen.findByText(/Another import is/)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeEnabled(), { timeout: 5000 })
+    expect(createImportReview).not.toHaveBeenCalled()
+  })
+
+  it.each(['focus', 'online'])('requires fresh availability after %s restoration', async (kind) => {
+    renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeEnabled())
+    const setActive = (active: boolean) => kind === 'focus' ? focusManager.setFocused(active) : onlineManager.setOnline(active)
+    act(() => setActive(false))
+    vi.mocked(getImportStatus).mockReturnValue(new Promise(() => {}))
+    act(() => setActive(true))
+    await waitFor(() => expect(vi.mocked(getImportStatus).mock.calls.length).toBeGreaterThanOrEqual(2))
+    expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeDisabled()
+  })
+
+  it('rechecks a stale create conflict instead of offering blind cancellation or automatically retrying', async () => {
+    vi.mocked(getAccountImportSettings).mockResolvedValue({ mapping: savedMapping })
+    vi.mocked(createImportReview).mockImplementation(async () => {
+      vi.mocked(getImportStatus).mockResolvedValue({
+        accountId: account.id, availability: 'Blocked',
+        activeImport: { id: '550e8400-e29b-41d4-a716-446655440099', stage: 'Processing', canEnd: false, expiresAtUtc: null },
+        watchedImport: null,
+      })
+      throw new ApiError(409, { errors: { code: ['ConcurrentImport'] } })
+    })
+    const user = userEvent.setup()
+    renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
+    await user.upload(await screen.findByLabelText('CSV file'),
+      new File(['Date,Description,Amount\n2026-01-15,Market,10.00'], 'transactions.csv', { type: 'text/csv' }))
+    await user.click(await screen.findByRole('button', { name: 'Review import with saved settings' }))
+    expect(await screen.findByText(/Another import is processing/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Discard active review' })).not.toBeInTheDocument()
+    expect(createImportReview).toHaveBeenCalledTimes(1)
+  })
+
+  it('ends the displayed preview only on request, then revalidates before enabling a new import', async () => {
+    const target = '550e8400-e29b-41d4-a716-446655440099'
+    vi.mocked(getImportStatus).mockResolvedValue({
+      accountId: account.id, availability: 'Blocked',
+      activeImport: { id: target, stage: 'Preview', canEnd: true, expiresAtUtc: '2027-01-15T14:00:00Z' },
+      watchedImport: null,
+    })
+    let releaseCheck = () => {}
+    vi.mocked(cancelActiveImportReview).mockImplementation(async () => {
+      vi.mocked(getImportStatus).mockReturnValue(new Promise((resolve) => {
+        releaseCheck = () => resolve({ accountId: account.id, availability: 'Available', activeImport: null, watchedImport: null })
+      }))
+    })
+    const user = userEvent.setup()
+    renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
+    const end = await screen.findByRole('button', { name: 'End other import' })
+    expect(cancelActiveImportReview).not.toHaveBeenCalled()
+    await user.click(end)
+    await waitFor(() => expect(cancelActiveImportReview).toHaveBeenCalledWith(account.id, target))
+    expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeDisabled()
+    await waitFor(() => expect(vi.mocked(getImportStatus).mock.calls.length).toBeGreaterThanOrEqual(2))
+    vi.mocked(getImportStatus).mockResolvedValue({ accountId: account.id, availability: 'Available', activeImport: null, watchedImport: null })
+    await act(async () => releaseCheck())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeEnabled())
+    expect(createImportReview).not.toHaveBeenCalled()
+  })
+
+  it('keeps a replacement protected and reports a failed end with a retry path', async () => {
+    const target = '550e8400-e29b-41d4-a716-446655440099'
+    vi.mocked(getImportStatus).mockResolvedValue({
+      accountId: account.id, availability: 'Blocked',
+      activeImport: { id: target, stage: 'Preview', canEnd: true, expiresAtUtc: '2027-01-15T14:00:00Z' },
+      watchedImport: null,
+    })
+    vi.mocked(cancelActiveImportReview).mockImplementation(async () => {
+      vi.mocked(getImportStatus).mockResolvedValue({
+        accountId: account.id, availability: 'Blocked',
+        activeImport: { id: '550e8400-e29b-41d4-a716-446655440088', stage: 'Processing', canEnd: false, expiresAtUtc: null },
+        watchedImport: null,
+      })
+      throw new ApiError(409, { detail: 'The import changed. Check its current status.', errors: { code: ['ImportChanged'] } })
+    })
+    const user = userEvent.setup()
+    renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
+    await user.click(await screen.findByRole('button', { name: 'End other import' }))
+    expect(await screen.findByText('The import changed. Check its current status.')).toBeInTheDocument()
+    expect(await screen.findByText(/Another import is processing/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'End other import' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Retry availability check' })).toBeInTheDocument()
+  })
+
+  it('latches the ended notice despite a replacement and stops polling until acknowledgement', async () => {
+    const onBack = vi.fn()
+    const { user, queryClient } = await showOwnReview(onBack)
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
+    const watchedId = '550e8400-e29b-41d4-a716-446655440002'
+    vi.mocked(getImportStatus).mockResolvedValue({
+      accountId: account.id, availability: 'Blocked',
+      activeImport: { id: '550e8400-e29b-41d4-a716-446655440099', stage: 'Processing', canEnd: false, expiresAtUtc: null },
+      watchedImport: { id: watchedId, state: 'Ended', endedAtUtc: '2026-11-17T09:00:00Z', endedBy: { userId: 'owner', userName: 'owner@example.test' } },
+    })
+    await act(async () => { await queryClient.invalidateQueries({ queryKey: ['importStatus', account.id] }) })
+    expect(await screen.findByRole('dialog', { name: 'Import ended' })).toHaveTextContent('owner@example.test')
+    expect(screen.queryByRole('button', { name: 'Confirm import' })).not.toBeInTheDocument()
+    const reads = vi.mocked(getImportStatus).mock.calls.length
+    await act(async () => { await queryClient.invalidateQueries({ queryKey: ['importStatus', account.id] }) })
+    expect(getImportStatus).toHaveBeenCalledTimes(reads)
+    expect(onBack).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Return to transactions' }))
+    await waitFor(() => expect(onBack).toHaveBeenCalledOnce())
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['account', account.id] })
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['transactions', account.id] })
+    expect(cancelImportReview).not.toHaveBeenCalled()
+  })
+
+  it.each(['Expired', 'Unavailable'] as const)('explains %s without an actor and returns without cancellation', async (state) => {
+    const onBack = vi.fn()
+    const { user, queryClient } = await showOwnReview(onBack)
+    vi.mocked(getImportStatus).mockResolvedValue({
+      accountId: account.id, availability: 'Available', activeImport: null,
+      watchedImport: { id: '550e8400-e29b-41d4-a716-446655440002', state },
+    })
+    await act(async () => { await queryClient.invalidateQueries({ queryKey: ['importStatus', account.id] }) })
+    expect(await screen.findByText(state === 'Expired' ? 'This import preview has expired.' : 'This import preview is no longer available.')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Confirm import' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Return to transactions' }))
+    await waitFor(() => expect(onBack).toHaveBeenCalledOnce())
+    expect(cancelImportReview).not.toHaveBeenCalled()
+  })
+
+  it('refreshes ImportEndedElsewhere and does not retry confirmation', async () => {
+    const { user } = await showOwnReview()
+    vi.mocked(confirmImportReview).mockImplementation(async () => {
+      vi.mocked(getImportStatus).mockResolvedValue({
+        accountId: account.id, availability: 'Available', activeImport: null,
+        watchedImport: { id: '550e8400-e29b-41d4-a716-446655440002', state: 'Ended', endedAtUtc: '2026-11-17T09:00:00Z', endedBy: { userId: 'owner', userName: 'owner@example.test' } },
+      })
+      throw new ApiError(409, { errors: { code: ['ImportEndedElsewhere'] } })
+    })
+    await user.click(screen.getByRole('button', { name: 'Confirm import' }))
+    expect(await screen.findByRole('dialog', { name: 'Import ended' })).toBeVisible()
+    expect(confirmImportReview).toHaveBeenCalledTimes(1)
+  })
+
+  it('explains a protected watched preview after foreground restoration', async () => {
+    await showOwnReview()
+    act(() => focusManager.setFocused(false))
+    vi.mocked(getImportStatus).mockResolvedValue({
+      accountId: account.id, availability: 'Blocked',
+      activeImport: { id: '550e8400-e29b-41d4-a716-446655440002', stage: 'Processing', canEnd: false, expiresAtUtc: null },
+      watchedImport: { id: '550e8400-e29b-41d4-a716-446655440002', state: 'Processing' },
+    })
+    act(() => focusManager.setFocused(true))
+    expect(await screen.findByText('This import is processing transactions. Wait for it to finish.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Confirm import' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Cancel review' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'End other import' })).not.toBeInTheDocument()
+    expect(createImportReview).toHaveBeenCalledTimes(1)
+    expect(confirmImportReview).not.toHaveBeenCalled()
+  })
+
+  it('preserves an unknown confirmation outcome when the watched review is unavailable', async () => {
+    const { user } = await showOwnReview()
+    vi.mocked(confirmImportReview).mockImplementation(async () => {
+      vi.mocked(getImportStatus).mockResolvedValue({
+        accountId: account.id, availability: 'Available', activeImport: null,
+        watchedImport: { id: '550e8400-e29b-41d4-a716-446655440002', state: 'Unavailable' },
+      })
+      throw new ApiError(503, {
+        detail: 'The import outcome could not be established. Check transactions before trying again.',
+        errors: { code: ['ImportOutcomeUnknown'] },
+      })
+    })
+    await user.click(screen.getByRole('button', { name: 'Confirm import' }))
+    expect(await screen.findByText('The import outcome could not be established. Check transactions before trying again.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Confirm import' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Return to transactions' })).toBeEnabled()
+    expect(confirmImportReview).toHaveBeenCalledTimes(1)
   })
 
   it('displays the safe row and field from an import validation error', async () => {

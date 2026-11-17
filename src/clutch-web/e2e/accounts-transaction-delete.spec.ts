@@ -33,6 +33,7 @@ async function registerAndSignIn(context: BrowserContext, email: string) {
 
 async function importDeleteJourneyStatement(page: Page, { reimport = false } = {}) {
   await page.getByRole('button', { name: 'Import transactions' }).click()
+  await expect(page.getByRole('button', { name: 'Choose CSV file' })).toBeEnabled()
   await page.locator('#csv-file').setInputFiles({
     name: 'delete-journey.csv',
     mimeType: 'text/csv',

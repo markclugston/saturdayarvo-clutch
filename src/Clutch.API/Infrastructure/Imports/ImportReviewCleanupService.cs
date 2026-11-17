@@ -11,6 +11,7 @@ public sealed class ImportReviewCleanupService(
     ILogger<ImportReviewCleanupService> logger) : BackgroundService
 {
     private const int BatchSize = 100;
+    private static readonly TimeSpan AbandonedClaimLifetime = TimeSpan.FromMinutes(5);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -37,7 +38,7 @@ public sealed class ImportReviewCleanupService(
             .Where(window => window.WindowStartedAtUtc <= now.AddMinutes(-1))
             .ExecuteDeleteAsync(cancellationToken);
         var strategy = dbContext.Database.CreateExecutionStrategy();
-        var expiredCount = await strategy.ExecuteAsync(async () =>
+        var (expiredCount, recoveredCount) = await strategy.ExecuteAsync(async () =>
         {
             dbContext.ChangeTracker.Clear();
             await using var transaction = await dbContext.Database.BeginTransactionAsync(
@@ -71,7 +72,10 @@ public sealed class ImportReviewCleanupService(
                     .Where(candidate =>
                         candidate.Id == review.Id
                         && candidate.State == ImportReviewState.Ready
-                        && candidate.ExpiresAtUtc <= now)
+                        && candidate.ExpiresAtUtc <= now
+                        && dbContext.Accounts.Any(account =>
+                            account.Id == candidate.AccountId
+                            && account.ActiveImportId == candidate.Id))
                     .ExecuteUpdateAsync(
                         setters => setters.SetProperty(
                             candidate => candidate.State,
@@ -85,7 +89,7 @@ public sealed class ImportReviewCleanupService(
                 await dbContext.ImportReviewRows
                     .Where(row => row.ReviewId == review.Id)
                     .ExecuteDeleteAsync(cancellationToken);
-                await dbContext.Accounts
+                var released = await dbContext.Accounts
                     .Where(account =>
                         account.Id == review.AccountId
                         && account.ActiveImportId == review.Id)
@@ -94,6 +98,11 @@ public sealed class ImportReviewCleanupService(
                             account => account.ActiveImportId,
                             (Guid?)null),
                         cancellationToken);
+                if (released != 1)
+                {
+                    throw new InvalidOperationException("The expired import lease changed during cleanup.");
+                }
+
                 await dbContext.ImportReviews
                     .Where(candidate => candidate.Id == review.Id)
                     .ExecuteDeleteAsync(cancellationToken);
@@ -105,16 +114,83 @@ public sealed class ImportReviewCleanupService(
                 transitionedCount++;
             }
 
+            var staleClaims = await dbContext.ImportReviews
+                .AsNoTracking()
+                .Where(review =>
+                    review.State == ImportReviewState.Processing
+                    && review.ProcessingStartedAtUtc <= now.Add(-AbandonedClaimLifetime))
+                .Join(
+                    dbContext.Accounts.AsNoTracking(),
+                    review => review.AccountId,
+                    account => account.Id,
+                    (review, account) => new
+                    {
+                        review.Id,
+                        review.AccountId,
+                        review.ConfirmationAttemptId,
+                        review.ActingUserId,
+                        AccountDescription = account.Description,
+                    })
+                .OrderBy(review => review.Id)
+                .Take(BatchSize)
+                .ToListAsync(cancellationToken);
+            var recoveredClaimCount = 0;
+            foreach (var review in staleClaims)
+            {
+                if (review.ConfirmationAttemptId is not Guid attemptId)
+                {
+                    continue;
+                }
+
+                var removed = await dbContext.ImportReviews
+                    .Where(candidate =>
+                        candidate.Id == review.Id
+                        && candidate.AccountId == review.AccountId
+                        && candidate.State == ImportReviewState.Processing
+                        && candidate.ConfirmationAttemptId == attemptId
+                        && candidate.ProcessingStartedAtUtc <= now.Add(-AbandonedClaimLifetime)
+                        && dbContext.Accounts.Any(account =>
+                            account.Id == candidate.AccountId
+                            && account.ActiveImportId == candidate.Id))
+                    .ExecuteDeleteAsync(cancellationToken);
+                if (removed == 0)
+                {
+                    continue;
+                }
+
+                var released = await dbContext.Accounts
+                    .Where(account =>
+                        account.Id == review.AccountId
+                        && account.ActiveImportId == review.Id)
+                    .ExecuteUpdateAsync(
+                        setters => setters.SetProperty(
+                            account => account.ActiveImportId,
+                            (Guid?)null),
+                        cancellationToken);
+                if (released != 1)
+                {
+                    throw new InvalidOperationException("The abandoned import lease changed during recovery.");
+                }
+
+                auditWriter.Add(
+                    review.AccountDescription,
+                    review.ActingUserId,
+                    "ConfirmationFailed",
+                    now);
+                recoveredClaimCount++;
+            }
+
             await dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            return transitionedCount;
+            return (transitionedCount, recoveredClaimCount);
         });
 
-        if (expiredCount > 0)
+        if (expiredCount > 0 || recoveredCount > 0)
         {
             logger.LogInformation(
-                "Expired {ReviewCount} import reviews and released their account leases.",
-                expiredCount);
+                "Cleaned up {ExpiredReviewCount} expired reviews and {RecoveredClaimCount} abandoned claims.",
+                expiredCount,
+                recoveredCount);
         }
     }
 }

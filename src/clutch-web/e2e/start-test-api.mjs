@@ -10,10 +10,18 @@ import path from 'node:path'
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 const apiProject = path.join(repositoryRoot, 'src', 'Clutch.API', 'Clutch.API.csproj')
 const apiAssembly = path.join(repositoryRoot, 'src', 'Clutch.API', 'bin', 'Debug', 'net10.0', 'Clutch.API.dll')
-const containerName = 'clutch-e2e-sql-ownership'
+const resourceName = process.env.CLUTCH_E2E_RESOURCE_NAME ?? 'ownership'
+if (!/^[a-z0-9-]+$/.test(resourceName)) {
+  throw new Error('Invalid test resource name.')
+}
+const containerName = `clutch-e2e-sql-${resourceName}`
 const password = `ClutchE2e!${randomBytes(18).toString('hex')}Aa9`
-const certificatePath = path.join(os.tmpdir(), 'clutch-e2e-ownership.pfx')
+const certificatePath = path.join(os.tmpdir(), `clutch-e2e-${resourceName}.pfx`)
 const certificatePassword = randomBytes(24).toString('hex')
+const apiPort = process.env.CLUTCH_E2E_API_PORT ?? '7180'
+if (!/^\d{1,5}$/.test(apiPort) || Number(apiPort) < 1 || Number(apiPort) > 65535) {
+  throw new Error('Invalid test API port.')
+}
 let apiProcess
 let apiEnvironment
 
@@ -32,7 +40,7 @@ try {
   apiEnvironment = {
     ...process.env,
     ASPNETCORE_ENVIRONMENT: 'Development',
-    ASPNETCORE_URLS: 'https://localhost:7180',
+    ASPNETCORE_URLS: `https://localhost:${apiPort}`,
     ASPNETCORE_Kestrel__Certificates__Default__Path: certificatePath,
     ASPNETCORE_Kestrel__Certificates__Default__Password: certificatePassword,
     'Logging__LogLevel__Microsoft.EntityFrameworkCore.Database.Command': 'Warning',

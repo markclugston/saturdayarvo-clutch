@@ -15,6 +15,7 @@ public sealed class ConfirmImportService(
     AppDbContext dbContext,
     ImportAuditWriter auditWriter,
     ImportReviewService importReviewService,
+    ImportStateService importStateService,
     AccountImportSettingsService accountImportSettingsService,
     TimeProvider timeProvider)
 {
@@ -25,42 +26,82 @@ public sealed class ConfirmImportService(
         CancellationToken cancellationToken)
     {
         using var importMeasurement = ImportMetrics.StartImport();
-        var strategy = dbContext.Database.CreateExecutionStrategy();
-        ConfirmOutcome outcome;
-        var completed = false;
-        try
+        var attemptId = Guid.NewGuid();
+        var claimedAt = timeProvider.GetUtcNow();
+        var claim = await importStateService.TryClaimProcessingAsync(
+            ownerUserId,
+            reviewId,
+            attemptId,
+            claimedAt,
+            cancellationToken);
+        if (!claim.IsSuccess)
         {
-            outcome = await strategy.ExecuteAsync(
-                () => ConfirmWithinTransactionAsync(
+            if (claim.Error == ImportCoordinationError.ImportExpired)
+            {
+                await importReviewService.ExpireReadyReviewAsync(
                     ownerUserId,
                     reviewId,
-                    confirmPossibleDuplicates,
-                    cancellationToken));
-            completed = true;
-        }
-        catch (Exception exception) when (exception is DbUpdateException or SqlException)
-        {
-            throw new ApiProblemException(
-                StatusCodes.Status500InternalServerError,
-                "The import could not be completed.",
-                "No transactions were imported. Start a new review and try again.");
-        }
-        finally
-        {
-            if (!completed)
-            {
-                dbContext.ChangeTracker.Clear();
-                await importReviewService.CancelAfterFailureAsync(ownerUserId, reviewId, CancellationToken.None);
+                    claimedAt,
+                    cancellationToken);
+                throw ReviewExpired();
             }
+
+            throw ToProblem(claim.Error!.Value);
+        }
+
+        ConfirmOutcome outcome;
+        try
+        {
+            var strategy = dbContext.Database.CreateExecutionStrategy();
+            outcome = await strategy.ExecuteAsync(() => ConfirmWithinTransactionAsync(
+                ownerUserId,
+                reviewId,
+                attemptId,
+                confirmPossibleDuplicates,
+                cancellationToken));
+        }
+        catch (Exception exception)
+        {
+            dbContext.ChangeTracker.Clear();
+            var cleaned = await importReviewService.FailProcessingAttemptAsync(
+                ownerUserId,
+                reviewId,
+                attemptId,
+                CancellationToken.None);
+            if (!cleaned)
+            {
+                throw ImportOutcomeUnknown();
+            }
+
+            if (exception is OperationCanceledException)
+            {
+                throw;
+            }
+
+            if (exception is DbUpdateException or SqlException)
+            {
+                throw ConfirmationFailed();
+            }
+
+            throw;
         }
 
         if (outcome.Problem is not null)
         {
-            if (!outcome.RetainReview)
+            if (outcome.CleanupAttempt)
             {
                 dbContext.ChangeTracker.Clear();
-                await importReviewService.CancelAfterFailureAsync(ownerUserId, reviewId, CancellationToken.None);
+                var cleaned = await importReviewService.FailProcessingAttemptAsync(
+                    ownerUserId,
+                    reviewId,
+                    attemptId,
+                    CancellationToken.None);
+                if (!cleaned)
+                {
+                    throw ImportOutcomeUnknown();
+                }
             }
+
             throw outcome.Problem;
         }
 
@@ -71,23 +112,46 @@ public sealed class ConfirmImportService(
     private async Task<ConfirmOutcome> ConfirmWithinTransactionAsync(
         string ownerUserId,
         Guid reviewId,
+        Guid attemptId,
         bool confirmPossibleDuplicates,
         CancellationToken cancellationToken)
     {
         await using var transaction = await dbContext.Database.BeginTransactionAsync(
-            IsolationLevel.Serializable,
+            IsolationLevel.ReadCommitted,
             cancellationToken);
+
+        var locked = await dbContext.ImportReviews
+            .Where(review =>
+                review.Id == reviewId
+                && review.State == ImportReviewState.Processing
+                && review.ConfirmationAttemptId == attemptId
+                && dbContext.Accounts.Any(account =>
+                    account.Id == review.AccountId
+                    && account.OwnerUserId == ownerUserId
+                    && account.ActiveImportId == review.Id))
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(review => review.ConfirmationAttemptId, attemptId),
+                cancellationToken);
+        if (locked != 1)
+        {
+            return await RollbackOutcomeAsync(
+                transaction,
+                ImportOutcomeUnknown(),
+                cleanupAttempt: false);
+        }
+
+        dbContext.ChangeTracker.Clear();
         var review = await OwnedReviews(ownerUserId)
             .Include(candidate => candidate.Rows)
             .SingleOrDefaultAsync(candidate => candidate.Id == reviewId, cancellationToken);
-        if (review is null)
+        if (review is null
+            || review.State != ImportReviewState.Processing
+            || review.ConfirmationAttemptId != attemptId)
         {
-            return await RollbackOutcomeAsync(transaction, ReviewNotFound());
-        }
-
-        if (review.State != ImportReviewState.Ready)
-        {
-            return await RollbackOutcomeAsync(transaction, ReviewNotReady());
+            return await RollbackOutcomeAsync(
+                transaction,
+                ImportOutcomeUnknown(),
+                cleanupAttempt: false);
         }
 
         var account = await OwnedAccounts(ownerUserId)
@@ -95,22 +159,6 @@ public sealed class ConfirmImportService(
         if (account is null)
         {
             return await RollbackOutcomeAsync(transaction, AccountNotFound());
-        }
-
-        var now = timeProvider.GetUtcNow();
-        if (review.ExpiresAtUtc <= now)
-        {
-            review.TryTransition(ImportReviewState.Expired);
-            account.TryReleaseImport(review.Id);
-            dbContext.ImportReviews.Remove(review);
-            auditWriter.Add(
-                account.Description,
-                ownerUserId,
-                "ReviewExpired",
-                now);
-            await dbContext.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return ConfirmOutcome.Failed(ReviewExpired());
         }
 
         if (account.ActiveImportId != review.Id)
@@ -157,16 +205,21 @@ public sealed class ConfirmImportService(
                     row.Amount,
                     row.Direction))));
         var newlyDiscoveredDuplicates = duplicateRows.Except(previouslyFlaggedRows).ToHashSet();
-        review.UpdateDuplicateWarnings(duplicateRows);
         if (newlyDiscoveredDuplicates.Count > 0
             || (review.DuplicateConfirmationRequired && !confirmPossibleDuplicates))
         {
+            if (!review.TryRejectProcessing(attemptId, duplicateRows))
+            {
+                return await RollbackOutcomeAsync(transaction, InvalidStagedData());
+            }
+
             await dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            return ConfirmOutcome.Failed(DuplicateConfirmationRequired(duplicateRows), retainReview: true);
+            return ConfirmOutcome.Failed(DuplicateConfirmationRequired(duplicateRows), cleanupAttempt: false);
         }
 
         var transactions = new List<Transaction>(reviewRows.Length);
+        var now = timeProvider.GetUtcNow();
         foreach (var row in reviewRows)
         {
             if (!Transaction.TryCreate(
@@ -181,9 +234,7 @@ public sealed class ConfirmImportService(
                 out var newTransaction)
                 || newTransaction is null)
             {
-                return await RollbackOutcomeAsync(
-                    transaction,
-                    InvalidStagedData());
+                return await RollbackOutcomeAsync(transaction, InvalidStagedData());
             }
 
             transactions.Add(newTransaction);
@@ -205,7 +256,7 @@ public sealed class ConfirmImportService(
         dbContext.Transactions.AddRange(transactions);
         await accountImportSettingsService.SaveAsync(account.Id, mapping, cancellationToken);
         account.MarkSuccessfulImport(now);
-        if (!account.TryReleaseImport(review.Id) || !review.TryTransition(ImportReviewState.Confirmed))
+        if (!account.TryReleaseImport(review.Id))
         {
             return await RollbackOutcomeAsync(transaction, LeaseNotOwned());
         }
@@ -225,10 +276,11 @@ public sealed class ConfirmImportService(
 
     private async Task<ConfirmOutcome> RollbackOutcomeAsync(
         Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction,
-        ApiProblemException problem)
+        ApiProblemException problem,
+        bool cleanupAttempt = true)
     {
         await transaction.RollbackAsync(CancellationToken.None);
-        return ConfirmOutcome.Failed(problem);
+        return ConfirmOutcome.Failed(problem, cleanupAttempt);
     }
 
     private IQueryable<Account> OwnedAccounts(string ownerUserId) =>
@@ -239,6 +291,16 @@ public sealed class ConfirmImportService(
             dbContext.Accounts.Any(account =>
                 account.Id == review.AccountId
                 && account.OwnerUserId == ownerUserId));
+
+    private static ApiProblemException ToProblem(ImportCoordinationError error) =>
+        error switch
+        {
+            ImportCoordinationError.ReviewNotFound => ReviewNotFound(),
+            ImportCoordinationError.ImportNotEndable => ImportNotEndable(),
+            ImportCoordinationError.ImportEndedElsewhere => ImportEndedElsewhere(),
+            ImportCoordinationError.ImportOutcomeUnknown => ImportOutcomeUnknown(),
+            _ => LeaseNotOwned(),
+        };
 
     private static ApiProblemException AccountNotFound() =>
         new(
@@ -252,23 +314,33 @@ public sealed class ConfirmImportService(
             "Import review not found.",
             "The import review does not exist or is not available to this user.");
 
-    private static ApiProblemException ReviewNotReady() =>
-        new(
+    private static ApiProblemException ImportNotEndable() =>
+        Problem(
             StatusCodes.Status409Conflict,
-            "The import review is no longer available.",
-            "A review can only be confirmed once while it is ready.");
+            "The import is already being processed.",
+            "Once confirmation has been accepted, an import cannot be ended from another session.",
+            "ImportNotEndable");
 
     private static ApiProblemException ReviewExpired() =>
-        new(
+        Problem(
             StatusCodes.Status409Conflict,
             "The import review has expired.",
-            "Start a new import review to continue.");
+            "Start a new import review to continue.",
+            "ImportChanged");
+
+    private static ApiProblemException ImportEndedElsewhere() =>
+        Problem(
+            StatusCodes.Status409Conflict,
+            "The import was ended elsewhere.",
+            "Return to the account's transactions before continuing.",
+            "ImportEndedElsewhere");
 
     private static ApiProblemException LeaseNotOwned() =>
-        new(
+        Problem(
             StatusCodes.Status409Conflict,
             "The account import is no longer active.",
-            "Start a new import review to continue.");
+            "Recheck the account import status before continuing.",
+            "ImportChanged");
 
     private static ApiProblemException DuplicateConfirmationRequired(
         IReadOnlySet<int> duplicateRowNumbers) =>
@@ -286,21 +358,43 @@ public sealed class ConfirmImportService(
             });
 
     private static ApiProblemException InvalidStagedData() =>
-        new(
+        Problem(
             StatusCodes.Status409Conflict,
             "The import review is no longer valid.",
-            "Start a new import review to continue.");
+            "Start a new import review to continue.",
+            "ImportChanged");
+
+    private static ApiProblemException ConfirmationFailed() =>
+        Problem(
+            StatusCodes.Status500InternalServerError,
+            "The import could not be completed.",
+            "The failed attempt was rolled back. Start a new import review and try again.",
+            "ConfirmationFailed");
+
+    private static ApiProblemException ImportOutcomeUnknown() =>
+        Problem(
+            StatusCodes.Status500InternalServerError,
+            "The import outcome could not be verified.",
+            "Check the account's transactions before attempting another import.",
+            "ImportOutcomeUnknown");
+
+    private static ApiProblemException Problem(int status, string title, string detail, string code) =>
+        new(
+            status,
+            title,
+            detail,
+            new Dictionary<string, string[]> { ["code"] = [code] });
 
     private sealed record ConfirmOutcome(
         ConfirmImportResponse? Response,
         ApiProblemException? Problem,
-        bool RetainReview)
+        bool CleanupAttempt)
     {
         public static ConfirmOutcome Succeeded(ConfirmImportResponse response) =>
             new(response, null, false);
 
-        public static ConfirmOutcome Failed(ApiProblemException problem, bool retainReview = false) =>
-            new(null, problem, retainReview);
+        public static ConfirmOutcome Failed(ApiProblemException problem, bool cleanupAttempt = true) =>
+            new(null, problem, cleanupAttempt);
     }
 }
 

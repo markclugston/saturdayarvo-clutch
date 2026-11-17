@@ -22,10 +22,19 @@ public static class ImportMetrics
         Meter.CreateCounter<long>("clutch.import.settings_save.outcomes", "{save}");
     private static readonly Histogram<double> SettingsSaveDuration =
         Meter.CreateHistogram<double>("clutch.import.settings_save.duration", "ms");
+    private static readonly Counter<long> CoordinationOutcomes =
+        Meter.CreateCounter<long>("clutch.import.coordination.outcomes", "{operation}");
+    private static readonly Counter<long> CoordinationFailures =
+        Meter.CreateCounter<long>("clutch.import.coordination.failures", "{operation}");
+    private static readonly Histogram<double> CoordinationDuration =
+        Meter.CreateHistogram<double>("clutch.import.coordination.duration", "ms");
 
     public static ImportMeasurement StartImport() => new();
 
     public static long StartSettingsSave() => Stopwatch.GetTimestamp();
+
+    public static CoordinationMeasurement StartCoordination(ImportCoordinationOperation operation) =>
+        new(operation);
 
     public static void RecordSettingsSave(string outcome, long startedAtTimestamp)
     {
@@ -71,4 +80,93 @@ public static class ImportMetrics
                 tags);
         }
     }
+
+    public sealed class CoordinationMeasurement(ImportCoordinationOperation operation) : IDisposable
+    {
+        private readonly long startedAtTimestamp = Stopwatch.GetTimestamp();
+        private string outcome = "failure";
+        private bool completed;
+        private bool disposed;
+
+        public void MarkSucceeded(
+            ImportCoordinationSuccessOutcome result = ImportCoordinationSuccessOutcome.Success)
+        {
+            outcome = SuccessOutcomeName(result);
+            completed = true;
+        }
+
+        public void MarkFailed(ImportCoordinationError error)
+        {
+            outcome = OutcomeName(error);
+            completed = true;
+        }
+
+        public void Dispose()
+        {
+            if (disposed)
+            {
+                return;
+            }
+
+            disposed = true;
+            var finalOutcome = completed ? outcome : "failure";
+            var tags = new KeyValuePair<string, object?>[]
+            {
+                new("operation", OperationName(operation)),
+                new("outcome", finalOutcome),
+            };
+            CoordinationOutcomes.Add(1, tags);
+            CoordinationDuration.Record(Stopwatch.GetElapsedTime(startedAtTimestamp).TotalMilliseconds, tags);
+            if (finalOutcome != "success")
+            {
+                CoordinationFailures.Add(1, tags);
+            }
+        }
+    }
+
+    private static string OperationName(ImportCoordinationOperation operation) =>
+        operation switch
+        {
+            ImportCoordinationOperation.Status => "status",
+            ImportCoordinationOperation.End => "end",
+            ImportCoordinationOperation.Claim => "claim",
+            _ => "unknown",
+        };
+
+    private static string OutcomeName(ImportCoordinationError error) =>
+        error switch
+        {
+            ImportCoordinationError.AccountNotFound => "account_not_found",
+            ImportCoordinationError.ReviewNotFound => "review_not_found",
+            ImportCoordinationError.ImportChanged => "import_changed",
+            ImportCoordinationError.ImportExpired => "import_expired",
+            ImportCoordinationError.ImportNotEndable => "import_not_endable",
+            ImportCoordinationError.ImportEndedElsewhere => "import_ended_elsewhere",
+            ImportCoordinationError.EndingIdentityUnavailable => "ending_identity_unavailable",
+            ImportCoordinationError.ImportOutcomeUnknown => "import_outcome_unknown",
+            _ => "failure",
+        };
+
+    private static string SuccessOutcomeName(ImportCoordinationSuccessOutcome outcome) =>
+        outcome switch
+        {
+            ImportCoordinationSuccessOutcome.Success => "success",
+            ImportCoordinationSuccessOutcome.Available => "available",
+            ImportCoordinationSuccessOutcome.Blocked => "blocked",
+            _ => "success",
+        };
+}
+
+public enum ImportCoordinationOperation
+{
+    Status,
+    End,
+    Claim,
+}
+
+public enum ImportCoordinationSuccessOutcome
+{
+    Success,
+    Available,
+    Blocked,
 }

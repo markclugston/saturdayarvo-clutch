@@ -2,8 +2,10 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { clearCsrfToken } from '@/lib/api/client'
 import {
   confirmImportReview,
+  cancelActiveImportReview,
   createImportReview,
   getAccountImportSettings,
+  getImportStatus,
   type ImportMapping,
 } from './api'
 
@@ -22,6 +24,96 @@ const mapping: ImportMapping = {
 afterEach(() => {
   clearCsrfToken()
   vi.unstubAllGlobals()
+})
+
+const available = { accountId, availability: 'Available', activeImport: null, watchedImport: null }
+const expiresAtUtc = '2026-11-17T09:00:00Z'
+
+it.each([
+  available,
+  ...(['Preview', 'Processing', 'Unknown'] as const).map((stage) => ({
+    ...available, availability: 'Blocked',
+    activeImport: { id: reviewId, stage, canEnd: stage === 'Preview', expiresAtUtc: stage === 'Preview' ? expiresAtUtc : null },
+  })),
+])('reads validated availability: %j', async (status) => {
+  const controller = new AbortController()
+  const fetchMock = vi.fn(async () => Response.json(status))
+  vi.stubGlobal('fetch', fetchMock)
+  await expect(getImportStatus(accountId, undefined, controller.signal)).resolves.toEqual(status)
+  expect(fetchMock).toHaveBeenCalledWith(
+    `/api/accounts/${accountId}/import-status`,
+    expect.objectContaining({ signal: controller.signal, cache: 'no-store' }),
+  )
+})
+
+it.each([
+  { id: reviewId, state: 'Ready', expiresAtUtc },
+  { id: reviewId, state: 'Processing' },
+  { id: reviewId, state: 'Ended', endedAtUtc: expiresAtUtc, endedBy: { userId: 'owner', userName: 'owner@example.test' } },
+  { id: reviewId, state: 'Expired' },
+  { id: reviewId, state: 'Unavailable' },
+])('reads the exact watched state: %j', async (watchedImport) => {
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ ...available, watchedImport })))
+  await expect(getImportStatus(accountId, reviewId)).resolves.toMatchObject({ watchedImport })
+})
+
+it.each([
+  { ...available, activeImport: { id: reviewId, stage: 'Preview', canEnd: true, expiresAtUtc } },
+  { ...available, availability: 'Blocked' },
+  { ...available, availability: 'Maybe' },
+  { ...available, accountId: reviewId },
+  { ...available, watchedImport: { id: reviewId, state: 'Unknown' } },
+  ...([
+    { id: 'invalid', stage: 'Preview', canEnd: true, expiresAtUtc },
+    { id: reviewId, stage: 'Processing', canEnd: true, expiresAtUtc: null },
+    { id: reviewId, stage: 'Preview', canEnd: true, expiresAtUtc: 'invalid' },
+    { id: reviewId, stage: 'Unknown', canEnd: false, expiresAtUtc },
+  ]).map((activeImport) => ({ ...available, availability: 'Blocked', activeImport })),
+])('rejects invalid availability instead of enabling a new import: %j', async (status) => {
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json(status)))
+  await expect(getImportStatus(accountId)).rejects.toThrow('invalid response')
+})
+
+it.each([
+  null,
+  { id: accountId, state: 'Expired' },
+  { id: reviewId, state: 'Ready', expiresAtUtc: 'not-a-date' },
+  { id: reviewId, state: 'Ended', endedAtUtc: expiresAtUtc, endedBy: { userId: 'owner', userName: '  ' } },
+])('rejects missing or invalid watched identity: %j', async (watchedImport) => {
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ ...available, watchedImport })))
+  await expect(getImportStatus(accountId, reviewId)).rejects.toThrow('invalid response')
+})
+
+it('preserves status errors and cancellation instead of reporting availability', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ title: 'Status failed' }, { status: 503 })))
+  await expect(getImportStatus(accountId)).rejects.toMatchObject({ status: 503 })
+  vi.stubGlobal('fetch', vi.fn(async (_input, init?: RequestInit) => {
+    init?.signal?.throwIfAborted()
+    throw new Error('Expected an aborted read')
+  }))
+  const controller = new AbortController()
+  controller.abort(new DOMException('Timed out', 'TimeoutError'))
+  await expect(getImportStatus(accountId, undefined, controller.signal)).rejects.toMatchObject({ name: 'TimeoutError' })
+})
+
+it('ends only the exact required review target', async () => {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) =>
+    String(input) === '/api/security/csrf-token'
+      ? Response.json({ requestToken: 'token' })
+      : new Response(null, { status: 204 }))
+  vi.stubGlobal('fetch', fetchMock)
+  await cancelActiveImportReview(accountId, reviewId)
+  expect(fetchMock).toHaveBeenCalledWith(
+    `/api/accounts/${accountId}/active-import-review?reviewId=${reviewId}`,
+    expect.objectContaining({ method: 'DELETE' }),
+  )
+})
+
+it('refuses an invalid end target without an account-only request', async () => {
+  const fetchMock = vi.fn()
+  vi.stubGlobal('fetch', fetchMock)
+  await expect(cancelActiveImportReview(accountId, '')).rejects.toThrow()
+  expect(fetchMock).not.toHaveBeenCalled()
 })
 
 it.each([204, 500])('cancels the specific review after an invalid 201 response (cleanup %s)', async (cleanupStatus) => {

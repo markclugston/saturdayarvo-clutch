@@ -228,16 +228,29 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             {
                 table.HasCheckConstraint(
                     "CK_ImportReviews_ValidState",
-                    "[State] IN ('Ready', 'Confirmed', 'Cancelled', 'Expired')");
+                    "[State] IN ('Ready', 'Processing', 'Confirmed', 'Cancelled', 'Expired')");
                 table.HasCheckConstraint(
                     "CK_ImportReviews_Mapping",
                     "([SchemaVersion] IS NULL AND [MappingJson] IS NULL) OR ([SchemaVersion] IS NOT NULL AND [SchemaVersion] > 0 AND [MappingJson] IS NOT NULL)");
+                table.HasCheckConstraint(
+                    "CK_ImportReviews_ProcessingMetadata",
+                    "(([State] = 'Processing' AND [ConfirmationAttemptId] IS NOT NULL AND [ProcessingStartedAtUtc] IS NOT NULL AND [EndedByUserId] IS NULL AND [EndedAtUtc] IS NULL) OR ([State] <> 'Processing' AND [ConfirmationAttemptId] IS NULL AND [ProcessingStartedAtUtc] IS NULL))");
+                table.HasCheckConstraint(
+                    "CK_ImportReviews_EndedMetadata",
+                    "(([EndedByUserId] IS NULL AND [EndedAtUtc] IS NULL) OR ([State] = 'Cancelled' AND [EndedByUserId] IS NOT NULL AND LEN(LTRIM(RTRIM([EndedByUserId]))) > 0 AND [EndedAtUtc] IS NOT NULL AND [ConfirmationAttemptId] IS NULL AND [ProcessingStartedAtUtc] IS NULL))");
             });
             entity.Property(review => review.MappingJson);
             entity.HasKey(review => review.Id);
             entity.Property(review => review.ActingUserId)
                 .HasMaxLength(450)
                 .IsRequired();
+            entity.Property(review => review.ConfirmationAttemptId);
+            entity.Property(review => review.ProcessingStartedAtUtc)
+                .HasColumnType("datetimeoffset");
+            entity.Property(review => review.EndedByUserId)
+                .HasMaxLength(450);
+            entity.Property(review => review.EndedAtUtc)
+                .HasColumnType("datetimeoffset");
             entity.Property(review => review.State)
                 .HasConversion<string>()
                 .HasMaxLength(16)
@@ -245,6 +258,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .IsRequired();
             entity.HasIndex(review => new { review.AccountId, review.State });
             entity.HasIndex(review => review.ExpiresAtUtc);
+            entity.HasIndex(review => new { review.ProcessingStartedAtUtc, review.Id })
+                .HasFilter("[State] = 'Processing'");
             entity.HasOne<Account>()
                 .WithMany()
                 .HasForeignKey(review => review.AccountId)

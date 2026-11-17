@@ -2,9 +2,14 @@ import { spawnSync } from 'node:child_process'
 import { rmSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import process from 'node:process'
 
-const containerName = 'clutch-e2e-sql-ownership'
-const certificatePath = path.join(os.tmpdir(), 'clutch-e2e-ownership.pfx')
+const resourceName = process.env.CLUTCH_E2E_RESOURCE_NAME ?? 'ownership'
+if (!/^[a-z0-9-]+$/.test(resourceName)) {
+  throw new Error('Invalid test resource name.')
+}
+const containerName = `clutch-e2e-sql-${resourceName}`
+const certificatePath = path.join(os.tmpdir(), `clutch-e2e-${resourceName}.pfx`)
 
 export default async function cleanupTestApi() {
   try {
