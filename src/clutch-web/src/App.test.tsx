@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { focusManager, useQuery } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -163,6 +163,7 @@ describe('session loading', () => {
     renderWithQueryClient(<App />)
 
     expect(screen.getByRole('status')).toHaveTextContent('Checking your session')
+    expect(screen.queryByRole('navigation', { name: 'Primary' })).not.toBeInTheDocument()
     expect(document.querySelector('h1')).toHaveTextContent('Sign in')
     expect(document.querySelector('main')).toHaveAttribute('inert')
     expect(screen.queryByRole('combobox', { name: 'Theme' })).not.toBeInTheDocument()
@@ -208,6 +209,7 @@ describe('session loading', () => {
 
     await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument())
     expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Primary' })).not.toBeInTheDocument()
     expect(getSession).toHaveBeenCalledTimes(1)
   })
 
@@ -311,12 +313,14 @@ describe('session loading', () => {
 
     renderWithQueryClient(<App />)
     await startImportReview(user)
+    await user.hover(screen.getByRole('navigation', { name: 'Primary' }))
     await act(async () => {
       focusManager.setFocused(false)
       focusManager.setFocused(true)
     })
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Unable to refresh your session')
+    expect(within(screen.getByRole('button', { name: 'Categories' })).getByText('Categories')).toBeVisible()
     expect(screen.getByRole('heading', { name: 'Review transactions' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Retry session check' }))
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
@@ -331,12 +335,14 @@ describe('session loading', () => {
 
     renderWithQueryClient(<App />)
     await startImportReview(user)
+    await user.hover(screen.getByRole('navigation', { name: 'Primary' }))
     await act(async () => {
       focusManager.setFocused(false)
       focusManager.setFocused(true)
     })
 
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Primary' })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Review transactions' })).not.toBeInTheDocument()
   })
 
@@ -372,6 +378,159 @@ describe('session loading', () => {
 
     await user.click(accountsButton)
     expect(screen.getByRole('heading', { name: 'Your accounts' })).toBeInTheDocument()
+  })
+
+  it('keeps primary navigation outside the header across signed-in screens', async () => {
+    const user = userEvent.setup()
+    vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
+    renderWithQueryClient(<App />)
+
+    const nav = await screen.findByRole('navigation', { name: 'Primary' })
+    expect(screen.getByRole('banner')).not.toContainElement(nav)
+    const accounts = within(nav).getByRole('button', { name: 'Accounts' })
+    const categories = within(nav).getByRole('button', { name: 'Categories' })
+    expect(accounts).toHaveAttribute('aria-current', 'page')
+    await user.click(screen.getByRole('button', { name: 'Open account' }))
+    expect(accounts).toHaveAttribute('aria-current', 'page')
+    await user.click(categories)
+    expect(categories).toHaveAttribute('aria-current', 'page')
+    await user.click(accounts)
+    expect(screen.getByRole('heading', { name: 'Your accounts' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Import limits' })).not.toBeInTheDocument()
+  })
+
+  it('expands on hover across screens and starts compact after sign-out', async () => {
+    vi.mocked(getSession)
+      .mockResolvedValueOnce({ id: 'user-1', roles: [] })
+      .mockRejectedValueOnce(new ApiError(401, { title: 'Authentication required' }))
+      .mockResolvedValueOnce({ id: 'user-1', roles: [] })
+    vi.mocked(signOut).mockResolvedValue()
+    vi.mocked(signIn).mockResolvedValue()
+    const user = userEvent.setup()
+    renderWithQueryClient(<App />)
+
+    const nav = await screen.findByRole('navigation', { name: 'Primary' })
+    const label = within(nav).getByText('Categories')
+    expect(label).not.toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Toggle navigation' })).not.toBeInTheDocument()
+    await user.hover(nav)
+    expect(label).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Categories' }))
+    expect(label).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Sign out' }))
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Primary' })).not.toBeInTheDocument()
+    await user.type(screen.getByLabelText('Email'), 'user@example.test')
+    await user.type(screen.getByLabelText('Password'), 'password')
+    await user.click(screen.getByRole('button', { name: 'Sign in' }))
+    const newNav = await screen.findByRole('navigation', { name: 'Primary' })
+    expect(within(newNav).getByText('Categories')).not.toBeVisible()
+  })
+
+  it('keeps expanded navigation available when sign-out fails', async () => {
+    vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
+    vi.mocked(signOut).mockRejectedValue(new ApiError(500, { title: 'Server error' }))
+    const user = userEvent.setup()
+    renderWithQueryClient(<App />)
+
+    await user.hover(await screen.findByRole('navigation', { name: 'Primary' }))
+    await user.click(screen.getByRole('button', { name: 'Sign out' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to sign out')
+    await user.hover(screen.getByRole('navigation', { name: 'Primary' }))
+    expect(within(screen.getByRole('button', { name: 'Categories' })).getByText('Categories')).toBeVisible()
+  })
+
+  it('removes navigation after sign-out even if the session check fails and resets it on sign-in', async () => {
+    let rejectSession: ((error: Error) => void) | undefined
+    vi.mocked(getSession)
+      .mockResolvedValueOnce({ id: 'user-1', roles: [] })
+      .mockImplementationOnce(() => new Promise((_resolve, reject) => {
+        rejectSession = reject
+      }))
+      .mockResolvedValueOnce({ id: 'user-2', roles: [] })
+    vi.mocked(signOut).mockResolvedValue()
+    vi.mocked(signIn).mockResolvedValue()
+    const user = userEvent.setup()
+    renderWithQueryClient(<App />)
+
+    await user.hover(await screen.findByRole('navigation', { name: 'Primary' }))
+    await user.click(screen.getByRole('button', { name: 'Sign out' }))
+    await waitFor(() => expect(getSession).toHaveBeenCalledTimes(2))
+    expect(screen.queryByRole('navigation', { name: 'Primary' })).not.toBeInTheDocument()
+    await act(async () => rejectSession?.(new ApiError(500, { title: 'Server error' })))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load your session')
+    expect(screen.queryByRole('navigation', { name: 'Primary' })).not.toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('Email'), 'user@example.test')
+    await user.type(screen.getByLabelText('Password'), 'password')
+    await user.click(screen.getByRole('button', { name: 'Sign in' }))
+    const nav = await screen.findByRole('navigation', { name: 'Primary' })
+    expect(within(nav).getByText('Categories')).not.toBeVisible()
+  })
+
+  it('reveals labels on keyboard focus and operates destinations by keyboard', async () => {
+    vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
+    const user = userEvent.setup()
+    renderWithQueryClient(<App />)
+
+    const accounts = await screen.findByRole('button', { name: 'Accounts' })
+    await user.tab()
+    await user.tab()
+    await user.tab()
+    expect(accounts).toHaveFocus()
+    expect(within(accounts).getByText('Accounts')).toBeVisible()
+    const categories = screen.getByRole('button', { name: 'Categories' })
+    await user.tab()
+    await user.keyboard('{Enter}')
+    expect(categories).toHaveAttribute('aria-current', 'page')
+    await user.tab({ shift: true })
+    await user.keyboard('{Enter}')
+    expect(accounts).toHaveAttribute('aria-current', 'page')
+    await user.tab({ shift: true })
+    expect(within(accounts).getByText('Accounts')).not.toBeVisible()
+  })
+
+  it('dismisses hovered navigation with Escape and reopens it on a new hover', async () => {
+    vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
+    const user = userEvent.setup()
+    renderWithQueryClient(<App />)
+
+    const nav = await screen.findByRole('navigation', { name: 'Primary' })
+    const label = within(nav).getByText('Accounts')
+    const signOutButton = screen.getByRole('button', { name: 'Sign out' })
+    await user.tab()
+    await user.tab()
+    expect(signOutButton).toHaveFocus()
+    await user.hover(nav)
+    expect(label).toBeVisible()
+    await user.keyboard('{Escape}')
+    expect(signOutButton).toHaveFocus()
+    expect(label).not.toBeVisible()
+    await user.unhover(nav)
+    await user.hover(nav)
+    expect(label).toBeVisible()
+  })
+
+  it('dismisses keyboard-focused navigation with Escape and reopens on new focus', async () => {
+    vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
+    const user = userEvent.setup()
+    renderWithQueryClient(<App />)
+
+    const accounts = await screen.findByRole('button', { name: 'Accounts' })
+    await user.tab()
+    await user.tab()
+    await user.tab()
+    expect(accounts).toHaveFocus()
+    const label = within(accounts).getByText('Accounts')
+    expect(label).toBeVisible()
+    await user.keyboard('{Escape}')
+    expect(accounts).toHaveFocus()
+    expect(label).not.toBeVisible()
+    await user.tab()
+    expect(screen.getByRole('button', { name: 'Categories' })).toHaveFocus()
+    expect(label).toBeVisible()
+    await user.keyboard('{Enter}')
+    expect(screen.getByRole('heading', { name: 'Categories and groups' })).toBeInTheDocument()
   })
 
   it('does not show the theme selector in the signed-out view', async () => {

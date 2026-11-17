@@ -44,7 +44,7 @@ export function DeleteCategoryDialog({ node, onClose }: DeleteCategoryDialogProp
   return (
     <div
       aria-labelledby={`delete-${node.id}-title`}
-      className="mt-2 space-y-3 rounded-lg border border-destructive bg-card p-4"
+      className="mt-2 space-y-3 break-words rounded-lg border border-destructive bg-card p-4"
       onKeyDown={(event) => {
         if (event.key === 'Escape' && !deleteMutation.isPending) {
           onClose()
@@ -69,7 +69,7 @@ export function DeleteCategoryDialog({ node, onClose }: DeleteCategoryDialogProp
         </p>
       )}
       {deleteMutation.isError && <p role="alert">{getMessage(deleteMutation.error)}</p>}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <button
           className="cursor-pointer rounded-md bg-destructive px-3 py-2 text-sm text-destructive-foreground disabled:cursor-not-allowed disabled:opacity-50"
           disabled={itemCount === undefined || deleteMutation.isPending}
