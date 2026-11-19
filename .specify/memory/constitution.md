@@ -1,11 +1,13 @@
 <!--
 Sync Impact Report
-Version change: 4.5.0 -> 4.6.0
-Modified principles: III. Data Access, Async, and Performance (require all audit data to be stored
-  in the existing Audit table)
+Version change: 4.7.1 -> 5.0.0
+Modified principles: VI. Frontend Engineering (clutch-web) (remove the one-off arbitrary styling
+  allowance and feature-level theme selection, default, and persistence redefinition)
 Added sections: None
 Removed sections: None
-Follow-up TODOs: None
+Follow-up TODOs: Add the Compliance checklist from section 11 of docs/style-guide.md to the plan
+  template's Constitution Check and to the task-completion gate for UI work (deferred; dependent
+  templates are outside this command's scope).
 -->
 
 # SaturdayArvo Clutch Constitution
@@ -136,8 +138,7 @@ validation. API clients MUST handle RFC 9457 `ProblemDetails` responses as a typ
 Styling MUST use Tailwind utility classes. Custom CSS is permitted only for global theme tokens and
 base layers, or where a documented browser or design requirement cannot be expressed with Tailwind
 utilities. Reusable colors, spacing, radii, and typography MUST come from theme tokens (semantic
-CSS variables); one-off arbitrary values require a clear design or technical rationale. Class
-names MUST NOT be constructed by string concatenation. Conditional and merged classes MUST use the
+CSS variables). Class names MUST NOT be constructed by string concatenation. Conditional and merged classes MUST use the
 shared `cn()` helper (`clsx` and `tailwind-merge`). Layouts MUST be mobile-first. Inline `style` is
 permitted only for values computed at runtime.
 
@@ -158,8 +159,8 @@ checks. shadcn/ui does not by itself satisfy accessibility requirements; each fe
 responsible for conformance.
 
 Every page MUST support light and dark themes, keyboard access, responsive layouts, and WCAG 2.2
-Level AA. Feature specifications MUST define theme selection, default, and persistence behavior,
-and any additional accessibility requirements. `clutch-web` MUST include unit and component tests
+Level AA. Feature specifications MUST define any additional accessibility requirements.
+`clutch-web` MUST include unit and component tests
 for meaningful components, hooks, utilities, and state behavior, using the project's established
 frontend test tools. UI tests MUST verify user-observable behavior through accessible roles and
 names rather than component implementation details. Critical user journeys MUST have
@@ -177,6 +178,40 @@ when measurable progress is available. Production user-facing services MUST achi
 Application services MUST use OpenTelemetry to emit failure counts and rates, and duration and
 outcome metrics for long-running tasks. Metrics for transaction imports MUST include the number of
 transactions successfully imported and the number successfully imported per minute.
+
+## UI Design System
+
+Applies to any work that creates or changes UI (components, pages, layouts, styles, theming,
+forms, navigation).
+
+When a spec, plan, task or implementation touches UI, you MUST read `docs/style-guide.md` before
+proceeding and comply with it. The plan MUST list which sections of the guide apply.
+
+Non-negotiable rules (these apply even if the guide has not been read):
+- Separation uses background tone and rounded corners. No borders or divider lines on layout
+  containers.
+- Colours, radii and shadows come from design tokens only. No raw hex values and no default
+  Tailwind palette classes.
+- The dark theme never uses pure black surfaces or pure white text.
+- Form fields use in-field floating labels.
+- The existing navigation expand/collapse behaviour is preserved. Only its styling changes.
+- Both light and dark themes are verified, WCAG 2.2 AA contrast is checked, and every interactive
+  element has a visible focus ring.
+
+Source of truth for token values and Tailwind configuration is
+`src/clutch-web/src/index.css`, which defines the CSS custom properties and Tailwind v4 `@theme`
+mappings. There is no separate `tailwind.config` file. The style guide describes intent and rules,
+and its hex values are a snapshot. The full guide is
+[docs/style-guide.md](../../docs/style-guide.md).
+
+Governance:
+- Any spec or plan that introduces a border, a raw colour, a non-token radius, a pure black or
+  white dark-theme surface, or an external (non-floating) label MUST include an explicit
+  justification, and is rejected at review otherwise.
+- Amending the style guide's rules or tokens requires a matching update to
+  `src/clutch-web/src/index.css`.
+- Add the "Compliance checklist" from section 11 of `docs/style-guide.md` to the plan template's
+  Constitution Check and to the task-completion gate for UI work.
 
 ## Engineering Requirements
 
@@ -299,4 +334,4 @@ Exceptions require an explicit amendment; review findings MUST NOT be waived sil
 4. Commit with message format: `docs: amend constitution to vX.Y.Z (description)`.
 5. Tag commit with `constitution-vX.Y.Z`.
 
-**Version**: 4.6.0 | **Ratified**: 2026-11-01 | **Last Amended**: 2026-11-15
+**Version**: 5.0.0 | **Ratified**: 2026-11-01 | **Last Amended**: 2026-11-19
