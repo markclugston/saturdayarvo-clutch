@@ -1,0 +1,30 @@
+# WEB-001 Frontend Instructions
+
+- Use current stable React with function components and hooks.
+- Class components prohibited except approved error-boundary scenarios.
+- Do not derive render state through useEffect.
+- Use dedicated server-state libraries.
+- Stable keys required.
+- dangerouslySetInnerHTML with untrusted content is prohibited.
+- TypeScript required.
+- strict and noUncheckedIndexedAccess enabled.
+- any prohibited.
+- ts-ignore prohibited.
+- ts-expect-error requires explanation.
+- Validate data crossing trust boundaries.
+- Generated types do not replace runtime validation.
+- Handle ProblemDetails as typed cases.
+- Tailwind utilities are required.
+- Use theme tokens.
+- Use shared cn helper.
+- Responsive layouts encouraged.
+- Navigation uses button controls.
+- Accessible file-selection buttons required.
+- shadcn/ui is default primitive source.
+- Third-party UI registries require security review.
+- Unit and component tests required.
+- Test user-visible behaviour.
+- Critical journeys require browser-level testing.
+- CI requires typecheck, lint, tests and production build.
+- Run tsc --noEmit.
+- Use typescript-eslint.
