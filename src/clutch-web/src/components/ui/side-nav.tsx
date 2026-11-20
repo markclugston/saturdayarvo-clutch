@@ -1,18 +1,17 @@
 import type { LucideIcon } from 'lucide-react'
-import { useState, type ComponentPropsWithoutRef } from 'react'
-import { Tooltip } from '@/components/ui/tooltip'
+import { useEffect, useState, type ComponentPropsWithoutRef } from 'react'
 import { cn } from '@/lib/utils'
 
 type SideNavProps = ComponentPropsWithoutRef<'nav'> & { expanded: boolean }
 
 export function SideNav({ expanded, className, children, ...props }: SideNavProps) {
   return (
-    <div className="relative h-full w-16 shrink-0 md:w-full">
+    <div className="relative h-full w-14 shrink-0 md:w-full">
       <nav
         aria-label="Primary"
         className={cn(
           'absolute inset-y-0 left-0 z-10 flex flex-col gap-2 overflow-hidden bg-canvas p-2 transition-[width] duration-200 ease-in-out md:w-full',
-          expanded ? 'w-40' : 'w-16',
+          expanded ? 'w-40' : 'w-14',
           className,
         )}
         {...props}
@@ -32,36 +31,40 @@ type SideNavItemProps = {
 }
 
 export function SideNavItem({ icon: Icon, label, current, expanded, onClick }: SideNavItemProps) {
-  const [focused, setFocused] = useState(false)
-  const [hovered, setHovered] = useState(false)
-  // While the navigation is collapsed (including after Escape dismisses it), a focused or
-  // hovered item names itself with a tooltip.
-  const showTooltip = !expanded && (focused || hovered)
+  // Keep the label rendered while it fades out so collapsing reverses the expand transition.
+  const [labelShown, setLabelShown] = useState(expanded)
+  useEffect(() => {
+    if (expanded) {
+      setLabelShown(true)
+      return
+    }
+    const timer = setTimeout(() => setLabelShown(false), 200)
+    return () => clearTimeout(timer)
+  }, [expanded])
 
   return (
-    <Tooltip label={label} open={showTooltip}>
-      <button
-        aria-current={current ? 'page' : undefined}
-        aria-label={label}
-        className="flex w-full cursor-pointer items-center gap-2 rounded-control px-2.5 py-2.5 text-sm font-semibold transition-colors hover:bg-hover focus-visible:focus-ring aria-[current=page]:bg-primary aria-[current=page]:text-primary-contrast"
-        onBlur={() => setFocused(false)}
-        onClick={onClick}
-        onFocus={(event) => setFocused(isFocusVisible(event.currentTarget))}
-        onPointerEnter={(event) => { if (event.pointerType === 'mouse') setHovered(true) }}
-        onPointerLeave={() => setHovered(false)}
-        type="button"
+    <button
+      aria-current={current ? 'page' : undefined}
+      aria-label={label}
+      className={cn(
+        'flex cursor-pointer items-center gap-2 overflow-hidden whitespace-nowrap rounded-control px-2.5 py-2.5 text-sm',
+        expanded ? 'w-full' : 'w-10',
+        'font-semibold transition-[width] duration-200 ease-in-out motion-reduce:transition-none hover:bg-hover focus-visible:focus-ring aria-[current=page]:bg-selected aria-[current=page]:text-primary aria-[current=page]:hover:bg-selected',
+      )}
+      onClick={onClick}
+      type="button"
+    >
+      <Icon aria-hidden="true" className="size-5 shrink-0" />
+      <span
+        aria-hidden="true"
+        className={cn(
+          'transition-opacity duration-200 ease-in-out motion-reduce:transition-none',
+          expanded ? 'opacity-100' : 'opacity-0',
+        )}
+        style={{ visibility: labelShown ? 'visible' : 'hidden' }}
       >
-        <Icon aria-hidden="true" className="size-5 shrink-0" />
-        <span className="transition-opacity duration-200" hidden={!expanded}>{label}</span>
-      </button>
-    </Tooltip>
+        {label}
+      </span>
+    </button>
   )
-}
-
-function isFocusVisible(element: HTMLElement): boolean {
-  try {
-    return element.matches(':focus-visible')
-  } catch {
-    return true
-  }
 }

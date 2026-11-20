@@ -529,25 +529,6 @@ for (const theme of ['Light', 'Dark'] as const) {
   }
 }
 
-test('nav-dismissed-tooltip [Light]', async ({ page }) => {
-  await mockApi(page)
-  await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
-  const accountsItem = page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: 'Accounts' })
-  // The page heading moves focus into the content, so walk backwards into the navigation.
-  for (let step = 0; step < 12; step += 1) {
-    await page.keyboard.press('Shift+Tab')
-    if (await accountsItem.evaluate((element) => element === document.activeElement)) break
-  }
-  await expect(accountsItem).toBeFocused()
-  await page.keyboard.press('Escape')
-  const tooltip = page.locator('[data-slot="tooltip-popup"]')
-  await expect(tooltip).toBeVisible()
-  await expect(tooltip).toHaveText('Accounts')
-  const results = await new AxeBuilder({ page }).withTags(axeTags).analyze()
-  expect(results.violations).toEqual([])
-})
-
 for (const theme of ['Light', 'Dark'] as const) {
   test(`surface lightness [${theme}]`, async ({ page }) => {
     await mockApi(page, { theme })

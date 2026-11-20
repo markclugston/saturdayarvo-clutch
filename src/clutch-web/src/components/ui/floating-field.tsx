@@ -1,4 +1,4 @@
-import { CircleAlert } from 'lucide-react'
+import { ChevronDown, CircleAlert } from 'lucide-react'
 import type { ComponentPropsWithoutRef, ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
@@ -20,10 +20,19 @@ type SelectFieldProps = FieldCommon
 
 type FloatingFieldProps = InputFieldProps | SelectFieldProps
 
+// Every field is the same height as a button (40px) with the same value font size.
 const controlClass =
-  'peer h-14 w-full rounded-control bg-transparent px-3 pt-5 pb-1.5 text-fg placeholder:text-transparent focus-visible:focus-ring'
+  'peer h-10 w-full rounded-control bg-transparent px-3 pt-[18px] pb-1.5 text-sm leading-4 text-fg placeholder:text-transparent focus-visible:focus-ring'
+const selectControlClass = cn(
+  controlClass,
+  'appearance-none pr-9 [&>option]:bg-raised [&>option]:text-fg',
+)
+// Text inputs: the label rests in the middle and floats to the top on focus or when filled.
 const labelClass =
-  'pointer-events-none absolute left-3 top-4 origin-left text-sm text-fg-secondary transition-[color,transform] duration-150 ease-out peer-focus:[transform:translateY(-0.625rem)_scale(0.75)] peer-not-placeholder-shown:[transform:translateY(-0.625rem)_scale(0.75)]'
+  'pointer-events-none absolute left-3 top-2.5 origin-left text-sm text-fg-secondary transition-[color,transform] duration-150 ease-out peer-focus:[transform:translateY(-0.5rem)_scale(0.75)] peer-not-placeholder-shown:[transform:translateY(-0.5rem)_scale(0.75)]'
+// Selects always show a value, so their label stays small at the top.
+const selectLabelClass =
+  'pointer-events-none absolute left-3 top-1.5 text-[0.625rem] leading-none text-fg-secondary'
 
 export function FloatingField(props: FloatingFieldProps) {
   const { id, label, error, description, describedBy } = props
@@ -33,12 +42,14 @@ export function FloatingField(props: FloatingFieldProps) {
 
   let control: ReactNode
   let wrapperClassName: string | undefined
+  let isSelect = false
   if (props.as === 'select') {
     const { as, label: _label, error: _error, description: _description, describedBy: _describedBy, className, children, ...rest } = props
     void [as, _label, _error, _description, _describedBy]
     wrapperClassName = className
+    isSelect = true
     control = (
-      <select aria-describedby={ariaDescribedBy} aria-invalid={invalid} className={controlClass} {...rest}>
+      <select aria-describedby={ariaDescribedBy} aria-invalid={invalid} className={selectControlClass} {...rest}>
         {children}
       </select>
     )
@@ -61,7 +72,10 @@ export function FloatingField(props: FloatingFieldProps) {
     <div className={cn('min-w-0', wrapperClassName)}>
       <div className="relative rounded-control bg-raised">
         {control}
-        <label className={labelClass} htmlFor={id}>{label}</label>
+        {isSelect && (
+          <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-fg-secondary" />
+        )}
+        <label className={isSelect ? selectLabelClass : labelClass} htmlFor={id}>{label}</label>
       </div>
       {description && (
         <p className="mt-1 px-1 text-xs text-fg-secondary" id={description.id}>{description.text}</p>

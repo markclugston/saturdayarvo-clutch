@@ -4,8 +4,9 @@
 
 All text inputs, selects and textareas use an **in-field floating label**. External labels need documented justification.
 
-- **Resting and empty:** the label sits inside the field at body size in `fg-secondary` (`fg-muted` fails AA for label text), vertically centred.
-- **Focus or filled:** the label moves up and shrinks to about 75% (150-200ms ease-out, `transform` only) at the top of the field. The value sits in the lower portion. Field height is 52-56px.
+- **All fields (text inputs and drop-down lists):** the same height as a button (`h-10`, 40px) and the same value font size (`text-sm`, 14px).
+- **Text inputs, resting and empty:** the label sits inside the field at body size in `fg-secondary` (`fg-muted` fails AA for label text), vertically centred. **Focus or filled:** it moves up and shrinks to about 75% (150-200ms ease-out, `transform` only) at the top of the field, with the value below it.
+- **Selects:** always show a value, so the label stays small (10px) at the top. Option lists use `raised` background and `fg` text so they stay readable in every theme. Selects use a custom chevron with `appearance-none`.
 - Field background is `raised`. No border at rest.
 - **Focus:** the shared `focus-ring` utility (2px `primary` outline, 2px offset). Never a heavy outline.
 - **Error:** label and ring use `danger`, with helper text below. **Disabled:** reduced opacity, no pointer events.
@@ -18,15 +19,15 @@ All text inputs, selects and textareas use an **in-field floating label**. Exter
   <input
     id={id}
     placeholder=" "
-    className="peer h-14 w-full rounded-control bg-transparent px-3 pt-5 pb-1.5 text-fg
-               placeholder:text-transparent focus-visible:focus-ring"
+    className="peer h-10 w-full rounded-control bg-transparent px-3 pt-[18px] pb-1.5 text-sm
+               leading-4 text-fg placeholder:text-transparent focus-visible:focus-ring"
   />
   <label
     htmlFor={id}
-    className="pointer-events-none absolute left-3 top-4 origin-left text-sm text-fg-secondary
+    className="pointer-events-none absolute left-3 top-2.5 origin-left text-sm text-fg-secondary
                transition-[color,transform] duration-150 ease-out
-               peer-focus:[transform:translateY(-0.625rem)_scale(0.75)]
-               peer-not-placeholder-shown:[transform:translateY(-0.625rem)_scale(0.75)]"
+               peer-focus:[transform:translateY(-0.5rem)_scale(0.75)]
+               peer-not-placeholder-shown:[transform:translateY(-0.5rem)_scale(0.75)]"
   >
     {label}
   </label>

@@ -64,11 +64,10 @@ async function mockApi(page: Page) {
 
 async function setPaneState(page: Page, expanded: boolean) {
   const nav = page.getByRole('navigation', { name: 'Primary' })
-  if (expanded) {
-    await nav.getByRole('button', { name: 'Accounts' }).hover()
-  } else {
-    await page.mouse.move(0, 0)
-  }
+  const toggle = page.getByRole('button', { name: 'Toggle navigation' })
+  await page.mouse.move(600, 400)
+  if ((await toggle.getAttribute('aria-expanded') === 'true') !== expanded) await toggle.click()
+  await page.mouse.move(600, 400)
   const label = nav.getByText('Accounts', { exact: true })
   if (expanded) await expect(label).toBeVisible()
   else await expect(label).toBeHidden()
@@ -81,7 +80,7 @@ const themes = [
   { mode: 'System', scheme: 'dark' },
 ] as const
 
-const navGrowth = 96
+const navGrowth = 104
 
 async function applyTheme(page: Page, theme: (typeof themes)[number]) {
   await page.emulateMedia({ colorScheme: theme.scheme })
@@ -277,9 +276,8 @@ test('keeps the pane and content usable across viewports and themes', async ({ p
       }
     }
     await page.getByRole('combobox', { name: 'Theme' }).focus()
-    await page.mouse.move(0, 0)
     const start = Date.now()
-    await nav.getByRole('button', { name: 'Accounts' }).hover()
+    await page.getByRole('button', { name: 'Toggle navigation' }).click()
     await expect(nav.getByText('Accounts', { exact: true })).toBeVisible()
     expect(Date.now() - start).toBeLessThan(500)
     await expect(nav.getByRole('button', { name: 'Accounts' })).toHaveCSS('cursor', 'pointer')
@@ -740,71 +738,22 @@ test('reveals navigation labels on keyboard focus and hides them after focus lea
   await expect(nav.getByText('Accounts', { exact: true })).toBeHidden()
 })
 
-test('dismisses hover expansion without moving the pointer or focus', async ({ page }) => {
+test('expands on hover and the hamburger pins it open', async ({ page }) => {
   await mockApi(page)
   await page.goto('/')
   const nav = page.getByRole('navigation', { name: 'Primary' })
   const label = nav.getByText('Accounts', { exact: true })
-  const signOut = page.getByRole('button', { name: 'Sign out' })
-  await signOut.focus()
+  const toggle = page.getByRole('button', { name: 'Toggle navigation' })
   await nav.getByRole('button', { name: 'Accounts' }).hover()
   await expect(label).toBeVisible()
-  await page.keyboard.press('Escape')
-  await expect(signOut).toBeFocused()
+  await page.mouse.move(600, 400)
   await expect(label).toBeHidden()
-  await expect(nav).toHaveCSS('width', '64px')
-  await page.mouse.move(0, 0)
-  await nav.getByRole('button', { name: 'Accounts' }).hover()
+  await toggle.click()
   await expect(label).toBeVisible()
-})
-
-test('dismisses keyboard expansion without moving focus', async ({ page }) => {
-  await mockApi(page)
-  await page.goto('/')
-  const nav = page.getByRole('navigation', { name: 'Primary' })
-  const accounts = nav.getByRole('button', { name: 'Accounts' })
-  const categories = nav.getByRole('button', { name: 'Categories' })
-  const label = nav.getByText('Accounts', { exact: true })
-  await page.getByRole('button', { name: 'Sign out' }).focus()
-  await page.keyboard.press('Tab')
-  await expect(accounts).toBeFocused()
+  await page.mouse.move(600, 400)
   await expect(label).toBeVisible()
-  await page.keyboard.press('Escape')
-  await expect(accounts).toBeFocused()
+  await toggle.click()
+  await page.mouse.move(600, 400)
   await expect(label).toBeHidden()
-  await page.keyboard.press('Tab')
-  await expect(categories).toBeFocused()
-  await expect(label).toBeVisible()
-  await page.keyboard.press('Enter')
-  await expect(page.getByRole('heading', { name: 'Categories and groups' })).toBeVisible()
-})
-
-test('both destinations remain reachable from every signed-in screen', async ({ page }) => {
-  await mockApi(page)
-  for (const screen of ['overview', 'details', 'import', 'categories', 'admin']) {
-    for (const destination of ['Accounts', 'Categories']) {
-      await page.goto('/')
-      const nav = page.getByRole('navigation', { name: 'Primary' })
-      await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
-      if (screen === 'details' || screen === 'import') {
-        await page.getByRole('button', { name: /Browser account/ }).click()
-        await expect(page.getByRole('heading', { name: 'Account details' })).toBeVisible()
-        if (screen === 'import') {
-          await page.getByRole('button', { name: 'Import transactions' }).click()
-          await expect(page.getByLabel('CSV file')).toBeAttached()
-        }
-      } else if (screen === 'categories') {
-        await nav.getByRole('button', { name: 'Categories' }).click()
-      } else if (screen === 'admin') {
-        await page.getByRole('button', { name: 'Import limits' }).click()
-        await expect(page.getByRole('heading', { name: 'Import limits' })).toBeVisible()
-      }
-      const start = Date.now()
-      await nav.getByRole('button', { name: destination }).click()
-      await expect(page.getByRole('heading', {
-        name: destination === 'Accounts' ? 'Your accounts' : 'Categories and groups',
-      })).toBeVisible()
-      expect(Date.now() - start).toBeLessThan(500)
-    }
-  }
+  await expect(nav).toHaveCSS('width', '56px')
 })

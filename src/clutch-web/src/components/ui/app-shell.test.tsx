@@ -5,6 +5,7 @@ import { AppShell } from './app-shell'
 function renderShell(navExpanded: boolean) {
   return render(
     <AppShell
+      title="Test title"
       header={<header>Header</header>}
       nav={<nav aria-label="Test nav">Nav</nav>}
       navExpanded={navExpanded}
@@ -21,8 +22,8 @@ function gridOf(container: HTMLElement) {
 it('keeps the compact column at md and above while the navigation is collapsed', () => {
   const { container } = renderShell(false)
   const grid = gridOf(container)
-  expect(grid.className).toContain('grid-cols-[4rem_minmax(0,1fr)]')
-  expect(grid.className).toContain('md:grid-cols-[4rem_minmax(0,1fr)]')
+  expect(grid.className).toContain('grid-cols-[3.5rem_minmax(0,1fr)]')
+  expect(grid.className).toContain('md:grid-cols-[3.5rem_minmax(0,1fr)]')
   expect(grid.className).not.toContain('md:grid-cols-[10rem_minmax(0,1fr)]')
 })
 
@@ -30,8 +31,8 @@ it('widens the navigation column at md and above while expanded, keeping the bas
   const { container } = renderShell(true)
   const grid = gridOf(container)
   expect(grid.className).toContain('md:grid-cols-[10rem_minmax(0,1fr)]')
-  expect(grid.className).not.toContain('md:grid-cols-[4rem_minmax(0,1fr)]')
-  expect(grid.className.split(/\s+/)).toContain('grid-cols-[4rem_minmax(0,1fr)]')
+  expect(grid.className).not.toContain('md:grid-cols-[3.5rem_minmax(0,1fr)]')
+  expect(grid.className.split(/\s+/)).toContain('grid-cols-[3.5rem_minmax(0,1fr)]')
 })
 
 it('animates the column change and respects reduced motion', () => {

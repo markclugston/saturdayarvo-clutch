@@ -32,7 +32,7 @@ AppShell (bg-canvas)
 - Surface is `canvas`. No border or divider against the content panel; the transition is the tone change alone.
 - Collapsed: icon-only rail, 64px (`w-16`). Expanded: 160px (`w-40`). The wider 240px of the original guide is not used: the navigation overlays the content below 768px and shrinks the content at 768px and above (015), and the width must be the same at every viewport.
 - Width animates 200ms ease-in-out (`transition-[width] duration-200 ease-in-out`); at 768px and above the shell's grid columns animate in step (`transition-[grid-template-columns]`). Labels fade with `transition-opacity` rather than popping.
-- Active item: `rounded-control` fill using `primary` with `primary-contrast` text and heavier text (the `selected` tint is under 3:1 against `canvas`, so it cannot be the only indicator). Hover: a subtler fill (`hover`).
+- Active item: `rounded-control` fill using the `selected` tint with `primary` text/icon and heavier text. Selection is not an action, so it never uses the solid `primary` fill reserved for primary buttons; the `selected` tint is under 3:1 against `canvas`, so the `primary` text and heavier weight carry the indicator too. Hover: a subtler fill (`hover`); a selected item keeps its `selected` fill on hover.
 - Icons 18-20px, consistent outline style, stroke about 1.5px.
-- Collapsed items show tooltips on hover or keyboard focus, including after Escape dismisses the expanded rail while an item is still focused or hovered.
+- Navigation items have no tooltips. Hovering the collapsed rail with a mouse expands it; the hamburger button at the top of the rail pins it open until clicked again (not persisted).
 - Group headings (e.g. "Division") are small, muted, uppercase labels. No divider lines.

@@ -24,7 +24,7 @@ it('overlays below md and fills its grid column at md and above', () => {
   const { container } = renderNav(true)
   const wrapper = container.firstElementChild as HTMLElement
   const nav = screen.getByRole('navigation', { name: 'Primary' })
-  expect(wrapper.className).toContain('w-16')
+  expect(wrapper.className).toContain('w-14')
   expect(wrapper.className).toContain('md:w-full')
   expect(nav.className).toContain('absolute')
   expect(nav.className).toContain('w-40')
@@ -32,12 +32,12 @@ it('overlays below md and fills its grid column at md and above', () => {
 })
 
 it('keeps the compact width below md when collapsed and hides labels', () => {
-  const { container } = renderNav(false)
+  renderNav(false)
   const nav = screen.getByRole('navigation', { name: 'Primary' })
-  expect(nav.className).toContain('w-16')
+  expect(nav.className).toContain('w-14')
   expect(nav.className).not.toContain('w-40')
   expect(nav.className).toContain('md:w-full')
-  expect(container.querySelector('span[hidden]')).not.toBeNull()
+  expect(screen.getByText('Accounts')).not.toBeVisible()
 })
 
 it('shows the label and no tooltip when expanded', async () => {
@@ -48,11 +48,11 @@ it('shows the label and no tooltip when expanded', async () => {
   expect(document.querySelector('[data-slot="tooltip-popup"]')).toBeNull()
 })
 
-it('shows a tooltip with the label when collapsed and focused', async () => {
+it('shows no tooltip when collapsed and hovered or focused', async () => {
   const user = userEvent.setup()
   renderNav(false)
   await user.tab()
   expect(screen.getByRole('button', { name: 'Accounts' })).toHaveFocus()
-  const popup = await screen.findByText('Accounts', { selector: '[data-slot="tooltip-popup"]' })
-  expect(popup).toBeInTheDocument()
+  await user.hover(screen.getByRole('button', { name: 'Accounts' }))
+  expect(document.querySelector('[data-slot="tooltip-popup"]')).toBeNull()
 })

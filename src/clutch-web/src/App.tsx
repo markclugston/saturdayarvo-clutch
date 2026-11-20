@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { FolderTree, Wallet } from 'lucide-react'
-import { useEffect, useRef, useState, type FocusEvent, type PointerEvent } from 'react'
+import { FolderTree, Menu, Wallet } from 'lucide-react'
+import { useRef, useState, type PointerEvent } from 'react'
 import { AccountDetails } from '@/features/accounts/AccountDetails'
 import { AccountsPage } from '@/features/accounts/AccountsPage'
 import { ImportLimitsPage } from '@/features/admin/ImportLimitsPage'
@@ -67,6 +67,7 @@ export default function App() {
       setIsImporting(false)
       setShowAdminSettings(false)
       setShowCategories(false)
+      navigation.reset()
       setMode('Light')
       queryClient.removeQueries({
         predicate: (query) => query.queryKey[0] !== 'session',
@@ -113,6 +114,7 @@ export default function App() {
 
   return (
     <AppShell
+      title="Clutch"
       navExpanded={navigation.expanded}
       nav={(
         <PrimaryNavigation
@@ -132,8 +134,7 @@ export default function App() {
         />
       )}
       header={(
-        <header className="flex flex-wrap items-center justify-between gap-4 px-5 py-3">
-          <p className="font-semibold">SaturdayArvo Clutch</p>
+        <header className="flex flex-wrap items-center justify-end gap-4 px-5 py-3">
           <div className="flex flex-wrap items-center gap-3">
             {sessionQuery.data.id && <ThemeSelector userId={sessionQuery.data.id} />}
             {sessionQuery.data.roles?.includes('Administrator') && (
@@ -159,6 +160,7 @@ export default function App() {
     >
       {/* Keep keyboard focus visible while the pointer holds the overlay open below md. */}
       <ContentPanel className={cn(
+        'ml-0 lg:ml-0',
         '[&_:is(button,input,select,textarea):not(.sr-only):focus-visible]:relative [&_:is(button,input,select,textarea):not(.sr-only):focus-visible]:z-20',
         '[&_:focus-visible:not(.sr-only)]:focus-ring',
       )}>
@@ -205,55 +207,43 @@ export default function App() {
 type NavigationExpansion = ReturnType<typeof useNavigationExpansion>
 
 /**
- * Owns hover, keyboard-focus and Escape state for the primary navigation so that both the
- * shell (column width) and the navigation (labels) share one `expanded` value.
+ * The navigation expands while a mouse hovers it. Clicking the hamburger pins it open until
+ * the hamburger is clicked again; unpinning while the pointer is still over the navigation
+ * collapses it until the pointer leaves and re-enters. Nothing is persisted.
  */
 function useNavigationExpansion() {
+  const [pinned, setPinned] = useState(false)
   const [hovered, setHovered] = useState(false)
-  const [keyboardFocused, setKeyboardFocused] = useState(false)
-  const [dismissed, setDismissed] = useState(false)
-  const pointerFocus = useRef(false)
-  const expanded = (hovered || keyboardFocused) && !dismissed
+  const [hoverSuppressed, setHoverSuppressed] = useState(false)
+  const expanded = pinned || (hovered && !hoverSuppressed)
 
-  useEffect(() => {
-    if (!expanded) return
-
-    const dismissOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !event.defaultPrevented) setDismissed(true)
-    }
-    window.addEventListener('keydown', dismissOnEscape)
-    return () => window.removeEventListener('keydown', dismissOnEscape)
-  }, [expanded])
-
-  const handlers = {
-    onPointerEnter: (event: PointerEvent<HTMLElement>) => {
-      if (event.pointerType === 'mouse') {
-        setHovered(true)
-        setDismissed(false)
+  return {
+    expanded,
+    toggle: () => {
+      if (pinned) {
+        setPinned(false)
+        setHoverSuppressed(true)
+      } else {
+        setPinned(true)
       }
     },
-    onPointerLeave: (event: PointerEvent<HTMLElement>) => {
-      pointerFocus.current = false
-      if (event.pointerType === 'mouse') setHovered(false)
+    reset: () => {
+      setPinned(false)
+      setHovered(false)
+      setHoverSuppressed(false)
     },
-    onPointerDownCapture: () => {
-      pointerFocus.current = true
-      setKeyboardFocused(false)
-    },
-    onPointerUpCapture: () => { pointerFocus.current = false },
-    onPointerCancelCapture: () => { pointerFocus.current = false },
-    onFocusCapture: () => {
-      if (!pointerFocus.current) {
-        setKeyboardFocused(true)
-        setDismissed(false)
-      }
-    },
-    onBlurCapture: (event: FocusEvent<HTMLElement>) => {
-      if (!event.currentTarget.contains(event.relatedTarget)) setKeyboardFocused(false)
+    handlers: {
+      onPointerEnter: (event: PointerEvent<HTMLElement>) => {
+        if (event.pointerType === 'mouse') setHovered(true)
+      },
+      onPointerLeave: (event: PointerEvent<HTMLElement>) => {
+        if (event.pointerType === 'mouse') {
+          setHovered(false)
+          setHoverSuppressed(false)
+        }
+      },
     },
   }
-
-  return { expanded, handlers }
 }
 
 type PrimaryNavigationProps = {
@@ -265,7 +255,7 @@ type PrimaryNavigationProps = {
 }
 
 function PrimaryNavigation({
-  navigation: { expanded, handlers },
+  navigation: { expanded, toggle, handlers },
   accountsCurrent,
   categoriesCurrent,
   onAccounts,
@@ -273,6 +263,17 @@ function PrimaryNavigation({
 }: PrimaryNavigationProps) {
   return (
     <SideNav expanded={expanded} {...handlers}>
+      <Button
+        aria-expanded={expanded}
+        aria-label="Toggle navigation"
+        className="text-fg"
+        onClick={toggle}
+        size="icon"
+        type="button"
+        variant="tertiary"
+      >
+        <Menu aria-hidden="true" className="size-5" />
+      </Button>
       <SideNavItem
         current={accountsCurrent}
         expanded={expanded}

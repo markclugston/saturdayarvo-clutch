@@ -8,7 +8,7 @@ it('names the control with its label', () => {
   expect(screen.getByRole('textbox', { name: 'Email' })).toBeInTheDocument()
 })
 
-it('floats the label on focus and keeps it floated when the field has a value', async () => {
+it('floats the label on focus and keeps it floated when the field has a value, at the select height', async () => {
   const user = userEvent.setup()
   render(<FloatingField id="email" label="Email" />)
   const input = screen.getByLabelText('Email')
@@ -16,6 +16,8 @@ it('floats the label on focus and keeps it floated when the field has a value', 
   expect(label.className).toContain('peer-focus:')
   expect(label.className).toContain('peer-not-placeholder-shown:')
   expect(input).toHaveAttribute('placeholder', ' ')
+  expect(input.className).toContain('h-10')
+  expect(input.className).toContain('text-sm')
 
   await user.click(input)
   expect(input).toHaveFocus()
