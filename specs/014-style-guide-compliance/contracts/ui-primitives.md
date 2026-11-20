@@ -1,0 +1,28 @@
+# Contract: UI primitives (`src/clutch-web/src/components/ui/`)
+
+Variants use `class-variance-authority`. `className` is merged with `cn` (the existing `cn` package, shadcn's clsx and tailwind-merge replacement; `src/lib/utils.test.ts` confirms it keeps token utilities such as `text-fg` and `text-sm` apart and resolves `rounded-control` against `rounded-card`). Callers MUST NOT pass colour, border, ring, shadow or radius classes; the lint rule enforces this. The table lists props and the elements each primitive renders.
+
+| Primitive | File | Props / variants | Renders |
+|---|---|---|---|
+| `AppShell` | `app-shell.tsx` | `header: ReactNode`, `nav: ReactNode`, `children` | `div.min-h-svh.flex.bg-canvas` with the nav slot, then a `min-w-0 flex-1 flex flex-col` column holding the header slot (on `canvas`, no border) and the content slot. The nav is never inside the header (`navigation.spec.ts` checks the banner has no navigation). |
+| `SideNav` | `side-nav.tsx` | `expanded: boolean`, nav event handlers passed through, `children` | a `w-16` placeholder plus an overlay `nav.bg-canvas` (`w-16` or `w-60`, `transition-[width] duration-200 ease-in-out`) with no border; `aria-label="Primary"` unchanged |
+| `SideNavItem` | `side-nav.tsx` | `icon`, `label`, `current`, `expanded`, `onClick` | a `button` with `cursor-pointer`, `rounded-control`, `hover:bg-hover`, `aria-[current=page]:bg-primary aria-[current=page]:text-primary-contrast font-semibold` (D6), `transition-colors` and `focus-visible:focus-ring`; icon `size-5`; label in a `span` with the `hidden` toggle and `transition-opacity duration-200`; `aria-label` unchanged. When collapsed it is wrapped in a `Tooltip` that shows its label on hover or focus (reachable in the app after the nav is dismissed with Escape while an item is still focused or hovered). |
+| `ContentPanel` | `content-panel.tsx` | `children`, plus `main` HTML props (`className`, `inert`) | `main.bg-content.rounded-panel` with `m-2 lg:m-3` and `p-4 xl:p-6`, and an inner `mx-auto max-w-5xl` wrapper (R10) |
+| `Card` | `card.tsx` | `as?: 'section' \| 'form' \| 'div'`, `children`, element props passed through | `bg-card rounded-card p-3 xl:p-5` with `data-slot="card"` (used by the surface checks); sibling cards are separated by `gap-3` or `space-y-3` in the page |
+| `CardTitle` | `card.tsx` | `as: 'h2' \| 'h3'`, `children` | `text-base font-semibold` (§7 section title); the heading level matches the element it replaces |
+| `CardFooter` | `card.tsx` | `children` | `hairline-t pt-3` |
+| `FloatingField` | `floating-field.tsx` | `id`, `label`, `error?`, `description?` (`{ id, text }`), `describedBy?`, and either input props or `as="select"` with `children` | the §4 structure: `relative rounded-control bg-raised`, control `peer h-14 w-full bg-transparent px-3 pt-5 pb-1.5 text-fg focus-visible:focus-ring`, label `text-fg-secondary` (D2) floated with `translate`/`scale` and `transition-[color,transform] duration-150 ease-out`. `aria-describedby` merges `describedBy`, the description id and the error id; `aria-invalid` is set only when `error` is given. Error text uses `text-danger` with an `aria-hidden` icon. No screen passes `error` in this feature (R11). Accessible name stays the label text. |
+| `ErrorMessage` | `error-message.tsx` | `children`, plus `p` HTML props; `role` defaults to `alert` | `p.flex.items-start.gap-2.text-danger` with an `aria-hidden` `CircleAlert` icon (`size-4`) before the unchanged text |
+| `Button` | `button.tsx` (rewritten) | `variant: primary \| secondary \| tertiary \| danger \| icon`, `size: default \| sm \| icon`, all `button` props passed through | `cursor-pointer rounded-control focus-visible:focus-ring transition-colors`, minimum height 40px, no border. Colours: `primary` = `bg-primary text-primary-contrast`; `secondary` = `bg-secondary-solid text-secondary-solid-contrast`; `tertiary` = `text-primary hover:bg-hover`; `danger` = `bg-danger-solid text-danger-solid-contrast`; `icon` = square `bg-raised text-fg hover:bg-hover`. `disabled:opacity-50 disabled:cursor-not-allowed`. |
+| `Chip` | `chip.tsx` | `onRemove?`, `children` | `bg-raised rounded-chip`, with a remove button named `Remove <label>` when `onRemove` is given |
+| `StatusChip` | `status-chip.tsx` | `status: danger \| warning \| success \| info \| neutral`, `icon?`, `children` (text is required), plus `span` HTML props (`role`, `id`, `aria-live`) | `bg-{status}-bg text-{status} rounded-chip`; the icon is `aria-hidden` |
+| `Tooltip` | `tooltip.tsx` | `label`, `children` (trigger) | `@base-ui/react/tooltip`; popup uses `bg-neutral-strong text-neutral-strong-contrast rounded-chip shadow-float` |
+| `Dialog*` | `dialog.tsx` (restyled) | unchanged exports | popup uses `bg-card rounded-card shadow-float` with no border; backdrop uses `bg-scrim/40` |
+| `PageHeading` | `page-heading.tsx` | unchanged | adds the page title style `text-2xl font-semibold` |
+| `HatchedRegion` | not added | n/a | no timelines exist (spec Assumptions, D7) |
+
+Screens that are not built on a primitive:
+- `StartupLoadingDialog` keeps its own backdrop and `role="status"` panel and is restyled in place (R13).
+- `DeleteCategoryDialog` stays an inline `role="alertdialog"` panel, styled `bg-raised rounded-card p-4` with no border or shadow (R12).
+
+Behavioural contract: no primitive changes accessible names, roles, descriptions, focus order or event semantics of the elements it replaces (FR-014). Existing class assertions in component tests (`cursor-pointer` on nav items, `text-xl`, `mt-6` and indent padding in the category tree, `text-right` in the review table) stay true.
