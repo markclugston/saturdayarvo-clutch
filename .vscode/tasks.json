@@ -4,7 +4,39 @@
     {
       "label": "prepare-api",
       "dependsOrder": "sequence",
-      "dependsOn": ["start-otel-dashboard", "build-api", "migrate-api"],
+      "dependsOn": ["preflight", "start-otel-dashboard", "build-api", "migrate-api", "open-aspire-when-ready"],
+      "problemMatcher": []
+    },
+    {
+      "label": "preflight",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/.vscode/preflight.ps1"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "open-aspire-when-ready",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "Start-Process powershell.exe -WindowStyle Hidden -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','${workspaceFolder}/.vscode/open-when-ready.ps1'"
+      ],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      },
       "problemMatcher": []
     },
     {
