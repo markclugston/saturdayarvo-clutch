@@ -75,24 +75,26 @@ export function AccountsPage({ onSelectAccount }: AccountsPageProps) {
         <p className="mt-2 text-fg-secondary">Each account keeps its own currency and transactions.</p>
       </div>
 
-      <Card>
-        <ul className="grid gap-3 sm:grid-cols-2">
-          {accountRows.map(({ account, currency }) => (
-            <li className="min-w-0" key={account.id}>
-              <button
-                className="w-full cursor-pointer rounded-control bg-raised p-4 text-left transition-colors hover:bg-hover focus-visible:focus-ring"
-                onClick={() => onSelectAccount(account.id)}
-                type="button"
-              >
-                <span className="block break-words font-medium">{account.description}</span>
-                <span className="mt-1 block break-words text-sm text-fg-secondary">
-                  {currency.name} ({account.currencyCode})
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </Card>
+      {accountRows.length > 0 && (
+        <Card className="w-fit max-w-full">
+          <ul className="flex flex-wrap gap-3">
+            {accountRows.map(({ account, currency }) => (
+              <li className="w-full min-w-0 sm:w-[16.875rem] xl:w-[16.375rem]" key={account.id}>
+                <button
+                  className="w-full cursor-pointer rounded-control bg-raised p-4 text-left transition-colors hover:bg-hover focus-visible:focus-ring"
+                  onClick={() => onSelectAccount(account.id)}
+                  type="button"
+                >
+                  <span className="block break-words font-medium">{account.description}</span>
+                  <span className="mt-1 block break-words text-sm text-fg-secondary">
+                    {currency.name} ({account.currencyCode})
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       <Card as="form" className="max-w-xl space-y-4" onSubmit={submit}>
         <CardTitle as="h2">Add an account</CardTitle>
