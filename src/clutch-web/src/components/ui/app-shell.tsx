@@ -22,18 +22,20 @@ export function AppShell({ title, header, nav, navExpanded, children }: AppShell
   return (
     <div
       className={cn(
-        'grid min-h-svh grid-cols-[3.5rem_minmax(0,1fr)] grid-rows-[auto_1fr] bg-canvas transition-[grid-template-columns] duration-200 ease-in-out motion-reduce:transition-none',
+        'grid h-svh grid-cols-[3.5rem_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-canvas transition-[grid-template-columns] duration-200 ease-in-out motion-reduce:transition-none',
         navExpanded ? 'md:grid-cols-[10rem_minmax(0,1fr)]' : 'md:grid-cols-[3.5rem_minmax(0,1fr)]',
       )}
     >
-      <h1 className="pointer-events-none sticky top-0 z-30 col-span-2 col-start-1 row-start-1 ml-[4.5rem] min-w-0">
-        {/* Absolutely positioned so the header row, not the image, sets the height the logo fills. */}
-        <img alt={title} className="absolute left-0 top-[8%] h-[104%] w-auto max-w-none dark:hidden" src={logoLight} />
-        <img alt={title} className="absolute left-0 top-[8%] hidden h-[104%] w-auto max-w-none dark:block" src={logoDark} />
+      {/* The page itself never scrolls; only the content panel does, so header, logo, nav and panel corners stay put. */}
+      <h1 className="pointer-events-none relative z-30 col-span-2 col-start-1 row-start-1 ml-[4.5rem] min-w-0 overflow-hidden">
+        {/* Absolutely positioned so the header row, not the image, sets the height the logo fills; clipped to the header. */}
+        {/* The artwork sits ~4% above the image's own centre, so nudge the image down to centre the artwork itself. */}
+        <img alt={title} className="absolute left-0 top-[54%] h-full w-auto max-w-none -translate-y-1/2 dark:hidden" src={logoLight} />
+        <img alt={title} className="absolute left-0 top-[54%] hidden h-full w-auto max-w-none -translate-y-1/2 dark:block" src={logoDark} />
       </h1>
-      <div className="sticky top-0 z-20 col-start-2 row-start-1 min-w-0 bg-canvas">{header}</div>
-      <div className="col-start-1 row-span-2 row-start-1">{nav}</div>
-      <div className="col-start-2 row-start-2 flex min-w-0">{children}</div>
+      <div className="z-20 col-start-2 row-start-1 min-w-0 bg-canvas">{header}</div>
+      <div className="col-start-1 row-span-2 row-start-1 min-h-0">{nav}</div>
+      <div className="col-start-2 row-start-2 flex min-h-0 min-w-0">{children}</div>
     </div>
   )
 }
