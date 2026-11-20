@@ -134,7 +134,7 @@ export default function App() {
         />
       )}
       header={(
-        <header className="flex flex-wrap items-center justify-end gap-4 px-5 py-3">
+        <header className="flex flex-wrap items-center justify-end gap-4 px-5 pb-2.5 pt-[18px] lg:pb-1.5">
           <div className="flex flex-wrap items-center gap-3">
             {sessionQuery.data.id && <ThemeSelector userId={sessionQuery.data.id} />}
             {sessionQuery.data.roles?.includes('Administrator') && (

@@ -7,7 +7,7 @@ type SideNavProps = ComponentPropsWithoutRef<'nav'> & { expanded: boolean }
 export function SideNav({ expanded, className, children, ...props }: SideNavProps) {
   return (
     <div className="relative h-full w-14 shrink-0 md:w-full">
-      {/* Backing sits below the logo (z-30) and the controls above it, so the logo shows between them. */}
+      {/* Backing sits below the logo (z-30) and the controls above it. */}
       <div
         aria-hidden="true"
         className={cn(
@@ -18,7 +18,7 @@ export function SideNav({ expanded, className, children, ...props }: SideNavProp
       <nav
         aria-label="Primary"
         className={cn(
-          'absolute inset-y-0 left-0 z-40 flex flex-col gap-2 overflow-hidden p-2 pt-[18px] transition-[width] duration-200 ease-in-out md:w-full',
+          'absolute inset-y-0 left-0 z-40 flex flex-col gap-2 overflow-hidden p-2 transition-[width] duration-200 ease-in-out md:w-full',
           expanded ? 'w-40' : 'w-14',
           className,
         )}
