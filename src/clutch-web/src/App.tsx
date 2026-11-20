@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FolderTree, Wallet } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type FocusEvent, type PointerEvent } from 'react'
 import { AccountDetails } from '@/features/accounts/AccountDetails'
 import { AccountsPage } from '@/features/accounts/AccountsPage'
 import { ImportLimitsPage } from '@/features/admin/ImportLimitsPage'
@@ -29,6 +29,7 @@ export default function App() {
   const [isImporting, setIsImporting] = useState(false)
   const [showAdminSettings, setShowAdminSettings] = useState(false)
   const [showCategories, setShowCategories] = useState(false)
+  const navigation = useNavigationExpansion()
   const sessionQuery = useQuery({
     queryKey: ['session'],
     queryFn: async ({ signal }) => {
@@ -112,8 +113,10 @@ export default function App() {
 
   return (
     <AppShell
+      navExpanded={navigation.expanded}
       nav={(
         <PrimaryNavigation
+          navigation={navigation}
           accountsCurrent={!showCategories && !showAdminSettings}
           categoriesCurrent={showCategories && !showAdminSettings}
           onAccounts={() => {
@@ -154,7 +157,7 @@ export default function App() {
         </header>
       )}
     >
-      {/* Keep keyboard focus visible while the pointer holds the overlay open. */}
+      {/* Keep keyboard focus visible while the pointer holds the overlay open below md. */}
       <ContentPanel className={cn(
         '[&_:is(button,input,select,textarea):not(.sr-only):focus-visible]:relative [&_:is(button,input,select,textarea):not(.sr-only):focus-visible]:z-20',
         '[&_:focus-visible:not(.sr-only)]:focus-ring',
@@ -199,19 +202,13 @@ export default function App() {
   )
 }
 
-type PrimaryNavigationProps = {
-  accountsCurrent: boolean
-  categoriesCurrent: boolean
-  onAccounts: () => void
-  onCategories: () => void
-}
+type NavigationExpansion = ReturnType<typeof useNavigationExpansion>
 
-function PrimaryNavigation({
-  accountsCurrent,
-  categoriesCurrent,
-  onAccounts,
-  onCategories,
-}: PrimaryNavigationProps) {
+/**
+ * Owns hover, keyboard-focus and Escape state for the primary navigation so that both the
+ * shell (column width) and the navigation (labels) share one `expanded` value.
+ */
+function useNavigationExpansion() {
   const [hovered, setHovered] = useState(false)
   const [keyboardFocused, setKeyboardFocused] = useState(false)
   const [dismissed, setDismissed] = useState(false)
@@ -228,35 +225,54 @@ function PrimaryNavigation({
     return () => window.removeEventListener('keydown', dismissOnEscape)
   }, [expanded])
 
+  const handlers = {
+    onPointerEnter: (event: PointerEvent<HTMLElement>) => {
+      if (event.pointerType === 'mouse') {
+        setHovered(true)
+        setDismissed(false)
+      }
+    },
+    onPointerLeave: (event: PointerEvent<HTMLElement>) => {
+      pointerFocus.current = false
+      if (event.pointerType === 'mouse') setHovered(false)
+    },
+    onPointerDownCapture: () => {
+      pointerFocus.current = true
+      setKeyboardFocused(false)
+    },
+    onPointerUpCapture: () => { pointerFocus.current = false },
+    onPointerCancelCapture: () => { pointerFocus.current = false },
+    onFocusCapture: () => {
+      if (!pointerFocus.current) {
+        setKeyboardFocused(true)
+        setDismissed(false)
+      }
+    },
+    onBlurCapture: (event: FocusEvent<HTMLElement>) => {
+      if (!event.currentTarget.contains(event.relatedTarget)) setKeyboardFocused(false)
+    },
+  }
+
+  return { expanded, handlers }
+}
+
+type PrimaryNavigationProps = {
+  navigation: NavigationExpansion
+  accountsCurrent: boolean
+  categoriesCurrent: boolean
+  onAccounts: () => void
+  onCategories: () => void
+}
+
+function PrimaryNavigation({
+  navigation: { expanded, handlers },
+  accountsCurrent,
+  categoriesCurrent,
+  onAccounts,
+  onCategories,
+}: PrimaryNavigationProps) {
   return (
-    <SideNav
-      expanded={expanded}
-      onPointerEnter={(event) => {
-        if (event.pointerType === 'mouse') {
-          setHovered(true)
-          setDismissed(false)
-        }
-      }}
-      onPointerLeave={(event) => {
-        pointerFocus.current = false
-        if (event.pointerType === 'mouse') setHovered(false)
-      }}
-      onPointerDownCapture={() => {
-        pointerFocus.current = true
-        setKeyboardFocused(false)
-      }}
-      onPointerUpCapture={() => { pointerFocus.current = false }}
-      onPointerCancelCapture={() => { pointerFocus.current = false }}
-      onFocusCapture={() => {
-        if (!pointerFocus.current) {
-          setKeyboardFocused(true)
-          setDismissed(false)
-        }
-      }}
-      onBlurCapture={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setKeyboardFocused(false)
-      }}
-    >
+    <SideNav expanded={expanded} {...handlers}>
       <SideNavItem
         current={accountsCurrent}
         expanded={expanded}

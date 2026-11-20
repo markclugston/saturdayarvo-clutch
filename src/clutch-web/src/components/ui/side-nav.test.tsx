@@ -20,6 +20,26 @@ it('marks the current item and keeps its name and pointer cursor', () => {
   expect(screen.getByRole('navigation', { name: 'Primary' })).toBeInTheDocument()
 })
 
+it('overlays below md and fills its grid column at md and above', () => {
+  const { container } = renderNav(true)
+  const wrapper = container.firstElementChild as HTMLElement
+  const nav = screen.getByRole('navigation', { name: 'Primary' })
+  expect(wrapper.className).toContain('w-16')
+  expect(wrapper.className).toContain('md:w-full')
+  expect(nav.className).toContain('absolute')
+  expect(nav.className).toContain('w-40')
+  expect(nav.className).toContain('md:w-full')
+})
+
+it('keeps the compact width below md when collapsed and hides labels', () => {
+  const { container } = renderNav(false)
+  const nav = screen.getByRole('navigation', { name: 'Primary' })
+  expect(nav.className).toContain('w-16')
+  expect(nav.className).not.toContain('w-40')
+  expect(nav.className).toContain('md:w-full')
+  expect(container.querySelector('span[hidden]')).not.toBeNull()
+})
+
 it('shows the label and no tooltip when expanded', async () => {
   const user = userEvent.setup()
   renderNav(true)

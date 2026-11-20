@@ -27,7 +27,7 @@ const REASONS = {
   ring: 'use focus-ring for focus indication',
   shadow: 'only shadow-float is allowed',
   darkColour: 'colour tokens switch by theme, do not use dark: for colour',
-  transition: 'only colour, opacity, transform and width may transition',
+  transition: 'only colour, opacity, transform, width and the app shell grid columns may transition',
   duration: 'transitions last 150, 200 or 250ms',
   easing: 'only ease-out and ease-in-out are allowed',
 }
@@ -37,6 +37,7 @@ const ALLOWED_TRANSITIONS = new Set([
   'transition-opacity',
   'transition-transform',
   'transition-[width]',
+  'transition-[grid-template-columns]',
   'transition-[opacity,transform]',
   'transition-[color,transform]',
   'transition-none',

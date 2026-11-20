@@ -7,11 +7,11 @@ type SideNavProps = ComponentPropsWithoutRef<'nav'> & { expanded: boolean }
 
 export function SideNav({ expanded, className, children, ...props }: SideNavProps) {
   return (
-    <div className="relative h-full w-16 shrink-0">
+    <div className="relative h-full w-16 shrink-0 md:w-full">
       <nav
         aria-label="Primary"
         className={cn(
-          'absolute inset-y-0 left-0 z-10 flex flex-col gap-2 overflow-hidden bg-canvas p-2 transition-[width] duration-200 ease-in-out',
+          'absolute inset-y-0 left-0 z-10 flex flex-col gap-2 overflow-hidden bg-canvas p-2 transition-[width] duration-200 ease-in-out md:w-full',
           expanded ? 'w-40' : 'w-16',
           className,
         )}

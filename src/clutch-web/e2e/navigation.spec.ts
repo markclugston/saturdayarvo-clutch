@@ -36,6 +36,13 @@ async function mockApi(page: Page) {
       await route.fulfill({ json: account })
     } else if (path === `/api/accounts/${accountId}/transactions`) {
       await route.fulfill({ json: { items: [], nextCursor: null } })
+    } else if (path === `/api/accounts/${accountId}/import-status`) {
+      await route.fulfill({ json: {
+        accountId,
+        availability: 'Available',
+        activeImport: null,
+        watchedImport: null,
+      } })
     } else if (path === `/api/accounts/${accountId}/import-settings`) {
       await route.fulfill({ json: { mapping: null } })
     } else if (path === '/api/category-nodes') {
@@ -65,6 +72,42 @@ async function setPaneState(page: Page, expanded: boolean) {
   const label = nav.getByText('Accounts', { exact: true })
   if (expanded) await expect(label).toBeVisible()
   else await expect(label).toBeHidden()
+}
+
+const themes = [
+  { mode: 'Light', scheme: 'light' },
+  { mode: 'Dark', scheme: 'dark' },
+  { mode: 'System', scheme: 'light' },
+  { mode: 'System', scheme: 'dark' },
+] as const
+
+const navGrowth = 96
+
+async function applyTheme(page: Page, theme: (typeof themes)[number]) {
+  await page.emulateMedia({ colorScheme: theme.scheme })
+  await page.getByRole('combobox', { name: 'Theme' }).selectOption(theme.mode)
+  await expect(page.locator('html')).toHaveClass(theme.scheme === 'dark' ? /dark/ : /^(?!.*dark)/)
+}
+
+type Box = NonNullable<Awaited<ReturnType<Locator['boundingBox']>>>
+
+/** Reads bounds once the 200 ms width transition has finished (two equal reads in a row). */
+async function settledBox(locator: Locator): Promise<Box> {
+  let previous = await locator.boundingBox()
+  for (let attempt = 0; attempt < 40; attempt++) {
+    await locator.page().waitForTimeout(50)
+    const current = await locator.boundingBox()
+    if (previous && current
+      && (['x', 'y', 'width', 'height'] as const).every((key) => Math.abs(previous![key] - current[key]) < 0.01)) {
+      return current
+    }
+    previous = current
+  }
+  throw new Error('Layout did not settle')
+}
+
+async function hasNoHorizontalScroll(page: Page) {
+  return page.locator('html').evaluate((element) => element.scrollWidth <= element.clientWidth)
 }
 
 test('shows contrasting current and keyboard focus indicators in both themes and pane states', async ({ page }) => {
@@ -137,26 +180,20 @@ test('keeps the pane and content usable across viewports and themes', async ({ p
     const main = page.getByRole('main')
     const selector = page.getByRole('combobox', { name: 'Theme' })
     const checkLayout = async (expanded: boolean) => {
+      const shrinks = (page.viewportSize()?.width ?? 0) >= 768
       await setPaneState(page, expanded)
-      const pane = await nav.boundingBox()
-      const content = await main.boundingBox()
-      expect(pane).not.toBeNull()
-      expect(content).not.toBeNull()
-      if (!pane || !content) throw new Error('Navigation or content has no bounds')
-      if (expanded) {
-        expect(pane.width).toBeGreaterThan(56)
-      }
-      else expect(pane.x + pane.width).toBeLessThanOrEqual(content.x + 0.5)
+      const pane = await settledBox(nav)
+      const content = await settledBox(main)
+      if (expanded) expect(pane.width).toBeGreaterThan(56)
+      if (shrinks || !expanded) expect(pane.x + pane.width).toBeLessThanOrEqual(content.x + 0.5)
       expect(content.width).toBeGreaterThan(0)
       await setPaneState(page, !expanded)
-      const otherContent = await main.boundingBox()
-      if (!otherContent) throw new Error('Content has no bounds')
-      expect(otherContent.x).toBeCloseTo(content.x, 1)
-      expect(otherContent.width).toBeCloseTo(content.width, 1)
+      const otherContent = await settledBox(main)
+      const growth = shrinks ? (expanded ? -navGrowth : navGrowth) : 0
+      expect(otherContent.x).toBeCloseTo(content.x + growth, 1)
+      expect(otherContent.width).toBeCloseTo(content.width - growth, 1)
       await setPaneState(page, expanded)
-      expect(await page.locator('html').evaluate((element) =>
-        element.ownerDocument.documentElement.scrollWidth
-        <= element.ownerDocument.documentElement.clientWidth)).toBe(true)
+      expect(await hasNoHorizontalScroll(page)).toBe(true)
       await expect(nav.getByRole('button', { name: 'Accounts' })).toBeVisible()
     }
     const checkAccessibility = async () => {
@@ -473,49 +510,192 @@ test('expands on hover and collapses on exit without changing destination behavi
   await expect(page.getByRole('heading', { name: 'Categories and groups' })).toBeVisible()
 })
 
-test('overlays only intersecting page content without changing its geometry', async ({ page }) => {
+test('shrinks the main section on expand at 1280 and 1920 and restores it on collapse', async ({ page }) => {
   await mockApi(page)
   await page.goto('/')
   const nav = page.getByRole('navigation', { name: 'Primary' })
   const main = page.getByRole('main')
-  const heading = page.getByRole('heading', { name: 'Your accounts' })
 
-  let expandedWidth: number | undefined
   for (const viewport of [
-    { width: 320, height: 812 },
     { width: 1280, height: 720 },
     { width: 1920, height: 1080 },
   ]) {
     await page.setViewportSize(viewport)
     await setPaneState(page, false)
-    const compactPane = await nav.boundingBox()
-    const compactMain = await main.boundingBox()
-    const compactHeading = await heading.boundingBox()
+    const compactPane = await settledBox(nav)
+    const compactMain = await settledBox(main)
     await setPaneState(page, true)
-    const pane = await nav.boundingBox()
-    const expandedMain = await main.boundingBox()
-    const expandedHeading = await heading.boundingBox()
-    if (!pane || !compactPane || !compactMain || !compactHeading || !expandedMain || !expandedHeading) {
-      throw new Error('Navigation or page content has no bounds')
-    }
-    expect(pane.width).toBeGreaterThan(compactPane.width)
-    if (expandedWidth === undefined) expandedWidth = pane.width
-    else expect(pane.width).toBeCloseTo(expandedWidth, 1)
-    for (const key of ['x', 'y', 'width', 'height'] as const) {
-      expect(expandedMain[key]).toBeCloseTo(compactMain[key], 1)
-      expect(expandedHeading[key]).toBeCloseTo(compactHeading[key], 1)
-    }
+    const pane = await settledBox(nav)
+    const expandedMain = await settledBox(main)
+    expect(pane.width).toBeCloseTo(compactPane.width + navGrowth, 1)
+    expect(expandedMain.x).toBeCloseTo(compactMain.x + navGrowth, 1)
+    expect(expandedMain.width).toBeCloseTo(compactMain.width - navGrowth, 1)
+    expect(pane.x + pane.width).toBeLessThanOrEqual(expandedMain.x + 0.5)
+    expect(await hasNoHorizontalScroll(page)).toBe(true)
 
-    if (viewport.width === 320) {
+    await setPaneState(page, false)
+    const restoredMain = await settledBox(main)
+    expect(restoredMain.x).toBeCloseTo(compactMain.x, 1)
+    expect(restoredMain.width).toBeCloseTo(compactMain.width, 1)
+  }
+})
+
+for (const theme of themes) {
+  test(`shrinks content for keyboard focus like hover without clipping in ${theme.mode} (${theme.scheme} scheme)`, async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 })
+    await mockApi(page)
+    await page.goto('/')
+    await applyTheme(page, theme)
+    const nav = page.getByRole('navigation', { name: 'Primary' })
+    const main = page.getByRole('main')
+    const compactMain = await settledBox(main)
+
+    await page.getByRole('button', { name: 'Sign out' }).focus()
+    await page.keyboard.press('Tab')
+    await expect(nav.getByRole('button', { name: 'Accounts' })).toBeFocused()
+    await expect(nav.getByText('Accounts', { exact: true })).toBeVisible()
+    const expandedMain = await settledBox(main)
+    const pane = await settledBox(nav)
+    expect(expandedMain.x).toBeCloseTo(compactMain.x + navGrowth, 1)
+    expect(expandedMain.width).toBeCloseTo(compactMain.width - navGrowth, 1)
+    expect(pane.x + pane.width).toBeLessThanOrEqual(expandedMain.x + 0.5)
+    expect(expandedMain.x + expandedMain.width).toBeLessThanOrEqual(1280 + 0.5)
+    expect(await hasNoHorizontalScroll(page)).toBe(true)
+    await expect(page.getByLabel('Account description')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Add account' })).toBeVisible()
+  })
+}
+
+test('keeps focus and typed input in the page while the navigation expands and collapses', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 })
+  await mockApi(page)
+  await page.goto('/')
+  const field = page.getByLabel('Account description')
+  await field.fill('Typed value')
+  await expect(field).toBeFocused()
+
+  await setPaneState(page, true)
+  await settledBox(page.getByRole('main'))
+  await expect(field).toBeFocused()
+  await expect(field).toHaveValue('Typed value')
+  await page.keyboard.type(' more')
+  await setPaneState(page, false)
+  await settledBox(page.getByRole('main'))
+  await expect(field).toBeFocused()
+  await expect(field).toHaveValue('Typed value more')
+})
+
+test('settles without oscillating when the pointer repeatedly crosses the navigation edge', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 })
+  await mockApi(page)
+  await page.goto('/')
+  const label = page.getByRole('navigation', { name: 'Primary' }).getByText('Accounts', { exact: true })
+  await page.mouse.move(600, 300)
+  for (const x of [63, 64, 65, 64, 63, 65, 64, 63, 65, 64]) await page.mouse.move(x, 300)
+
+  const states: boolean[] = []
+  for (let sample = 0; sample < 20; sample++) {
+    states.push(await label.isVisible())
+    await page.waitForTimeout(50)
+  }
+  const changes = states.filter((state, index) => index > 0 && state !== states[index - 1]).length
+  expect(changes).toBeLessThanOrEqual(1)
+})
+
+test('applies the final geometry without a transition when reduced motion is requested', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 })
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await mockApi(page)
+  await page.goto('/')
+  const main = page.getByRole('main')
+  const compactMain = await settledBox(main)
+  const grid = page.locator('div.grid.min-h-svh')
+  const seconds = parseFloat(await grid.evaluate((element) =>
+    getComputedStyle(element).transitionDuration.split(',')[0] ?? '0s'))
+  expect(seconds).toBeLessThanOrEqual(0.0001)
+
+  await setPaneState(page, true)
+  await expect.poll(async () => (await main.boundingBox())?.x, { timeout: 250 })
+    .toBeCloseTo(compactMain.x + navGrowth, 0)
+})
+
+for (const theme of themes) {
+  test(`stays expanded across a destination change with no layout jump or seam in ${theme.mode} (${theme.scheme} scheme)`, async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 })
+    await mockApi(page)
+    await page.goto('/')
+    await applyTheme(page, theme)
+    const nav = page.getByRole('navigation', { name: 'Primary' })
+    const main = page.getByRole('main')
+
+    await setPaneState(page, true)
+    const before = await settledBox(main)
+    const paneBefore = await settledBox(nav)
+    await nav.getByRole('button', { name: 'Categories' }).click()
+    await expect(page.getByRole('heading', { name: 'Categories and groups' })).toBeVisible()
+    await expect(nav.getByText('Categories', { exact: true })).toBeVisible()
+    const after = await settledBox(main)
+    const paneAfter = await settledBox(nav)
+    expect(after.x).toBeCloseTo(before.x, 1)
+    expect(after.width).toBeCloseTo(before.width, 1)
+    expect(paneAfter.width).toBeCloseTo(paneBefore.width, 1)
+    // The content panel keeps its own margin; the gap to the navigation must not change.
+    expect(after.x - (paneAfter.x + paneAfter.width)).toBeCloseTo(before.x - (paneBefore.x + paneBefore.width), 1)
+    expect(after.x).toBeGreaterThanOrEqual(paneAfter.x + paneAfter.width - 0.5)
+  })
+}
+
+for (const theme of themes) {
+  test(`overlays the content below 768px without changing it in ${theme.mode} (${theme.scheme} scheme)`, async ({ page }) => {
+    await mockApi(page)
+    await page.goto('/')
+    await applyTheme(page, theme)
+    const nav = page.getByRole('navigation', { name: 'Primary' })
+    const main = page.getByRole('main')
+    const heading = page.getByRole('heading', { name: 'Your accounts' })
+
+    for (const width of [320, 767]) {
+      await page.setViewportSize({ width, height: 812 })
+      await setPaneState(page, false)
+      const compactPane = await settledBox(nav)
+      const compactMain = await settledBox(main)
+      const compactHeading = await settledBox(heading)
+      await setPaneState(page, true)
+      const pane = await settledBox(nav)
+      const expandedMain = await settledBox(main)
+      const expandedHeading = await settledBox(heading)
+      expect(pane.width).toBeGreaterThan(compactPane.width)
+      for (const key of ['x', 'y', 'width', 'height'] as const) {
+        expect(expandedMain[key]).toBeCloseTo(compactMain[key], 1)
+        expect(expandedHeading[key]).toBeCloseTo(compactHeading[key], 1)
+      }
       expect(pane.x + pane.width).toBeGreaterThan(expandedHeading.x)
-      const coveredByNav = await nav.evaluate((element, { x, y }) =>
+      expect(await nav.evaluate((element, { x, y }) =>
         element.contains(element.ownerDocument.elementFromPoint(x, y)),
-      { x: expandedHeading.x + 5, y: expandedHeading.y + expandedHeading.height / 2 })
-      expect(coveredByNav).toBe(true)
-    } else {
-      expect(compactMain.x - compactPane.width)
-        .toBeCloseTo(viewport.width - compactMain.x - compactMain.width, 1)
+      { x: expandedHeading.x + 5, y: expandedHeading.y + expandedHeading.height / 2 })).toBe(true)
+      expect(await hasNoHorizontalScroll(page)).toBe(true)
+
+      await setPaneState(page, false)
+      const collapsedPane = await settledBox(nav)
+      expect(collapsedPane.width).toBeCloseTo(compactPane.width, 1)
+      expect(collapsedPane.x + collapsedPane.width).toBeLessThanOrEqual(compactMain.x + 0.5)
     }
+  })
+}
+
+test('overlays at 767px and shrinks the content at 768px', async ({ page }) => {
+  await mockApi(page)
+  await page.goto('/')
+  const main = page.getByRole('main')
+
+  for (const { width, shrinks } of [{ width: 767, shrinks: false }, { width: 768, shrinks: true }]) {
+    await page.setViewportSize({ width, height: 900 })
+    await setPaneState(page, false)
+    const compactMain = await settledBox(main)
+    await setPaneState(page, true)
+    const expandedMain = await settledBox(main)
+    expect(expandedMain.x).toBeCloseTo(compactMain.x + (shrinks ? navGrowth : 0), 1)
+    expect(expandedMain.width).toBeCloseTo(compactMain.width - (shrinks ? navGrowth : 0), 1)
   }
 })
 

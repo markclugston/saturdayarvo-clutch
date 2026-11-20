@@ -27,11 +27,11 @@ AppShell (bg-canvas)
 
 ## 3. Navigation
 
-**Existing expand/collapse behaviour MUST be preserved** (triggers, persisted state, breakpoints). Only styling changes.
+**Existing expand/collapse behaviour MUST be preserved** (triggers, persisted state, breakpoints) unless an approved spec amends it (015: the content resizes at 768px and above). Otherwise only styling changes.
 
 - Surface is `canvas`. No border or divider against the content panel; the transition is the tone change alone.
-- Collapsed: icon-only rail, 64px (`w-16`). Expanded: 160px (`w-40`). The wider 240px of the original guide is not used: at 320px the browser tests require form controls to stay clear of the expanded overlay, and the width must be the same at every viewport.
-- Width animates 200ms ease-in-out (`transition-[width] duration-200 ease-in-out`). Labels fade with `transition-opacity` rather than popping.
+- Collapsed: icon-only rail, 64px (`w-16`). Expanded: 160px (`w-40`). The wider 240px of the original guide is not used: the navigation overlays the content below 768px and shrinks the content at 768px and above (015), and the width must be the same at every viewport.
+- Width animates 200ms ease-in-out (`transition-[width] duration-200 ease-in-out`); at 768px and above the shell's grid columns animate in step (`transition-[grid-template-columns]`). Labels fade with `transition-opacity` rather than popping.
 - Active item: `rounded-control` fill using `primary` with `primary-contrast` text and heavier text (the `selected` tint is under 3:1 against `canvas`, so it cannot be the only indicator). Hover: a subtler fill (`hover`).
 - Icons 18-20px, consistent outline style, stroke about 1.5px.
 - Collapsed items show tooltips on hover or keyboard focus, including after Escape dismisses the expanded rail while an item is still focused or hovered.

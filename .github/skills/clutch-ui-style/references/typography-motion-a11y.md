@@ -8,7 +8,7 @@
 
 ## 8. Motion
 
-- 150-250ms, ease-out or ease-in-out. Animate colour, opacity, transform and width only.
+- 150-250ms, ease-out or ease-in-out. Animate colour, opacity, transform and width only. The one exception is the app shell's `grid-template-columns` (`transition-[grid-template-columns]`), which keeps the navigation column and the content in step when the navigation expands at 768px and above.
 - Respect `prefers-reduced-motion`: disable, or shorten to under 50ms (`motion-reduce:transition-none` or a global media query).
 
 ## 9. Accessibility
