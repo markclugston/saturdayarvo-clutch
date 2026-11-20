@@ -1,31 +1,48 @@
+import { Feather, Trash2 } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardTitle } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { ErrorMessage } from '@/components/ui/error-message'
-import { FloatingField } from '@/components/ui/floating-field'
 import { PageHeading } from '@/components/ui/page-heading'
-import { ApiError } from '@/lib/api/client'
 import type { CategoryNode } from '@/lib/api/schemas'
 import {
   categoryNodesQueryKey,
-  createCategoryNode,
   getCategoryNodes,
   renameCategoryNode,
 } from './api'
 import { DeleteCategoryDialog } from './DeleteCategoryDialog'
+import { getErrorMessage } from './getErrorMessage'
 
 const maxNameLength = 100
 
 export function CategoriesPage() {
   const queryClient = useQueryClient()
-  const [name, setName] = useState('')
-  const [parentId, setParentId] = useState('')
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const renameButtons = useRef(new Map<string, HTMLButtonElement>())
   const lastRenamedId = useRef<string | null>(null)
+  const [containerRef, containerWidth] = useElementWidth()
+  const scrollAreas = useRef(new Map<string, HTMLDivElement>())
+  const [cardWidths, setCardWidths] = useState<Record<string, number>>({})
+
+  // Measure each card's natural (unwrapped) width so columns are packed from real sizes.
+  useLayoutEffect(() => {
+    const next: Record<string, number> = {}
+    for (const [id, area] of scrollAreas.current) {
+      const card = area.parentElement
+      if (card) {
+        next[id] = area.scrollWidth + (card.offsetWidth - area.clientWidth)
+      }
+    }
+    const keys = Object.keys(next)
+    const changed = keys.length !== Object.keys(cardWidths).length
+      || keys.some((key) => next[key] !== cardWidths[key])
+    if (changed) {
+      setCardWidths(next)
+    }
+  })
 
   // Return focus to the item's Rename button once the inline editor closes.
   useEffect(() => {
@@ -38,13 +55,6 @@ export function CategoriesPage() {
     queryKey: categoryNodesQueryKey,
     queryFn: getCategoryNodes,
   })
-  const createMutation = useMutation({
-    mutationFn: () => createCategoryNode(name, parentId === '' ? null : parentId),
-    onSuccess: async () => {
-      setName('')
-      await queryClient.invalidateQueries({ queryKey: categoryNodesQueryKey })
-    },
-  })
   const renameMutation = useMutation({
     mutationFn: ({ id, value }: { id: string, value: string }) => renameCategoryNode(id, value),
     onSuccess: async (_result, variables) => {
@@ -53,11 +63,6 @@ export function CategoriesPage() {
       await queryClient.invalidateQueries({ queryKey: categoryNodesQueryKey })
     },
   })
-
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    createMutation.mutate()
-  }
 
   function submitRename(event: FormEvent<HTMLFormElement>, node: CategoryNode) {
     event.preventDefault()
@@ -73,8 +78,6 @@ export function CategoriesPage() {
   }
 
   const nodes = nodesQuery.data
-  // A parent that no longer exists (e.g. deleted) falls back to "None".
-  const selectedParentId = nodes.some((node) => node.id === parentId) ? parentId : ''
 
   return (
     <section aria-labelledby="categories-heading" className="space-y-4">
@@ -94,25 +97,39 @@ export function CategoriesPage() {
           </p>
         </Card>
       ) : (
-        <Card>
-        <ul
+        <div
           aria-label="Groups and categories"
-          className="space-y-1 overflow-x-auto focus-visible:focus-ring"
+          className="flex items-start gap-4"
+          ref={containerRef}
+          role="group"
+        >
+        {layoutColumns(groupNodes(nodes), containerWidth / 16, cardWidths).map((column) => (
+        <div className="flex min-w-0 flex-col items-start gap-4" key={column[0]?.head.id}>
+        {column.map((group) => (
+        <Card className="max-w-full" key={group.head.id}>
+        <div
+          className="overflow-x-auto rounded-control focus-visible:focus-ring"
+          ref={(element) => {
+            if (element) {
+              scrollAreas.current.set(group.head.id, element)
+            } else {
+              scrollAreas.current.delete(group.head.id)
+            }
+          }}
           tabIndex={0}
         >
-          {nodes.map((node) => {
+        <table aria-label={`${group.head.name} and its categories`} className="w-full text-left">
+          <tbody>
+          {group.nodes.map((node) => {
             const isGroup = node.parentId === null
-            // Reserve room for actions while preserving indentation in the scrollable list.
             return (
-              <li
-                key={node.id}
-                className={isGroup ? 'mt-6 first:mt-0' : undefined}
-                style={{
-                  paddingLeft: `${node.depth * 1.5}rem`,
-                  minWidth: `calc(${node.depth * 1.5}rem + 8rem)`,
-                }}
-              >
+              <tr key={node.id}>
                 {renamingId === node.id ? (
+                  <td
+                    className="px-3 py-2"
+                    colSpan={2}
+                    style={{ paddingLeft: `calc(0.75rem + ${node.depth * 1.5}rem)` }}
+                  >
                   <form
                     className="flex flex-wrap items-center gap-2"
                     onSubmit={(event) => submitRename(event, node)}
@@ -152,11 +169,18 @@ export function CategoriesPage() {
                       <ErrorMessage>{getErrorMessage(renameMutation.error)}</ErrorMessage>
                     )}
                   </form>
+                  </td>
                 ) : (
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className={isGroup ? 'min-w-0 break-words text-xl font-semibold' : 'min-w-0 break-words text-base'}>
+                  <>
+                  <td
+                    className="px-3 py-2"
+                    style={{ paddingLeft: `calc(0.75rem + ${node.depth * 1.5}rem)` }}
+                  >
+                    <span className={isGroup ? 'text-xl font-semibold whitespace-nowrap' : 'text-base whitespace-nowrap'}>
                       {node.name}
                     </span>
+                  </td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">
                     <Button
                       aria-label={`Rename ${node.name}`}
                       onClick={() => {
@@ -171,69 +195,111 @@ export function CategoriesPage() {
                           renameButtons.current.delete(node.id)
                         }
                       }}
-                      size="sm"
+                      size="icon"
                       type="button"
-                      variant="secondary"
+                      variant="tertiary"
                     >
-                      Rename
+                      <Feather aria-hidden="true" className="size-4" />
                     </Button>
                     <Button
                       aria-label={`Delete ${node.name}`}
                       onClick={() => setDeletingId(node.id)}
-                      size="sm"
+                      size="icon"
                       type="button"
-                      variant="secondary"
+                      variant="tertiary"
                     >
-                      Delete
+                      <Trash2 aria-hidden="true" className="size-4 text-danger" />
                     </Button>
-                  </div>
+                    {deletingId === node.id && (
+                      <DeleteCategoryDialog node={node} onClose={() => setDeletingId(null)} />
+                    )}
+                  </td>
+                  </>
                 )}
-                {deletingId === node.id && (
-                  <DeleteCategoryDialog node={node} onClose={() => setDeletingId(null)} />
-                )}
-              </li>
+              </tr>
             )
           })}
-        </ul>
+          </tbody>
+        </table>
+        </div>
         </Card>
+        ))}
+        </div>
+        ))}
+        </div>
       )}
-
-      <Card as="form" className="max-w-xl space-y-4" onSubmit={submit}>
-        <CardTitle as="h2">Add a group or category</CardTitle>
-        <FloatingField
-          autoComplete="off"
-          id="category-name"
-          label="Name"
-          maxLength={maxNameLength}
-          onChange={(event) => setName(event.currentTarget.value)}
-          required
-          value={name}
-        />
-        <FloatingField
-          as="select"
-          id="category-parent"
-          label="Parent"
-          onChange={(event) => setParentId(event.currentTarget.value)}
-          value={selectedParentId}
-        >
-          <option value="">None (create a group)</option>
-          {nodes.map((node) => (
-            <option key={node.id} value={node.id}>
-              {'\u00A0\u00A0'.repeat(node.depth)}{node.name}
-            </option>
-          ))}
-        </FloatingField>
-        <Button disabled={createMutation.isPending} type="submit">
-          {createMutation.isPending ? 'Saving…' : 'Add'}
-        </Button>
-        {createMutation.isError && <ErrorMessage>{getErrorMessage(createMutation.error)}</ErrorMessage>}
-      </Card>
     </section>
   )
 }
 
-function getErrorMessage(error: Error): string {
-  return error instanceof ApiError
-    ? error.problem.detail ?? error.problem.title ?? 'The request could not be completed.'
-    : 'The request could not be completed.'
+type NodeGroup = { head: CategoryNode, nodes: CategoryNode[] }
+
+const columnGapRem = 1
+
+// Width of a group card in rem: measured from the rendered card when known, otherwise estimated
+// from the widest row (indent + name + action icons + padding).
+function groupWidthRem(group: NodeGroup, measuredPx: Record<string, number>): number {
+  const measured = measuredPx[group.head.id]
+  if (measured !== undefined) {
+    return measured / 16
+  }
+  return Math.max(...group.nodes.map((node) =>
+    node.depth * 1.5 + node.name.length * (node.parentId === null ? 0.8 : 0.6) + 8))
+}
+
+// Packs groups into the most columns that fit the available width, so horizontal space is used
+// before vertical. Each group goes to the currently shortest column, keeping list order.
+function layoutColumns(
+  groups: NodeGroup[],
+  availableRem: number,
+  measuredPx: Record<string, number>,
+): NodeGroup[][] {
+  let best: NodeGroup[][] = [groups]
+  for (let count = 2; count <= groups.length; count++) {
+    const columns: NodeGroup[][] = Array.from({ length: count }, () => [])
+    const heights = new Array<number>(count).fill(0)
+    for (const group of groups) {
+      const shortest = heights.indexOf(Math.min(...heights))
+      columns[shortest]?.push(group)
+      heights[shortest] = (heights[shortest] ?? 0) + group.nodes.length + 2
+    }
+    const width = columns.reduce(
+      (sum, column) => sum + Math.max(0, ...column.map((group) => groupWidthRem(group, measuredPx))),
+      (count - 1) * columnGapRem,
+    )
+    if (width > availableRem) {
+      break
+    }
+    best = columns
+  }
+  return best
+}
+
+function useElementWidth(): [(element: HTMLElement | null) => void, number] {
+  const [width, setWidth] = useState(0)
+  const [element, setElement] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    if (element === null || typeof ResizeObserver === 'undefined') {
+      return
+    }
+    const observer = new ResizeObserver(() => setWidth(element.clientWidth))
+    observer.observe(element)
+    setWidth(element.clientWidth)
+    return () => observer.disconnect()
+  }, [element])
+  return [setElement, width]
+}
+
+// Splits the flat, depth-ordered node list into one array per top-level group.
+function groupNodes(nodes: CategoryNode[]): NodeGroup[] {
+  const groups: NodeGroup[] = []
+  for (const node of nodes) {
+    const current = groups.at(-1)
+    if (node.parentId === null || current === undefined) {
+      groups.push({ head: node, nodes: [node] })
+    } else {
+      current.nodes.push(node)
+    }
+  }
+  return groups
 }

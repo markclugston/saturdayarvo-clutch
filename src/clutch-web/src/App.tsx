@@ -6,6 +6,7 @@ import { AccountsPage } from '@/features/accounts/AccountsPage'
 import { ImportLimitsPage } from '@/features/admin/ImportLimitsPage'
 import { AuthPage } from '@/features/auth/AuthPage'
 import { StartupLoadingDialog } from '@/features/auth/StartupLoadingDialog'
+import { AddCategoryForm } from '@/features/categories/AddCategoryForm'
 import { CategoriesPage } from '@/features/categories/CategoriesPage'
 import { signOut, getSession } from '@/features/auth/api'
 import { ImportPage } from '@/features/imports/ImportPage'
@@ -159,7 +160,7 @@ export default function App() {
       )}
     >
       {/* Keep keyboard focus visible while the pointer holds the overlay open below md. */}
-      <ContentPanel className={cn(
+      <ContentPanel wide={showCategories && !showAdminSettings} className={cn(
         'ml-0 lg:ml-0',
         '[&_:is(button,input,select,textarea):not(.sr-only):focus-visible]:relative [&_:is(button,input,select,textarea):not(.sr-only):focus-visible]:z-20',
         '[&_:focus-visible:not(.sr-only)]:focus-ring',
@@ -200,6 +201,7 @@ export default function App() {
           <AccountsPage onSelectAccount={setSelectedAccountId} />
         )}
       </ContentPanel>
+      {showCategories && !showAdminSettings && <AddCategoryForm />}
     </AppShell>
   )
 }

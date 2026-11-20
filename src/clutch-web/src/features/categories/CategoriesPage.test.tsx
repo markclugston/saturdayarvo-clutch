@@ -11,6 +11,7 @@ import {
   getDeletionImpact,
   renameCategoryNode,
 } from './api'
+import { AddCategoryForm } from './AddCategoryForm'
 import { CategoriesPage } from './CategoriesPage'
 
 vi.mock('./api', () => ({
@@ -46,22 +47,25 @@ describe('CategoriesPage', () => {
   it('renders groups larger than categories, indented, with gaps between groups', async () => {
     renderWithQueryClient(<CategoriesPage />)
 
-    const list = within(await screen.findByRole('list', { name: 'Groups and categories' }))
-    const group = list.getByText('Food')
-    const category = list.getByText('Groceries')
+    const grid = within(await screen.findByRole('group', { name: 'Groups and categories' }))
+    const group = grid.getByText('Food')
+    const category = grid.getByText('Groceries')
     expect(group).toHaveClass('text-xl')
     expect(category).not.toHaveClass('text-xl')
-    expect(list.getByText('Home').closest('li')).toHaveClass('mt-6')
-    expect(category.closest('li')).not.toHaveClass('mt-6')
-    expect(list.getByText('Produce').closest('li')).toHaveStyle({ paddingLeft: '3rem' })
+    // Each top-level group sits in its own table.
+    expect(grid.getAllByRole('table')).toHaveLength(2)
+    expect(grid.getByText('Home').closest('table')).not.toBe(group.closest('table'))
+    expect(category.closest('table')).toBe(group.closest('table'))
+    expect(grid.getByText('Produce').closest('td')).toHaveStyle({ paddingLeft: 'calc(0.75rem + 3rem)' })
   })
 
   it('offers an indented parent dropdown with a none option and creates a group', async () => {
     const user = userEvent.setup()
     vi.mocked(createCategoryNode).mockResolvedValue(food)
-    renderWithQueryClient(<CategoriesPage />)
+    renderWithQueryClient(<AddCategoryForm />)
 
     const select = await screen.findByLabelText('Parent')
+    await screen.findByRole('option', { name: /Produce/ })
     const options = Array.from(select.querySelectorAll('option')).map((option) => option.value)
     expect(options).toEqual(['', 'g1', 'c1', 'c2', 'g2'])
     expect(select.querySelector('option')).toHaveTextContent('None (create a group)')
@@ -79,9 +83,10 @@ describe('CategoriesPage', () => {
       detail: 'A sibling with that name already exists.',
       status: 409,
     }))
-    renderWithQueryClient(<CategoriesPage />)
+    renderWithQueryClient(<AddCategoryForm />)
 
-    await user.selectOptions(await screen.findByLabelText('Parent'), 'g1')
+    await screen.findByRole('option', { name: /Food/ })
+    await user.selectOptions(screen.getByLabelText('Parent'), 'g1')
     await user.type(screen.getByLabelText('Name'), 'Groceries')
     await user.click(screen.getByRole('button', { name: 'Add' }))
 

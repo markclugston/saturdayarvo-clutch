@@ -8,6 +8,8 @@ type FieldCommon = {
   error?: string
   description?: { id: string; text: string }
   describedBy?: string
+  /** Use the lighter card tone for the field, for fields sitting on the content panel background. */
+  onPanel?: boolean
 }
 
 type InputFieldProps = FieldCommon
@@ -35,7 +37,7 @@ const selectLabelClass =
   'pointer-events-none absolute left-3 top-1.5 text-[0.625rem] leading-none text-fg-secondary'
 
 export function FloatingField(props: FloatingFieldProps) {
-  const { id, label, error, description, describedBy } = props
+  const { id, label, error, description, describedBy, onPanel } = props
   const errorId = error ? `${id}-error` : undefined
   const ariaDescribedBy = [describedBy, description?.id, errorId].filter(Boolean).join(' ') || undefined
   const invalid = error ? true : undefined
@@ -44,8 +46,8 @@ export function FloatingField(props: FloatingFieldProps) {
   let wrapperClassName: string | undefined
   let isSelect = false
   if (props.as === 'select') {
-    const { as, label: _label, error: _error, description: _description, describedBy: _describedBy, className, children, ...rest } = props
-    void [as, _label, _error, _description, _describedBy]
+    const { as, label: _label, error: _error, description: _description, describedBy: _describedBy, onPanel: _onPanel, className, children, ...rest } = props
+    void [as, _label, _error, _description, _describedBy, _onPanel]
     wrapperClassName = className
     isSelect = true
     control = (
@@ -54,8 +56,8 @@ export function FloatingField(props: FloatingFieldProps) {
       </select>
     )
   } else {
-    const { as, label: _label, error: _error, description: _description, describedBy: _describedBy, className, ...rest } = props
-    void [as, _label, _error, _description, _describedBy]
+    const { as, label: _label, error: _error, description: _description, describedBy: _describedBy, onPanel: _onPanel, className, ...rest } = props
+    void [as, _label, _error, _description, _describedBy, _onPanel]
     wrapperClassName = className
     control = (
       <input
@@ -70,7 +72,7 @@ export function FloatingField(props: FloatingFieldProps) {
 
   return (
     <div className={cn('min-w-0', wrapperClassName)}>
-      <div className="relative rounded-control bg-raised">
+      <div className={cn('relative rounded-control', onPanel ? 'bg-card' : 'bg-raised')}>
         {control}
         {isSelect && (
           <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-fg-secondary" />

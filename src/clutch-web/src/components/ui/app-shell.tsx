@@ -45,7 +45,7 @@ export function AppShell({ title, header, nav, navExpanded, children }: AppShell
       </h1>
       <div className="z-20 col-start-2 row-start-1 min-w-0 bg-canvas">{header}</div>
       <div className="col-start-1 row-start-2 min-h-0">{nav}</div>
-      <div className="col-start-2 row-start-2 flex min-h-0 min-w-0">{children}</div>
+      <div className="col-start-2 row-start-2 flex min-h-0 min-w-0 flex-col">{children}</div>
     </div>
   )
 }
