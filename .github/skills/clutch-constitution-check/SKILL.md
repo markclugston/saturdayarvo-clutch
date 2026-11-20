@@ -1,6 +1,6 @@
 ---
 name: "clutch-constitution-check"
-description: "Procedure for applying the Clutch constitution: identifying applicable requirement IDs, writing the plan's Constitution Check section, choosing which clutch-* skills to load, and running the delivery gates and completion review. Use whenever a plan needs a Constitution Check, when tasks or implementation are checked against the constitution, and before declaring work complete."
+description: "How to apply the Clutch constitution: Constitution Check, gate tasks, completion review. Use when planning, checking compliance, or before declaring work complete."
 metadata:
   author: "saturdayarvo-clutch"
   governs: "Constitution governance, ENG-001 completion"

@@ -1,6 +1,6 @@
 ---
 name: "clutch-data-access"
-description: "Clutch data access and audit rules (DOT-002, AUD-001, OPS-001 migrations): EF Core usage, the independent query review procedure, provider-backed integration tests, append-only Audit table rules, and migration review with rollback/backfill planning. Use when planning, writing or reviewing anything that touches the database, EF Core, migrations or audit records."
+description: "Clutch EF Core, audit, query review and migration review rules (DOT-002, AUD-001). Use for any database, migration or audit-record work."
 metadata:
   author: "saturdayarvo-clutch"
   governs: "DOT-002, AUD-001, OPS-001 (migrations)"

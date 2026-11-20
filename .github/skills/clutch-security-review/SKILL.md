@@ -1,6 +1,6 @@
 ---
 name: "clutch-security-review"
-description: "Clutch security rules and the independent security review procedure (SEC-001, SEC-002, SEC-003): OWASP Top 10 review of changed code, authentication/authorization, input validation, cookies/transport/headers/CSRF, secrets handling, sensitive and payment data, logging redaction, ProblemDetails errors, dependency vulnerabilities and third-party UI code. Use when planning or implementing security-relevant changes and for every completion review."
+description: "Clutch security rules and independent OWASP review (SEC-001..003). Use for auth, input, secrets or sensitive-data changes, and every completion review."
 metadata:
   author: "saturdayarvo-clutch"
   governs: "SEC-001, SEC-002, SEC-003"

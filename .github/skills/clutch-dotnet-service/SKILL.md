@@ -1,6 +1,6 @@
 ---
 name: "clutch-dotnet-service"
-description: "Clutch .NET service rules (DOT-001, OPS-001, ENG-001 for .NET): project settings, async/cancellation/timeouts/retries, disposal, ProblemDetails and Result-pattern errors, structured logging, health checks, OpenTelemetry, and .NET testing with xUnit, NSubstitute and WebApplicationFactory. Use when planning, writing, testing or reviewing C# services or projects."
+description: "Clutch .NET service rules, operations, tests and quality gates (DOT-001, OPS-001, ENG-001). Use when planning, writing, testing or reviewing C# code."
 metadata:
   author: "saturdayarvo-clutch"
   governs: "DOT-001, OPS-001, ENG-001 (.NET)"

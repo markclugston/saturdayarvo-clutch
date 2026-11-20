@@ -1,6 +1,6 @@
 ---
 name: "clutch-frontend"
-description: "Clutch frontend engineering rules (WEB-001): React function components and hooks, strict TypeScript, runtime validation at trust boundaries, ProblemDetails handling, Tailwind/shadcn usage, frontend testing and the clutch-web CI quality gates. Use when planning, writing, testing or reviewing code in src/clutch-web."
+description: "Clutch React/TypeScript rules, frontend tests and quality gates (WEB-001). Use when planning, writing, testing or reviewing clutch-web code."
 metadata:
   author: "saturdayarvo-clutch"
   governs: "WEB-001, ENG-001 (frontend)"

@@ -1,6 +1,6 @@
 ---
 name: "clutch-ui-style"
-description: "Clutch UI design system (WEB-001): layout surfaces, navigation, floating-label forms, components, colour/radius tokens, Light and Soft Dark themes, typography, motion, accessibility, Tailwind v4 token setup and the UI compliance checklist. Use for any UI planning, implementation or review in clutch-web, and when a Constitution Check needs the UI compliance checklist."
+description: "Clutch UI style guide and compliance checklist (WEB-001): layout, forms, tokens, themes, accessibility. Use for any UI planning, implementation or review."
 metadata:
   author: "saturdayarvo-clutch"
   governs: "WEB-001"
