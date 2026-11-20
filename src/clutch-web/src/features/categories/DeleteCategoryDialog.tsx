@@ -1,5 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { TriangleAlert } from 'lucide-react'
 import { useEffect, useRef } from 'react'
+import { Button } from '@/components/ui/button'
+import { ErrorMessage } from '@/components/ui/error-message'
 import { ApiError } from '@/lib/api/client'
 import type { CategoryNode } from '@/lib/api/schemas'
 import { categoryNodesQueryKey, deleteCategoryNode, getDeletionImpact } from './api'
@@ -44,7 +47,7 @@ export function DeleteCategoryDialog({ node, onClose }: DeleteCategoryDialogProp
   return (
     <div
       aria-labelledby={`delete-${node.id}-title`}
-      className="mt-2 space-y-3 break-words rounded-lg border border-destructive bg-card p-4"
+      className="mt-2 space-y-3 break-words rounded-card bg-raised p-4"
       onKeyDown={(event) => {
         if (event.key === 'Escape' && !deleteMutation.isPending) {
           onClose()
@@ -55,38 +58,43 @@ export function DeleteCategoryDialog({ node, onClose }: DeleteCategoryDialogProp
       <h3 className="font-semibold" id={`delete-${node.id}-title`}>
         Delete {kind} “{node.name}”?
       </h3>
-      {impactQuery.isPending && <p role="status">Checking what will be deleted…</p>}
+      {impactQuery.isPending && (
+        <p className="text-fg-secondary" role="status">Checking what will be deleted…</p>
+      )}
       {impactQuery.isError && (
-        <p role="alert">{getMessage(impactQuery.error)}</p>
+        <ErrorMessage>{getMessage(impactQuery.error)}</ErrorMessage>
       )}
       {itemCount !== undefined && (
-        <p>
-          This will permanently delete {node.name}
-          {descendants > 0
-            ? ` and ${descendants} ${descendants === 1 ? 'category' : 'categories'} inside it`
-            : ''}
-          . This cannot be undone. Do you want to continue?
+        <p className="flex items-start gap-2">
+          <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning" />
+          <span>
+            This will permanently delete {node.name}
+            {descendants > 0
+              ? ` and ${descendants} ${descendants === 1 ? 'category' : 'categories'} inside it`
+              : ''}
+            . This cannot be undone. Do you want to continue?
+          </span>
         </p>
       )}
-      {deleteMutation.isError && <p role="alert">{getMessage(deleteMutation.error)}</p>}
+      {deleteMutation.isError && <ErrorMessage>{getMessage(deleteMutation.error)}</ErrorMessage>}
       <div className="flex flex-wrap gap-2">
-        <button
-          className="cursor-pointer rounded-md bg-destructive px-3 py-2 text-sm text-destructive-foreground disabled:cursor-not-allowed disabled:opacity-50"
+        <Button
           disabled={itemCount === undefined || deleteMutation.isPending}
           onClick={() => deleteMutation.mutate()}
           type="button"
+          variant="danger"
         >
           {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
-        </button>
-        <button
-          className="cursor-pointer rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
+        </Button>
+        <Button
           disabled={deleteMutation.isPending}
           onClick={onClose}
           ref={cancelRef}
           type="button"
+          variant="secondary"
         >
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   )

@@ -1,0 +1,38 @@
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { Wallet } from 'lucide-react'
+import { expect, it } from 'vitest'
+import { SideNav, SideNavItem } from './side-nav'
+
+function renderNav(expanded: boolean) {
+  return render(
+    <SideNav expanded={expanded}>
+      <SideNavItem current expanded={expanded} icon={Wallet} label="Accounts" onClick={() => {}} />
+    </SideNav>,
+  )
+}
+
+it('marks the current item and keeps its name and pointer cursor', () => {
+  renderNav(true)
+  const item = screen.getByRole('button', { name: 'Accounts' })
+  expect(item).toHaveAttribute('aria-current', 'page')
+  expect(item.className).toContain('cursor-pointer')
+  expect(screen.getByRole('navigation', { name: 'Primary' })).toBeInTheDocument()
+})
+
+it('shows the label and no tooltip when expanded', async () => {
+  const user = userEvent.setup()
+  renderNav(true)
+  await user.hover(screen.getByRole('button', { name: 'Accounts' }))
+  expect(screen.getByText('Accounts')).toBeVisible()
+  expect(document.querySelector('[data-slot="tooltip-popup"]')).toBeNull()
+})
+
+it('shows a tooltip with the label when collapsed and focused', async () => {
+  const user = userEvent.setup()
+  renderNav(false)
+  await user.tab()
+  expect(screen.getByRole('button', { name: 'Accounts' })).toHaveFocus()
+  const popup = await screen.findByText('Accounts', { selector: '[data-slot="tooltip-popup"]' })
+  expect(popup).toBeInTheDocument()
+})

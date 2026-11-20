@@ -1,4 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
+import { Button } from '@/components/ui/button'
+import { CardTitle } from '@/components/ui/card'
+import { FloatingField } from '@/components/ui/floating-field'
 import type { CurrencyAmountFormat } from '@/lib/api/schemas'
 import type { ImportMapping } from './api'
 
@@ -120,68 +123,52 @@ export function ImportMappingForm({
   }
 
   return (
-    <form id="import-mapping" className="space-y-5 rounded-lg border border-border bg-card p-5" onSubmit={submit}>
-      <h2 className="text-lg font-semibold">Map CSV columns</h2>
+    <form id="import-mapping" className="space-y-5" onSubmit={submit}>
+      <CardTitle as="h2">Map CSV columns</CardTitle>
       {!headers && (
         <p>Choose a CSV file to see its column names and review the import.</p>
       )}
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <label htmlFor="import-date-column">Transaction date column</label>
-          <select
-            id="import-date-column"
-            className="w-full rounded-md border border-input bg-background px-3 py-2"
-            required
-            value={dateColumn}
-            onChange={(event) => setDateColumn(event.currentTarget.value)}
-          >
-            <option value="">Select a column</option>
-            {renderColumnOptions()}
-          </select>
-        </div>
-        <div className="space-y-2">
-          <label htmlFor="import-description-column">Description column</label>
-          <select
-            id="import-description-column"
-            className="w-full rounded-md border border-input bg-background px-3 py-2"
-            required
-            value={descriptionColumn}
-            onChange={(event) => setDescriptionColumn(event.currentTarget.value)}
-          >
-            <option value="">Select a column</option>
-            {renderColumnOptions()}
-          </select>
-        </div>
-        <div className="space-y-2">
-          <label htmlFor="import-date-format">Date format</label>
-          <select
-            id="import-date-format"
-            className="w-full rounded-md border border-input bg-background px-3 py-2"
-            required
-            value={dateFormat}
-            onChange={(event) => setDateFormat(event.currentTarget.value)}
-          >
-            <option value="">Confirm the date format</option>
-            {dateFormats.map((format) => (
-              <option key={format.value} value={format.value}>{format.label}</option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-2">
-          <label htmlFor="import-amount-mode">Amount mapping</label>
-          <select
-            id="import-amount-mode"
-            className="w-full rounded-md border border-input bg-background px-3 py-2"
-            value={amountMode}
-            onChange={(event) =>
-              setAmountMode(event.currentTarget.value as ImportMapping['amountMode'])
-            }
-          >
-            <option value="Signed">One signed amount</option>
-            <option value="SeparateIncomingOutgoing">Separate incoming and outgoing amounts</option>
-            <option value="AmountWithDirection">Amount and direction columns</option>
-          </select>
-        </div>
+        <ColumnSelect
+          id="import-date-column"
+          label="Transaction date column"
+          value={dateColumn}
+          onChange={setDateColumn}
+          renderOptions={renderColumnOptions}
+        />
+        <ColumnSelect
+          id="import-description-column"
+          label="Description column"
+          value={descriptionColumn}
+          onChange={setDescriptionColumn}
+          renderOptions={renderColumnOptions}
+        />
+        <FloatingField
+          as="select"
+          id="import-date-format"
+          label="Date format"
+          required
+          value={dateFormat}
+          onChange={(event) => setDateFormat(event.currentTarget.value)}
+        >
+          <option value="">Confirm the date format</option>
+          {dateFormats.map((format) => (
+            <option key={format.value} value={format.value}>{format.label}</option>
+          ))}
+        </FloatingField>
+        <FloatingField
+          as="select"
+          id="import-amount-mode"
+          label="Amount mapping"
+          value={amountMode}
+          onChange={(event) =>
+            setAmountMode(event.currentTarget.value as ImportMapping['amountMode'])
+          }
+        >
+          <option value="Signed">One signed amount</option>
+          <option value="SeparateIncomingOutgoing">Separate incoming and outgoing amounts</option>
+          <option value="AmountWithDirection">Amount and direction columns</option>
+        </FloatingField>
       </div>
 
       {amountMode === 'Signed' && (
@@ -193,23 +180,21 @@ export function ImportMappingForm({
             onChange={setSignedAmountColumn}
             renderOptions={renderColumnOptions}
           />
-          <div className="space-y-2">
-            <label htmlFor="incoming-sign">Incoming transactions use</label>
-            <select
-              id="incoming-sign"
-              className="w-full rounded-md border border-input bg-background px-3 py-2"
-              required
-              value={incomingSign}
-              onChange={(event) =>
-                setIncomingSign(event.currentTarget.value as '' | 'Positive' | 'Negative')
-              }
-            >
-              <option value="">Confirm the incoming sign</option>
-              <option value="Positive">Positive amounts</option>
-              <option value="Negative">Negative amounts</option>
-            </select>
-          </div>
-          <p className="text-sm text-muted-foreground sm:col-span-2">
+          <FloatingField
+            as="select"
+            id="incoming-sign"
+            label="Incoming transactions use"
+            required
+            value={incomingSign}
+            onChange={(event) =>
+              setIncomingSign(event.currentTarget.value as '' | 'Positive' | 'Negative')
+            }
+          >
+            <option value="">Confirm the incoming sign</option>
+            <option value="Positive">Positive amounts</option>
+            <option value="Negative">Negative amounts</option>
+          </FloatingField>
+          <p className="text-sm text-fg-secondary sm:col-span-2">
             Zero amounts are treated as outgoing.
           </p>
         </div>
@@ -233,7 +218,7 @@ export function ImportMappingForm({
               renderOptions={renderColumnOptions}
             />
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-fg-secondary">
             The column determines direction; plus or minus signs are ignored. Each row must
             have at most one non-zero amount. Zero in a single populated column uses that
             column's direction; zero in both columns is outgoing.
@@ -257,75 +242,63 @@ export function ImportMappingForm({
             onChange={setDirectionColumn}
             renderOptions={renderColumnOptions}
           />
-          <div className="space-y-2">
-            <label htmlFor="incoming-direction-value">Incoming direction value</label>
-            <input
-              id="incoming-direction-value"
-              className="w-full rounded-md border border-input bg-background px-3 py-2"
-              maxLength={100}
-              required
-              value={incomingDirectionValue}
-              onChange={(event) => setIncomingDirectionValue(event.currentTarget.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <label htmlFor="outgoing-direction-value">Outgoing direction value</label>
-            <input
-              id="outgoing-direction-value"
-              className="w-full rounded-md border border-input bg-background px-3 py-2"
-              maxLength={100}
-              required
-              value={outgoingDirectionValue}
-              onChange={(event) => setOutgoingDirectionValue(event.currentTarget.value)}
-            />
-          </div>
+          <FloatingField
+            id="incoming-direction-value"
+            label="Incoming direction value"
+            maxLength={100}
+            required
+            value={incomingDirectionValue}
+            onChange={(event) => setIncomingDirectionValue(event.currentTarget.value)}
+          />
+          <FloatingField
+            id="outgoing-direction-value"
+            label="Outgoing direction value"
+            maxLength={100}
+            required
+            value={outgoingDirectionValue}
+            onChange={(event) => setOutgoingDirectionValue(event.currentTarget.value)}
+          />
         </div>
       )}
 
-      <div className="space-y-2">
-        <label htmlFor="import-balance-column">Balance column (optional)</label>
-        <select
-          id="import-balance-column"
-          className="w-full rounded-md border border-input bg-background px-3 py-2"
-          value={balanceColumn}
-          onChange={(event) => setBalanceColumn(event.currentTarget.value)}
-        >
-          <option value="">None</option>
-          {renderColumnOptions()}
-        </select>
-        <p className="text-sm text-muted-foreground">
-          The balance is read from the file as supplied and is not calculated.
-        </p>
-      </div>
-
-      <div className="space-y-2">
-        <label htmlFor="number-format">Number format used in this file</label>
-        <select
-          id="number-format"
-          className="w-full rounded-md border border-input bg-background px-3 py-2"
-          required
-          value={numberFormat}
-          onChange={(event) => setNumberFormat(event.currentTarget.value)}
-        >
-          <option value="">Select the file's number format</option>
-          {amountFormats.map((format) => (
-            <option key={format.id} value={format.id}>
-              Decimal “{format.decimalSeparator}”, thousands “{format.groupSeparator}”
-            </option>
-          ))}
-        </select>
-        <p className="text-sm text-muted-foreground">
-          Format registry: {amountFormats[0]?.reference} {amountFormats[0]?.version}.
-        </p>
-      </div>
-
-      <button
-        className="rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
-        disabled={disabled || !headers}
-        type="submit"
+      <FloatingField
+        as="select"
+        description={{
+          id: 'import-balance-column-help',
+          text: 'The balance is read from the file as supplied and is not calculated.',
+        }}
+        id="import-balance-column"
+        label="Balance column (optional)"
+        value={balanceColumn}
+        onChange={(event) => setBalanceColumn(event.currentTarget.value)}
       >
+        <option value="">None</option>
+        {renderColumnOptions()}
+      </FloatingField>
+
+      <FloatingField
+        as="select"
+        description={{
+          id: 'number-format-help',
+          text: `Format registry: ${amountFormats[0]?.reference} ${amountFormats[0]?.version}.`,
+        }}
+        id="number-format"
+        label="Number format used in this file"
+        required
+        value={numberFormat}
+        onChange={(event) => setNumberFormat(event.currentTarget.value)}
+      >
+        <option value="">Select the file's number format</option>
+        {amountFormats.map((format) => (
+          <option key={format.id} value={format.id}>
+            Decimal “{format.decimalSeparator}”, thousands “{format.groupSeparator}”
+          </option>
+        ))}
+      </FloatingField>
+
+      <Button disabled={disabled || !headers} type="submit">
         {disabled ? 'Creating review…' : 'Review import'}
-      </button>
+      </Button>
     </form>
   )
 }
@@ -346,18 +319,16 @@ function ColumnSelect({
   renderOptions,
 }: ColumnSelectProps) {
   return (
-    <div className="space-y-2">
-      <label htmlFor={id}>{label}</label>
-      <select
-        id={id}
-        className="w-full rounded-md border border-input bg-background px-3 py-2"
-        required
-        value={value}
-        onChange={(event) => onChange(event.currentTarget.value)}
-      >
-        <option value="">Select a column</option>
-        {renderOptions()}
-      </select>
-    </div>
+    <FloatingField
+      as="select"
+      id={id}
+      label={label}
+      required
+      value={value}
+      onChange={(event) => onChange(event.currentTarget.value)}
+    >
+      <option value="">Select a column</option>
+      {renderOptions()}
+    </FloatingField>
   )
 }

@@ -1,5 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card, CardTitle } from '@/components/ui/card'
+import { ErrorMessage } from '@/components/ui/error-message'
+import { FloatingField } from '@/components/ui/floating-field'
 import { PageHeading } from '@/components/ui/page-heading'
 import { ApiError } from '@/lib/api/client'
 import type { CategoryNode } from '@/lib/api/schemas'
@@ -61,11 +65,11 @@ export function CategoriesPage() {
   }
 
   if (nodesQuery.isPending) {
-    return <p role="status">Loading categories…</p>
+    return <p className="text-fg-secondary" role="status">Loading categories…</p>
   }
 
   if (nodesQuery.isError) {
-    return <p role="alert">{getErrorMessage(nodesQuery.error)}</p>
+    return <ErrorMessage>{getErrorMessage(nodesQuery.error)}</ErrorMessage>
   }
 
   const nodes = nodesQuery.data
@@ -73,24 +77,27 @@ export function CategoriesPage() {
   const selectedParentId = nodes.some((node) => node.id === parentId) ? parentId : ''
 
   return (
-    <section aria-labelledby="categories-heading" className="space-y-8">
+    <section aria-labelledby="categories-heading" className="space-y-4">
       <div>
-        <PageHeading id="categories-heading" className="text-2xl font-semibold">
+        <PageHeading id="categories-heading">
           Categories and groups
         </PageHeading>
-        <p className="mt-2 text-muted-foreground">
+        <p className="mt-2 text-fg-secondary">
           Groups organise your categories. Categories can also sit inside other categories.
         </p>
       </div>
 
       {nodes.length === 0 ? (
-        <p className="text-muted-foreground">
-          You have no groups or categories yet. Create your first group below.
-        </p>
+        <Card>
+          <p className="text-fg-secondary">
+            You have no groups or categories yet. Create your first group below.
+          </p>
+        </Card>
       ) : (
+        <Card>
         <ul
           aria-label="Groups and categories"
-          className="space-y-1 overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          className="space-y-1 overflow-x-auto focus-visible:focus-ring"
           tabIndex={0}
         >
           {nodes.map((node) => {
@@ -117,31 +124,32 @@ export function CategoriesPage() {
                       id={`rename-${node.id}`}
                       autoComplete="off"
                       autoFocus
-                      className="max-w-full min-w-0 rounded-md border border-input bg-background px-3 py-1"
+                      className="max-w-full min-w-0 rounded-control bg-raised px-3 py-1 text-fg focus-visible:focus-ring"
                       maxLength={maxNameLength}
                       required
                       value={renameValue}
                       onChange={(event) => setRenameValue(event.currentTarget.value)}
                     />
-                    <button
-                      className="cursor-pointer rounded-md bg-primary px-3 py-1 text-sm text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                    <Button
                       disabled={renameMutation.isPending}
+                      size="sm"
                       type="submit"
                     >
                       Save
-                    </button>
-                    <button
-                      className="cursor-pointer rounded-md border border-border px-3 py-1 text-sm hover:bg-muted"
+                    </Button>
+                    <Button
                       onClick={() => {
                         lastRenamedId.current = node.id
                         setRenamingId(null)
                       }}
+                      size="sm"
                       type="button"
+                      variant="secondary"
                     >
                       Cancel
-                    </button>
+                    </Button>
                     {renameMutation.isError && (
-                      <p role="alert">{getErrorMessage(renameMutation.error)}</p>
+                      <ErrorMessage>{getErrorMessage(renameMutation.error)}</ErrorMessage>
                     )}
                   </form>
                 ) : (
@@ -149,9 +157,8 @@ export function CategoriesPage() {
                     <span className={isGroup ? 'min-w-0 break-words text-xl font-semibold' : 'min-w-0 break-words text-base'}>
                       {node.name}
                     </span>
-                    <button
+                    <Button
                       aria-label={`Rename ${node.name}`}
-                      className="cursor-pointer rounded-md border border-border px-2 py-1 text-xs hover:bg-muted"
                       onClick={() => {
                         renameMutation.reset()
                         setRenamingId(node.id)
@@ -164,18 +171,21 @@ export function CategoriesPage() {
                           renameButtons.current.delete(node.id)
                         }
                       }}
+                      size="sm"
                       type="button"
+                      variant="secondary"
                     >
                       Rename
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       aria-label={`Delete ${node.name}`}
-                      className="cursor-pointer rounded-md border border-border px-2 py-1 text-xs hover:bg-muted"
                       onClick={() => setDeletingId(node.id)}
+                      size="sm"
                       type="button"
+                      variant="secondary"
                     >
                       Delete
-                    </button>
+                    </Button>
                   </div>
                 )}
                 {deletingId === node.id && (
@@ -185,47 +195,39 @@ export function CategoriesPage() {
             )
           })}
         </ul>
+        </Card>
       )}
 
-      <form className="max-w-xl space-y-4 rounded-lg border border-border bg-card p-5" onSubmit={submit}>
-        <h2 className="text-lg font-semibold">Add a group or category</h2>
-        <div className="space-y-2">
-          <label htmlFor="category-name" className="block text-sm font-medium">Name</label>
-          <input
-            id="category-name"
-            autoComplete="off"
-            className="w-full rounded-md border border-input bg-background px-3 py-2"
-            maxLength={maxNameLength}
-            required
-            value={name}
-            onChange={(event) => setName(event.currentTarget.value)}
-          />
-        </div>
-        <div className="space-y-2">
-          <label htmlFor="category-parent" className="block text-sm font-medium">Parent</label>
-          <select
-            id="category-parent"
-            className="w-full rounded-md border border-input bg-background px-3 py-2"
-            value={selectedParentId}
-            onChange={(event) => setParentId(event.currentTarget.value)}
-          >
-            <option value="">None (create a group)</option>
-            {nodes.map((node) => (
-              <option key={node.id} value={node.id}>
-                {'\u00A0\u00A0'.repeat(node.depth)}{node.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button
-          className="cursor-pointer rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={createMutation.isPending}
-          type="submit"
+      <Card as="form" className="max-w-xl space-y-4" onSubmit={submit}>
+        <CardTitle as="h2">Add a group or category</CardTitle>
+        <FloatingField
+          autoComplete="off"
+          id="category-name"
+          label="Name"
+          maxLength={maxNameLength}
+          onChange={(event) => setName(event.currentTarget.value)}
+          required
+          value={name}
+        />
+        <FloatingField
+          as="select"
+          id="category-parent"
+          label="Parent"
+          onChange={(event) => setParentId(event.currentTarget.value)}
+          value={selectedParentId}
         >
+          <option value="">None (create a group)</option>
+          {nodes.map((node) => (
+            <option key={node.id} value={node.id}>
+              {'\u00A0\u00A0'.repeat(node.depth)}{node.name}
+            </option>
+          ))}
+        </FloatingField>
+        <Button disabled={createMutation.isPending} type="submit">
           {createMutation.isPending ? 'Saving…' : 'Add'}
-        </button>
-        {createMutation.isError && <p role="alert">{getErrorMessage(createMutation.error)}</p>}
-      </form>
+        </Button>
+        {createMutation.isError && <ErrorMessage>{getErrorMessage(createMutation.error)}</ErrorMessage>}
+      </Card>
     </section>
   )
 }

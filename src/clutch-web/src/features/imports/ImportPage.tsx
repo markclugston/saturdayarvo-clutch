@@ -1,5 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { ErrorMessage } from '@/components/ui/error-message'
 import { PageHeading } from '@/components/ui/page-heading'
 import { getAccount, getCurrencies } from '@/features/accounts/api'
 import { ApiError } from '@/lib/api/client'
@@ -179,30 +182,32 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
   if (watched?.state === 'Expired' || watched?.state === 'Unavailable') {
     return (
       <section className="space-y-4" aria-labelledby="import-heading">
-        <PageHeading id="import-heading" className="text-2xl font-semibold">Import transactions</PageHeading>
-        <p role="status">{watched.state === 'Expired'
-          ? 'This import preview has expired.' : 'This import preview is no longer available.'}</p>
-        {confirmMutation.isError && <p role="alert">{getErrorMessage(confirmMutation.error)}</p>}
-        {cancelMutation.isError && <p role="alert">{getErrorMessage(cancelMutation.error)}</p>}
-        {returnMutation.isError && <p role="alert">{getErrorMessage(returnMutation.error)}</p>}
-        <button type="button" className="rounded-md border border-border px-4 py-2"
-          disabled={returnMutation.isPending} onClick={() => returnMutation.mutate()}>
-          {returnMutation.isPending ? 'Returning to transactions…' : 'Return to transactions'}
-        </button>
+        <PageHeading id="import-heading">Import transactions</PageHeading>
+        <Card className="space-y-4">
+          <p className="text-fg-secondary" role="status">{watched.state === 'Expired'
+            ? 'This import preview has expired.' : 'This import preview is no longer available.'}</p>
+          {confirmMutation.isError && <ErrorMessage>{getErrorMessage(confirmMutation.error)}</ErrorMessage>}
+          {cancelMutation.isError && <ErrorMessage>{getErrorMessage(cancelMutation.error)}</ErrorMessage>}
+          {returnMutation.isError && <ErrorMessage>{getErrorMessage(returnMutation.error)}</ErrorMessage>}
+          <Button type="button" variant="secondary"
+            disabled={returnMutation.isPending} onClick={() => returnMutation.mutate()}>
+            {returnMutation.isPending ? 'Returning to transactions…' : 'Return to transactions'}
+          </Button>
+        </Card>
       </section>
     )
   }
 
   if (accountQuery.isPending || currenciesQuery.isPending || importSettingsQuery.isPending) {
-    return <p role="status">Loading import details…</p>
+    return <p className="text-fg-secondary" role="status">Loading import details…</p>
   }
 
   if (accountQuery.isError) {
-    return <p role="alert">{getErrorMessage(accountQuery.error)}</p>
+    return <ErrorMessage>{getErrorMessage(accountQuery.error)}</ErrorMessage>
   }
 
   if (currenciesQuery.isError) {
-    return <p role="alert">{getErrorMessage(currenciesQuery.error)}</p>
+    return <ErrorMessage>{getErrorMessage(currenciesQuery.error)}</ErrorMessage>
   }
 
   const account = accountQuery.data
@@ -214,7 +219,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
     (supportedCurrency) => supportedCurrency.code === account.currencyCode,
   )
   if (!currency) {
-    return <p role="alert">This account has a currency that is not supported.</p>
+    return <ErrorMessage>This account has a currency that is not supported.</ErrorMessage>
   }
 
   function handleFileChange(selectedFile: File | undefined) {
@@ -249,152 +254,154 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
   }
 
   return (
-    <section aria-labelledby="import-heading" className="space-y-6">
-      <button
-        className="rounded-md border border-border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50"
+    <section aria-labelledby="import-heading" className="space-y-4">
+      <Button
         disabled={busy || (review !== null && !canReview)}
         onClick={() => review ? cancelMutation.mutate() : onBack()}
         type="button"
+        variant="secondary"
       >
         {review ? 'Cancel import review' : 'Back to account'}
-      </button>
+      </Button>
       <div>
-        <PageHeading id="import-heading" className="text-2xl font-semibold">
+        <PageHeading id="import-heading">
           Import transactions
         </PageHeading>
-        <p className="mt-2 text-muted-foreground">
+        <p className="mt-2 text-fg-secondary">
           Destination: {account.description} — {currency.name} ({account.currencyCode})
         </p>
       </div>
 
       {importedCount === null && statusQuery.isError ? (
-        <div className="space-y-2" role="alert">
+        <Card className="space-y-2 text-danger" role="alert">
           <p>Import availability could not be checked. {getErrorMessage(statusQuery.error)}</p>
-          <button className="rounded-md border border-border px-3 py-2" type="button"
+          <Button type="button" variant="secondary"
             onClick={() => {
               recoverMutation.reset()
               void statusQuery.refetch()
             }} disabled={statusQuery.isFetching}>
             {statusQuery.isFetching ? 'Checking import availability…' : 'Retry availability check'}
-          </button>
-        </div>
+          </Button>
+        </Card>
       ) : importedCount === null && !statusQuery.fresh && !busy ? (
-        <p role="status">Checking import availability…</p>
+        <p className="text-fg-secondary" role="status">Checking import availability…</p>
       ) : null}
       {!review && statusQuery.data?.availability === 'Blocked' && (
-        <div className="space-y-2">
-          <p role="status">
+        <Card className="space-y-2">
+          <p className="text-fg-secondary" role="status">
             {statusQuery.data.activeImport.stage === 'Processing'
               ? 'Another import is processing transactions for this account. Wait for it to finish.'
               : 'Another import is active for this account. A new import cannot start yet.'}
           </p>
           {(statusQuery.fresh || recoverMutation.isPending)
             && statusQuery.data.activeImport.canEnd && (
-            <button type="button" className="rounded-md border border-border px-4 py-2 disabled:opacity-50"
+            <Button type="button" variant="secondary"
               disabled={busy} onClick={() => {
                 if (statusQuery.fresh && statusQuery.data?.activeImport?.canEnd) {
                   recoverMutation.mutate(statusQuery.data.activeImport.id)
                 }
               }}>
               {recoverMutation.isPending ? 'Ending other import…' : 'End other import'}
-            </button>
+            </Button>
           )}
-        </div>
+        </Card>
       )}
       {review && watched?.state === 'Processing' && (
-        <p role="status">This import is processing transactions. Wait for it to finish.</p>
+        <p className="text-fg-secondary" role="status">This import is processing transactions. Wait for it to finish.</p>
       )}
       {recoverMutation.isError && (
-        <div role="alert" className="space-y-2">
+        <Card role="alert" className="space-y-2 text-danger">
           <p>{getErrorMessage(recoverMutation.error)}</p>
-          {!statusQuery.isError && <button type="button" className="rounded-md border border-border px-3 py-2"
+          {!statusQuery.isError && <Button type="button" variant="secondary"
             disabled={statusQuery.isFetching} onClick={() => {
               recoverMutation.reset()
               void statusQuery.refetch()
-            }}>{statusQuery.isFetching ? 'Checking import availability…' : 'Retry availability check'}</button>}
-        </div>
+            }}>{statusQuery.isFetching ? 'Checking import availability…' : 'Retry availability check'}</Button>}
+        </Card>
       )}
       {importedCount !== null ? (
-        <div className="space-y-4">
-          <p role="status">{importedCount} transactions imported successfully.</p>
+        <Card className="space-y-4">
+          <p className="text-fg-secondary" role="status">{importedCount} transactions imported successfully.</p>
           {settingsSaved === false && (
-            <p role="alert">
+            <ErrorMessage>
               The transactions were imported, but the default import settings were not saved.
               Your previous settings remain unchanged.
-            </p>
+            </ErrorMessage>
           )}
-          <button
-            className="rounded-md border border-border px-4 py-2"
+          <Button
             onClick={onBack}
             type="button"
+            variant="secondary"
           >
             Return to account
-          </button>
-        </div>
+          </Button>
+        </Card>
       ) : review ? (
         <>
           <ImportReviewTable review={review} currencyCode={account.currencyCode} />
-          {review.duplicateConfirmationRequired && (
-            <label className="flex items-start gap-2">
-              <input
-                checked={confirmDuplicates}
+          <Card className="space-y-4">
+            {review.duplicateConfirmationRequired && (
+              <label className="flex items-start gap-2">
+                <input
+                  checked={confirmDuplicates}
+                  className="mt-1 accent-primary focus-visible:focus-ring"
+                  disabled={!canReview}
+                  onChange={(event) => setConfirmDuplicates(event.currentTarget.checked)}
+                  type="checkbox"
+                />
+                <span>
+                  I reviewed the possible duplicates and want to import every valid row,
+                  including the flagged rows.
+                </span>
+              </label>
+            )}
+            {confirmMutation.isError && (
+              <ErrorMessage>{getErrorMessage(confirmMutation.error)}</ErrorMessage>
+            )}
+            {cancelMutation.isError && (
+              <ErrorMessage>{getErrorMessage(cancelMutation.error)}</ErrorMessage>
+            )}
+            <div className="flex flex-wrap gap-3">
+              <Button
+                disabled={
+                  !canReview
+                  || (review.duplicateConfirmationRequired && !confirmDuplicates)
+                }
+                onClick={() => confirmMutation.mutate(confirmDuplicates)}
+              >
+                {confirmMutation.isPending ? 'Importing…' : 'Confirm import'}
+              </Button>
+              <Button
                 disabled={!canReview}
-                onChange={(event) => setConfirmDuplicates(event.currentTarget.checked)}
-                type="checkbox"
-              />
-              <span>
-                I reviewed the possible duplicates and want to import every valid row,
-                including the flagged rows.
-              </span>
-            </label>
-          )}
-          {confirmMutation.isError && (
-            <p role="alert">{getErrorMessage(confirmMutation.error)}</p>
-          )}
-          {cancelMutation.isError && (
-            <p role="alert">{getErrorMessage(cancelMutation.error)}</p>
-          )}
-          <div className="flex flex-wrap gap-3">
-            <button
-              className="rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
-              disabled={
-                !canReview
-                || (review.duplicateConfirmationRequired && !confirmDuplicates)
-              }
-              onClick={() => confirmMutation.mutate(confirmDuplicates)}
-            >
-              {confirmMutation.isPending ? 'Importing…' : 'Confirm import'}
-            </button>
-            <button
-              className="rounded-md border border-border px-4 py-2 disabled:opacity-50"
-              disabled={!canReview}
-              onClick={() => cancelMutation.mutate()}
-            >
-              {cancelMutation.isPending ? 'Cancelling…' : 'Cancel review'}
-            </button>
-          </div>
+                onClick={() => cancelMutation.mutate()}
+                variant="secondary"
+              >
+                {cancelMutation.isPending ? 'Cancelling…' : 'Cancel review'}
+              </Button>
+            </div>
+          </Card>
         </>
       ) : (
-        <>
+        <Card className="space-y-4">
           {importSettingsQuery.isError && (
-            <p role="alert">
+            <ErrorMessage>
               Saved import settings could not be retrieved. No defaults are active; enter
               settings for this import.
-            </p>
+            </ErrorMessage>
           )}
           {savedMapping && (
             <div className="space-y-2">
-              <p role="status">Using this account’s saved import settings.</p>
+              <p className="text-fg-secondary" role="status">Using this account’s saved import settings.</p>
               {(!headers || savedMappingCompatible) && (
-                <button
+                <Button
                   aria-controls={showSettings ? 'import-mapping' : undefined}
                   aria-expanded={showSettings}
-                  className="rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
                   onClick={() => setShowSettings((current) => !current)}
                   type="button"
+                  variant="secondary"
                 >
                   {showSettings ? 'Use saved settings' : 'View or change settings'}
-                </button>
+                </Button>
               )}
             </div>
           )}
@@ -402,14 +409,14 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
             <label className="block text-sm font-medium" htmlFor="csv-file">
               CSV file
             </label>
-            <button
-              className="rounded-md border border-border px-4 py-2 hover:bg-muted"
+            <Button
               disabled={!canStart}
               onClick={() => fileInput.current?.click()}
               type="button"
+              variant="secondary"
             >
               Choose CSV file
-            </button>
+            </Button>
             <input
               ref={fileInput}
               accept=".csv,text/csv"
@@ -422,27 +429,26 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
               type="file"
             />
             {file && <p aria-live="polite" className="text-sm">Selected file: {file.name}</p>}
-            <p className="text-sm text-muted-foreground" id="csv-file-description">
+            <p className="text-sm text-fg-secondary" id="csv-file-description">
               Only the header row is read in your browser. The server validates the entire file.
             </p>
           </div>
-          {readingHeaders && <p role="status">Reading CSV headers…</p>}
-          {fileError && <p role="alert">{fileError}</p>}
+          {readingHeaders && <p className="text-fg-secondary" role="status">Reading CSV headers…</p>}
+          {fileError && <ErrorMessage>{fileError}</ErrorMessage>}
           {savedMapping && headers && !savedMappingCompatible && (
-            <p role="alert">
+            <ErrorMessage>
               The saved settings do not match this file’s columns. Change the settings
               below before reviewing the import.
-            </p>
+            </ErrorMessage>
           )}
           {savedMappingError && (
-            <p role="alert">
+            <ErrorMessage>
               The saved settings could not be applied to this file. Review or change the
               settings before trying again.
-            </p>
+            </ErrorMessage>
           )}
           {savedMapping && headers && savedMappingCompatible && !showSettings && (
-            <button
-              className="rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
+            <Button
               disabled={!canStart}
               onClick={() => {
                 if (!canStart) return
@@ -453,7 +459,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
               type="button"
             >
               {createReviewMutation.isPending ? 'Creating review…' : 'Review import with saved settings'}
-            </button>
+            </Button>
           )}
           {((headers && (!savedMapping || !savedMappingCompatible)) || (savedMapping && showSettings)) && (
               <ImportMappingForm
@@ -465,9 +471,9 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
               />
           )}
           {createReviewMutation.isError && (
-            <p role="alert">{getErrorMessage(createReviewMutation.error)}</p>
+            <ErrorMessage>{getErrorMessage(createReviewMutation.error)}</ErrorMessage>
           )}
-        </>
+        </Card>
       )}
     </section>
   )

@@ -1,5 +1,8 @@
 import { Trash2 } from 'lucide-react'
 import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card, CardTitle } from '@/components/ui/card'
+import { ErrorMessage } from '@/components/ui/error-message'
 import { ApiError } from '@/lib/api/client'
 import { formatCurrencyAmount } from '@/lib/formatCurrencyAmount'
 import { DeleteTransactionDialog } from './DeleteTransactionDialog'
@@ -18,27 +21,27 @@ export function TransactionsTable({
   const [pendingDelete, setPendingDelete] = useState<{ id: string; description: string } | null>(null)
 
   if (transactionsQuery.isPending) {
-    return <p role="status">Loading transactions…</p>
+    return <p className="text-fg-secondary" role="status">Loading transactions…</p>
   }
 
   if (transactionsQuery.isError && !transactionsQuery.isFetchNextPageError) {
-    return <p role="alert">{getErrorMessage(transactionsQuery.error)}</p>
+    return <ErrorMessage>{getErrorMessage(transactionsQuery.error)}</ErrorMessage>
   }
 
   const transactions = transactionsQuery.data.pages.flatMap((page) => page.items)
   const showBalance = transactions.some((transaction) => transaction.balance != null)
   if (transactions.length === 0) {
     return (
-      <section aria-labelledby="transactions-heading" className="space-y-3">
-        <h2 id="transactions-heading" className="text-lg font-semibold">Transactions</h2>
+      <Card aria-labelledby="transactions-heading" as="section" className="space-y-3">
+        <CardTitle as="h2" id="transactions-heading">Transactions</CardTitle>
         <p>No transactions have been imported to this account.</p>
-      </section>
+      </Card>
     )
   }
 
   return (
-    <section aria-labelledby="transactions-heading" className="space-y-3">
-      <h2 id="transactions-heading" className="text-lg font-semibold">Transactions</h2>
+    <Card aria-labelledby="transactions-heading" as="section" className="min-w-0 space-y-3">
+      <CardTitle as="h2" id="transactions-heading">Transactions</CardTitle>
       {pendingDelete && (
         <DeleteTransactionDialog
           accountId={accountId}
@@ -46,10 +49,10 @@ export function TransactionsTable({
           transaction={pendingDelete}
         />
       )}
-      <div className="overflow-x-auto rounded-lg border border-border">
+      <div className="overflow-x-auto rounded-control">
         <table className="w-full text-left text-sm">
           <caption className="sr-only">Transactions for this account</caption>
-          <thead className="bg-muted">
+          <thead className="bg-raised">
             <tr>
               <th className="px-3 py-2" scope="col">Date</th>
               <th className="px-3 py-2" scope="col">Description</th>
@@ -61,7 +64,7 @@ export function TransactionsTable({
           </thead>
           <tbody>
             {transactions.map((transaction) => (
-              <tr className="border-t border-border" key={transaction.id}>
+              <tr className="hairline-b" key={transaction.id}>
                 <td className="px-3 py-2">
                   {new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' })
                     .format(new Date(`${transaction.transactionDate}T00:00:00`))}
@@ -79,17 +82,18 @@ export function TransactionsTable({
                   </td>
                 )}
                 <td className="px-3 py-2 text-right">
-                  <button
+                  <Button
                     aria-label="Delete transaction"
-                    className="cursor-pointer rounded-md p-1 text-destructive hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
                     onClick={() => setPendingDelete({
                       id: transaction.id,
                       description: transaction.description,
                     })}
+                    size="icon"
                     type="button"
+                    variant="tertiary"
                   >
-                    <Trash2 aria-hidden="true" className="size-4" />
-                  </button>
+                    <Trash2 aria-hidden="true" className="size-4 text-danger" />
+                  </Button>
                 </td>
               </tr>
             ))}
@@ -97,19 +101,19 @@ export function TransactionsTable({
         </table>
       </div>
       {transactionsQuery.hasNextPage && (
-        <button
-          className="rounded-md border border-border px-4 py-2 disabled:opacity-50"
+        <Button
           disabled={transactionsQuery.isFetchingNextPage}
           onClick={() => void transactionsQuery.fetchNextPage()}
           type="button"
+          variant="secondary"
         >
           {transactionsQuery.isFetchingNextPage ? 'Loading…' : 'Load more'}
-        </button>
+        </Button>
       )}
       {transactionsQuery.isFetchNextPageError && (
-        <p role="alert">Unable to load more transactions. Please try again.</p>
+        <ErrorMessage>Unable to load more transactions. Please try again.</ErrorMessage>
       )}
-    </section>
+    </Card>
   )
 }
 

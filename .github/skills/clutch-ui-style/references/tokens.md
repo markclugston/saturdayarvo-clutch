@@ -13,22 +13,26 @@ Define as CSS custom properties holding **space-separated RGB channels** so Tail
 | `hover` | `#EBECEF` | Hover fill |
 | `selected` | `#E8EEFC` | Selected item tint |
 | `fg` | `#111318` | Primary text |
-| `fg-secondary` | `#6B7280` | Secondary text |
-| `fg-muted` | `#9CA3AF` | Muted text, resting labels |
-| `primary` | `#1F6BFF` | Brand and primary actions |
+| `fg-secondary` | `#5F6673` | Secondary text (AA on every surface; guide value `#6B7280` failed) |
+| `fg-muted` | `#9CA3AF` | Disabled text and decorative icons only (below AA, never readable text) |
+| `primary` | `#1A5FE6` | Brand and primary actions (guide value `#1F6BFF` failed as text) |
 | `primary-contrast` | `#FFFFFF` | Text on primary |
 | `primary-tint` | `#E8EEFC` | Light primary background |
-| `neutral-strong` | `#14161B` | Secondary buttons, dark chart series |
+| `neutral-strong` | `#14161B` | Secondary buttons, tooltips, dark chart series |
+| `neutral-strong-contrast` | `#FFFFFF` | Text on `neutral-strong` |
 | `accent-navy` | `#1B2433` | Chart contrast series |
+| `scrim` | `#111318` | Dialog backdrop (`bg-scrim/40`) |
+| `danger-solid` / `danger-solid-contrast` | `#C5221F` / `#FFFFFF` | Danger button |
+| `secondary-solid` / `secondary-solid-contrast` | `#14161B` / `#FFFFFF` | Secondary button |
 
 Status chips (background / text):
 
 | Status | Background | Text |
 |---|---|---|
-| Danger / Urgent | `#FDECEC` | `#D93025` |
-| Warning / Medium / On Review | `#FFF1E0` | `#D97706` |
-| Success / Complete | `#E6F6EC` | `#1E9E5A` |
-| Info / Low | `#E6F0FF` | `#2563EB` |
+| Danger / Urgent | `#FDECEC` | `#C5221F` |
+| Warning / Medium / On Review | `#FFF1E0` | `#9A5B00` |
+| Success / Complete | `#E6F6EC` | `#167A45` |
+| Info / Low | `#E6F0FF` | `#1D4ED8` |
 | Neutral / Tag | `#EDEEF1` | `#4B5563` |
 
 ## 6.2 Soft Dark theme
@@ -48,11 +52,25 @@ Dark but not black. Aim for VS Code Dark / Claude Desktop: charcoal, low glare, 
 | `hover` | `#3C3C41` | Hover fill |
 | `selected` | `#26354D` | Selected tint (primary-tinted) |
 | `fg` | `#D4D4D4` | Primary text |
-| `fg-secondary` | `#A0A0A6` | Secondary text |
+| `fg-secondary` | `#ABABB1` | Secondary text (AA on `hover`) |
 | `fg-muted` | `#75757B` | Muted text |
-| `primary` | `#4C8DFF` | Lifted for contrast |
-| `primary-contrast` | `#0B1220` or `#FFFFFF` | Whichever passes AA |
+| `primary` | `#7EAEFF` | Lifted so text on `hover` passes AA |
+| `primary-contrast` | `#0B1220` | Text on primary (white is 3.2:1) |
+| `primary-tint` | `#26354D` | Light primary background |
+| `neutral-strong` / `neutral-strong-contrast` | `#36363A` / `#D4D4D4` | Secondary buttons and tooltips |
+| `accent-navy` | `#8AB4FF` | Chart contrast series |
+| `scrim` | `#0E0E10` | Dialog backdrop |
+| `danger-solid` / `danger-solid-contrast` | `#493D3E` / `#F59C94` | Danger button |
+| `secondary-solid` / `secondary-solid-contrast` | `#36363A` / `#D4D4D4` | Secondary button |
 
-Status chips: translucent background (12-16% alpha of the status colour) with a lightened text variant of the same hue.
+Status chips: an opaque background equal to the status text colour at about 14% over `card`, so chips look the same on any surface and contrast is measurable, with a lightened text variant of the same hue.
+
+| Status | Background | Text |
+|---|---|---|
+| Danger | `#493D3E` | `#F59C94` |
+| Warning | `#4A4136` | `#FBBF5A` |
+| Success | `#36443F` | `#6FD39B` |
+| Info | `#3A404D` | `#8AB4FF` |
+| Neutral | `#424346` | `#C4C7CE` |
 
 A slight warm tint (Claude Desktop style) is an acceptable variation only if applied consistently to every neutral token.

@@ -48,7 +48,7 @@ This feature brings every clutch-web screen and dialog into line with the `clutc
 | SEC-001 | Yes (marginal) | The sign-in form markup is rebuilt with `FloatingField`. Validation, submission, auth flow and dependencies do not change. | Independent security review over the full diff (T058a) | Pass (task required) |
 | SEC-002 | No | No secrets. | — | N/A |
 | SEC-003 | No | No change to how financial data is handled or shown (presentation styling only). | — | N/A |
-| WEB-001 | Yes | TypeScript only. Tokens and primitives follow the guide. Contrast is fixed at token level (R4). The lint rule enforces the token rules. Every style-guide reference that this change contradicts is updated in the same change (T052–T054). No third-party UI code is added (Tooltip uses the existing Base UI). | Lint, unit and browser tests (axe, focus sweep, surface checks and screenshots), the UI compliance checklist below, synchronized style-guide update | Pass with justified deviations D1–D7 |
+| WEB-001 | Yes | TypeScript only. Tokens and primitives follow the guide. Contrast is fixed at token level (R4). The lint rule enforces the token rules. Every style-guide reference that this change contradicts is updated in the same change (T052–T054). No third-party UI code is added (Tooltip uses the existing Base UI). | Lint, unit and browser tests (axe, focus sweep, surface checks and screenshots), the UI compliance checklist below, synchronized style-guide update | Pass with justified deviations D1–D8 |
 | Perf & Observability | Yes (UI) | All feedback states stay as they are. No new user actions. Metrics are unaffected (frontend only). | Existing journey tests | Pass |
 
 ### Applicable style guide sections
@@ -66,17 +66,17 @@ This feature brings every clutch-web screen and dialog into line with the `clutc
 
 ### UI compliance checklist (§11)
 
-- [ ] No borders or divider lines on layout containers (documented hairline exception only)
-- [ ] Surface hierarchy follows canvas, content, card, raised
-- [ ] Only tokens used: no raw hex, no default palette, no non-token radius
-- [ ] Form fields use floating labels (exceptions D3)
-- [ ] Navigation expand/collapse behaviour unchanged; only restyled
-- [ ] Dark theme has no pure black surface or pure white text
-- [ ] Both themes visually verified
-- [ ] WCAG 2.2 AA contrast checked in both themes
-- [ ] Visible focus ring on every interactive element
-- [ ] Status not conveyed by colour alone
-- [ ] `prefers-reduced-motion` respected
+- [X] No borders or divider lines on layout containers (documented hairline exception only)
+- [X] Surface hierarchy follows canvas, content, card, raised
+- [X] Only tokens used: no raw hex, no default palette, no non-token radius
+- [X] Form fields use floating labels (exceptions D3)
+- [X] Navigation expand/collapse behaviour unchanged; only restyled
+- [X] Dark theme has no pure black surface or pure white text
+- [X] Both themes visually verified
+- [X] WCAG 2.2 AA contrast checked in both themes
+- [X] Visible focus ring on every interactive element
+- [X] Status not conveyed by colour alone
+- [X] `prefers-reduced-motion` respected
 
 ### Justified deviations from the style guide
 
@@ -84,11 +84,12 @@ This feature brings every clutch-web screen and dialog into line with the `clutc
 |---|---|---|
 | D1 | Token values differ from the guide reference: Light `fg-secondary`, `primary`, danger, warning, success and info text; Dark `fg-secondary`, `primary`, `primary-contrast` and danger text. Values the reference does not define: Dark `primary-tint`, `neutral-strong`, `neutral-strong-contrast`, `accent-navy`, and Light `neutral-strong-contrast`. Dark status chip backgrounds are opaque (the text colour at 14% over `card`) rather than translucent. Added tokens: `danger-solid` / `danger-solid-contrast`, `secondary-solid` / `secondary-solid-contrast` and `scrim` | The reference values fail WCAG 2.2 AA (R4), including Dark secondary and primary text on the `hover` fill. The danger and secondary buttons change colour by theme (§5), so each needs a theme-switched pair because colour `dark:` variants are forbidden (FR-013). The dialog backdrop needs a scrim that darkens the page in both themes. Opaque chip backgrounds make contrast measurable in unit tests. `index.css` is the source of truth; `references/tokens.md`, `forms-components.md` §5 and `implementation.md` §10.2 are updated in the same change. |
 | D2 | Floating labels at rest use `fg-secondary`, not `fg-muted`; the label floats with `transform` and `transition-[color,transform]`, not by animating `top` and font size | `fg-muted` is 2.25–3.0:1 on `raised`, which fails AA for label text (R4). §8 allows only colour, opacity, transform and width to animate. Update the `references/forms-components.md` §4 text and sketch to match. |
-| D3 | Non-floating labels: the import duplicate-confirmation checkbox, the hidden CSV file input, and the inline category rename (sr-only label) | The guide does not cover checkboxes; the file input's visible control is a button; the inline rename keeps its row layout and step count (R8). None of these adds a visible external label to a text field. The checkbox and the `#csv-file` input are in `ImportPage.tsx`. The file input's existing visible label text stays as token-styled text, and its accessible name does not change. |
+| D3 | Non-floating labels: the import duplicate-confirmation checkbox, the hidden CSV file input, and the inline category rename (sr-only label) | The guide does not cover checkboxes; the file input's visible control is a button; the inline rename keeps its row layout and step count (R8). None of these adds a visible external label to a text field. The checkbox and the `#csv-file` input are in `ImportPage.tsx`. The account-list items in `AccountsPage.tsx` stay card-style `raised` buttons (a whole account summary, not a text action), styled with tokens and `focus-ring`, so they are not moved onto `Button`. The file input's existing visible label text stays as token-styled text, and its accessible name does not change. |
 | D4 | The theme stays on the `.dark` class with no pre-paint script, rather than `data-theme` (§10.4) | The theme runtime is settled (spec Assumptions, R2). Update `references/implementation.md` §10.1 and §10.4 to match the actual runtime. |
 | D5 | The `focus-ring` utility is a 2px `primary` outline with a 2px offset, not a `ring-2 ring-offset-2 ring-offset-canvas` box-shadow | Existing browser tests assert a visible outline (style, width, colour contrast) on focused controls, and SC-004 keeps them unchanged. An outline gives the same 2px primary ring with a 2px offset (§9) and a transparent offset on every surface. Update `references/typography-motion-a11y.md` §9. |
 | D6 | The current navigation item uses the `primary` fill with `primary-contrast` text, not the `selected` tint | `selected` is 1.16:1 (Light) and 1.35:1 (Dark) against `canvas`, below the 3:1 a state indicator needs (WCAG 1.4.11) and below the existing navigation test. `primary` is 5.49:1 and 7.45:1. Hover keeps the `hover` fill. Update `references/layout-navigation.md` §3. |
 | D7 | `HatchedRegion` is not added (§10.3 lists it) | No timeline or calendar exists (spec Assumptions). Update `references/implementation.md` §10.3 to say it is added with the first timeline. |
+| D8 | The expanded navigation is 160px wide (`w-40`), not 240px, and the header is full width, sticky and first in the DOM, with the navigation in the column under it | The frozen `navigation.spec.ts` tests need the same overlay width at every viewport, the first form control at 320px to stay clear of the expanded overlay (centres at 163px and beyond), a focused Save button to sit under it (right edge at 157px), and `(0,0)` to stay on the header after the page scrolls. Keyboard order stays header, navigation, content (`App.test.tsx`). Update `references/layout-navigation.md` §3 and §2. |
 
 ## Project Structure
 
@@ -165,8 +166,8 @@ src/clutch-web/
 
 ## Complexity Tracking
 
-No constitutional violations. The style-guide deviations D1–D7 are justified in the table above, as `clutch-constitution-check` requires.
+No constitutional violations. The style-guide deviations D1–D8 are justified in the table above, as `clutch-constitution-check` requires.
 
 | Deviation | Why needed | Simpler alternative rejected because |
 |---|---|---|
-| D1–D7 (style guide) | See the deviations table | Following the reference exactly fails WCAG 2.2 AA, the frozen browser tests, or describes a runtime and primitives the app does not have |
+| D1–D8 (style guide) | See the deviations table | Following the reference exactly fails WCAG 2.2 AA, the frozen browser tests, or describes a runtime and primitives the app does not have |

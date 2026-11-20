@@ -1,5 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { ErrorMessage } from '@/components/ui/error-message'
+import { FloatingField } from '@/components/ui/floating-field'
 import { PageHeading } from '@/components/ui/page-heading'
 import { ApiError } from '@/lib/api/client'
 import { getAccount, getCurrencies, updateAccountDescription } from './api'
@@ -40,15 +44,15 @@ export function AccountDetails({ accountId, onBack, onImport }: AccountDetailsPr
   })
 
   if (accountQuery.isPending || currenciesQuery.isPending) {
-    return <p role="status">Loading account…</p>
+    return <p className="text-fg-secondary" role="status">Loading account…</p>
   }
 
   if (accountQuery.isError) {
-    return <p role="alert">{getErrorMessage(accountQuery.error)}</p>
+    return <ErrorMessage>{getErrorMessage(accountQuery.error)}</ErrorMessage>
   }
 
   if (currenciesQuery.isError) {
-    return <p role="alert">{getErrorMessage(currenciesQuery.error)}</p>
+    return <ErrorMessage>{getErrorMessage(currenciesQuery.error)}</ErrorMessage>
   }
 
   const account = accountQuery.data
@@ -56,7 +60,7 @@ export function AccountDetails({ accountId, onBack, onImport }: AccountDetailsPr
     (supportedCurrency) => supportedCurrency.code === account.currencyCode,
   )
   if (!currency) {
-    return <p role="alert">This account has a currency that is not supported.</p>
+    return <ErrorMessage>This account has a currency that is not supported.</ErrorMessage>
   }
 
   const displayedDescription = description ?? account.description
@@ -67,31 +71,23 @@ export function AccountDetails({ accountId, onBack, onImport }: AccountDetailsPr
   }
 
   return (
-    <section aria-labelledby="account-details-heading" className="space-y-6">
-      <div className="flex flex-wrap gap-4">
-        <button
-          className="rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
-          onClick={onBack}
-          type="button"
-        >
+    <section aria-labelledby="account-details-heading" className="space-y-4">
+      <div className="flex flex-wrap gap-3">
+        <Button onClick={onBack} type="button" variant="secondary">
           Back to accounts
-        </button>
-        <button
-          className="rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
-          onClick={onImport}
-          type="button"
-        >
+        </Button>
+        <Button onClick={onImport} type="button" variant="secondary">
           Import transactions
-        </button>
+        </Button>
       </div>
       <div>
-        <PageHeading id="account-details-heading" className="text-2xl font-semibold">
+        <PageHeading id="account-details-heading">
           Account details
         </PageHeading>
-        <p className="mt-2 text-muted-foreground">
+        <p className="mt-2 text-fg-secondary">
           Currency: {currency.name} ({account.currencyCode})
         </p>
-        <p className="mt-1 text-muted-foreground">
+        <p className="mt-1 text-fg-secondary">
           Last successful import:{' '}
           {account.lastSuccessfulImportAtUtc
             ? new Intl.DateTimeFormat(undefined, {
@@ -101,29 +97,23 @@ export function AccountDetails({ accountId, onBack, onImport }: AccountDetailsPr
             : 'No successful imports'}
         </p>
       </div>
-      <form className="space-y-4 rounded-lg border border-border bg-card p-5" onSubmit={submit}>
-        <div className="space-y-2">
-          <label htmlFor="edit-account-description" className="block text-sm font-medium">
-            Account description
-          </label>
-          <input
-            id="edit-account-description"
-            className="w-full rounded-md border border-input bg-background px-3 py-2"
-            maxLength={200}
-            required
-            value={displayedDescription}
-            onChange={(event) => setDescription(event.currentTarget.value)}
-          />
-        </div>
-        <button
-          className="rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
+      <Card as="form" className="space-y-4" onSubmit={submit}>
+        <FloatingField
+          id="edit-account-description"
+          label="Account description"
+          maxLength={200}
+          onChange={(event) => setDescription(event.currentTarget.value)}
+          required
+          value={displayedDescription}
+        />
+        <Button
           disabled={updateMutation.isPending || displayedDescription === account.description}
           type="submit"
         >
           {updateMutation.isPending ? 'Saving…' : 'Save description'}
-        </button>
-        {updateMutation.isError && <p role="alert">{getErrorMessage(updateMutation.error)}</p>}
-      </form>
+        </Button>
+        {updateMutation.isError && <ErrorMessage>{getErrorMessage(updateMutation.error)}</ErrorMessage>}
+      </Card>
       <TransactionsTable accountId={accountId} currencyCode={account.currencyCode} />
     </section>
   )

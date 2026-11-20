@@ -1,8 +1,10 @@
 import { useRef } from 'react'
+import { Button } from '@/components/ui/button'
 import {
   Dialog, DialogBackdrop, DialogDescription, DialogPopup,
   DialogPortal, DialogTitle,
 } from '@/components/ui/dialog'
+import { ErrorMessage } from '@/components/ui/error-message'
 
 type ImportEndedDialogProps = {
   userName: string
@@ -22,11 +24,10 @@ export function ImportEndedDialog({ userName, busy = false, error, onAcknowledge
           <DialogDescription>
             Your import was ended by {userName} in another session. Return to this account&apos;s transactions to continue.
           </DialogDescription>
-          {error && <p role="alert">{error}</p>}
-          <button ref={acknowledge} type="button" disabled={busy} onClick={onAcknowledge}
-            className="cursor-pointer rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">
+          {error && <ErrorMessage>{error}</ErrorMessage>}
+          <Button ref={acknowledge} type="button" disabled={busy} onClick={onAcknowledge}>
             {busy ? 'Returning to transactions…' : 'Return to transactions'}
-          </button>
+          </Button>
         </DialogPopup>
       </DialogPortal>
     </Dialog>

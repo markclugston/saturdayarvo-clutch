@@ -14,5 +14,5 @@
 ## 9. Accessibility
 
 - All text/background pairs meet WCAG 2.2 AA in **both** themes: 4.5:1 for body text, 3:1 for large text and UI components.
-- Every interactive element has a visible focus ring: 2px `primary`, 2px offset, via a shared `focus-ring` utility (`outline-none ring-2 ring-primary ring-offset-2 ring-offset-canvas`, applied with `focus-visible:`).
+- Every interactive element has a visible focus ring: 2px `primary`, 2px offset, via the shared `focus-ring` utility in `index.css` (`outline: 2px solid rgb(var(--primary)); outline-offset: 2px`, applied with `focus-visible:`). It is an outline rather than a box-shadow ring because the browser tests assert the focused control's outline, and an outline offset is transparent on every surface.
 - Status is never conveyed by colour alone.

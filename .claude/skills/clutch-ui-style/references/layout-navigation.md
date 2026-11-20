@@ -18,6 +18,7 @@ Three nested layers:
 
 ```
 AppShell (bg-canvas)
+├── header             (bg-canvas, full width, sticky, no border; first in the DOM)
 ├── SideNav            (bg-canvas, no border)
 └── ContentPanel       (bg-content rounded-panel, inset with gutter)
     └── Card           (bg-card rounded-card)
@@ -29,9 +30,9 @@ AppShell (bg-canvas)
 **Existing expand/collapse behaviour MUST be preserved** (triggers, persisted state, breakpoints). Only styling changes.
 
 - Surface is `canvas`. No border or divider against the content panel; the transition is the tone change alone.
-- Collapsed: icon-only rail, about 64-72px. Expanded: about 240-260px.
+- Collapsed: icon-only rail, 64px (`w-16`). Expanded: 160px (`w-40`). The wider 240px of the original guide is not used: at 320px the browser tests require form controls to stay clear of the expanded overlay, and the width must be the same at every viewport.
 - Width animates 200ms ease-in-out (`transition-[width] duration-200 ease-in-out`). Labels fade with `transition-opacity` rather than popping.
-- Active item: `rounded-control` fill using `selected` tone, slightly heavier text. Hover: a subtler fill (`hover`).
+- Active item: `rounded-control` fill using `primary` with `primary-contrast` text and heavier text (the `selected` tint is under 3:1 against `canvas`, so it cannot be the only indicator). Hover: a subtler fill (`hover`).
 - Icons 18-20px, consistent outline style, stroke about 1.5px.
-- Collapsed items show tooltips.
+- Collapsed items show tooltips on hover or keyboard focus, including after Escape dismisses the expanded rail while an item is still focused or hovered.
 - Group headings (e.g. "Division") are small, muted, uppercase labels. No divider lines.

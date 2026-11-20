@@ -1,3 +1,5 @@
+import { Card, CardTitle } from '@/components/ui/card'
+import { StatusChip } from '@/components/ui/status-chip'
 import type { ImportReview } from '@/lib/api/schemas'
 import { formatCurrencyAmount } from '@/lib/formatCurrencyAmount'
 
@@ -9,23 +11,23 @@ type ImportReviewTableProps = {
 export function ImportReviewTable({ review, currencyCode }: ImportReviewTableProps) {
   const showBalance = review.rows.some((row) => row.balance != null)
   return (
-    <section aria-labelledby="import-review-heading" className="space-y-4">
+    <Card aria-labelledby="import-review-heading" as="section" className="min-w-0 space-y-4">
       <div>
-        <h2 id="import-review-heading" className="text-lg font-semibold">Review transactions</h2>
+        <CardTitle as="h2" id="import-review-heading">Review transactions</CardTitle>
         <p>
           {review.rowCount} transactions will be imported into this account in {currencyCode}.
         </p>
       </div>
       {review.duplicateConfirmationRequired && (
-        <p className="rounded-md border border-amber-500 p-3" role="status">
+        <p className="rounded-control bg-warning-bg p-3 text-warning" role="status">
           Possible duplicates are highlighted. Confirming will import every valid row,
           including these possible duplicates.
         </p>
       )}
-      <div className="overflow-x-auto rounded-lg border border-border">
+      <div className="overflow-x-auto rounded-control">
         <table className="w-full text-left text-sm">
           <caption className="sr-only">Validated transactions for review</caption>
-          <thead className="bg-muted">
+          <thead className="bg-raised">
             <tr>
               <th className="px-3 py-2" scope="col">Row</th>
               <th className="px-3 py-2" scope="col">Date</th>
@@ -38,7 +40,7 @@ export function ImportReviewTable({ review, currencyCode }: ImportReviewTablePro
           </thead>
           <tbody>
             {review.rows.map((row) => (
-              <tr className="border-t border-border" key={row.sourceRowNumber}>
+              <tr className="hairline-b" key={row.sourceRowNumber}>
                 <th className="px-3 py-2 font-normal" scope="row">{row.sourceRowNumber}</th>
                 <td className="px-3 py-2">
                   {new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' })
@@ -55,13 +57,15 @@ export function ImportReviewTable({ review, currencyCode }: ImportReviewTablePro
                   </td>
                 )}
                 <td className="px-3 py-2">
-                  {row.isPossibleDuplicate ? 'Possible duplicate' : '—'}
+                  {row.isPossibleDuplicate
+                    ? <StatusChip status="warning">Possible duplicate</StatusChip>
+                    : '—'}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-    </section>
+    </Card>
   )
 }

@@ -1,4 +1,6 @@
 import { useEffect, useRef } from 'react'
+import { ErrorMessage } from '@/components/ui/error-message'
+import { FloatingField } from '@/components/ui/floating-field'
 import { ApiError } from '@/lib/api/client'
 import { ThemeModeSchema } from '@/lib/api/schemas'
 import { useSaveThemePreference, useThemePreference } from '@/features/preferences/api'
@@ -33,28 +35,27 @@ export function ThemeSelector({ userId }: ThemeSelectorProps) {
 
   return (
     <div className="flex flex-col gap-1">
-      <label className="flex items-center gap-2 text-sm font-medium" htmlFor="theme-mode">
-        <span>Theme</span>
-        <select
-          className="max-w-full rounded-md border border-input bg-background px-2 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-          id="theme-mode"
-          onChange={(event) => changeMode(ThemeModeSchema.parse(event.currentTarget.value))}
-          value={mode}
-        >
-          <option value="Light">Light</option>
-          <option value="Dark">Dark</option>
-          <option value="System">System</option>
-        </select>
-      </label>
+      <FloatingField
+        as="select"
+        className="w-40"
+        id="theme-mode"
+        label="Theme"
+        onChange={(event) => changeMode(ThemeModeSchema.parse(event.currentTarget.value))}
+        value={mode}
+      >
+        <option value="Light">Light</option>
+        <option value="Dark">Dark</option>
+        <option value="System">System</option>
+      </FloatingField>
       {preferenceQuery.isError && (
-        <p className="text-xs text-destructive" role="alert">
+        <ErrorMessage className="text-xs">
           Your saved theme could not be loaded. Light is active.
-        </p>
+        </ErrorMessage>
       )}
       {saveMutation.isError && (
-        <p className="text-xs text-destructive" role="alert">
+        <ErrorMessage className="text-xs">
           {getSaveErrorMessage(saveMutation.error)}
-        </p>
+        </ErrorMessage>
       )}
     </div>
   )

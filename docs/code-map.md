@@ -26,6 +26,8 @@ contains what's described, search for the concern and update the pointer.
 | Frontend feature pattern (components, `api.ts`, hooks, tests) | a sibling folder in `src/clutch-web/src/features/` |
 | UI primitives | `src/clutch-web/src/components/ui/` |
 | Theme runtime and tokens | `src/clutch-web/src/components/theme/`, `src/clutch-web/src/index.css` |
+| Style lint rule (`clutch/style-tokens`) and its tests | `src/clutch-web/eslint-rules/clutch-style.js`, `clutch-style.test.js` |
+| Style-guide browser states (axe, focus, surfaces, screenshots) | `src/clutch-web/e2e/style-guide.spec.ts`, `playwright.style-guide.config.ts` |
 | Component test helpers | `src/clutch-web/src/test/` |
 | Browser test setup and per-journey configs | `src/clutch-web/playwright*.config.ts`, `src/clutch-web/e2e/fixtures.ts` |
 | Local run and debug setup | `.vscode/launch.json`, `README.md` |

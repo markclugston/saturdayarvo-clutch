@@ -1,5 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card, CardTitle } from '@/components/ui/card'
+import { ErrorMessage } from '@/components/ui/error-message'
+import { FloatingField } from '@/components/ui/floating-field'
 import { PageHeading } from '@/components/ui/page-heading'
 import { ApiError } from '@/lib/api/client'
 import { createAccount, getAccounts, getCurrencies } from './api'
@@ -40,15 +44,15 @@ export function AccountsPage({ onSelectAccount }: AccountsPageProps) {
   }
 
   if (accountsQuery.isPending || currenciesQuery.isPending) {
-    return <p role="status">Loading accounts…</p>
+    return <p className="text-fg-secondary" role="status">Loading accounts…</p>
   }
 
   if (accountsQuery.isError) {
-    return <p role="alert">{getErrorMessage(accountsQuery.error)}</p>
+    return <ErrorMessage>{getErrorMessage(accountsQuery.error)}</ErrorMessage>
   }
 
   if (currenciesQuery.isError) {
-    return <p role="alert">{getErrorMessage(currenciesQuery.error)}</p>
+    return <ErrorMessage>{getErrorMessage(currenciesQuery.error)}</ErrorMessage>
   }
 
   const accountRows = accountsQuery.data.flatMap((account) => {
@@ -59,75 +63,68 @@ export function AccountsPage({ onSelectAccount }: AccountsPageProps) {
   })
 
   if (accountRows.length !== accountsQuery.data.length) {
-    return <p role="alert">An account has a currency that is not supported.</p>
+    return <ErrorMessage>An account has a currency that is not supported.</ErrorMessage>
   }
 
   return (
-    <section aria-labelledby="accounts-heading" className="space-y-8">
+    <section aria-labelledby="accounts-heading" className="space-y-4">
       <div>
-        <PageHeading id="accounts-heading" className="text-2xl font-semibold">
+        <PageHeading id="accounts-heading">
           Your accounts
         </PageHeading>
-        <p className="mt-2 text-muted-foreground">Each account keeps its own currency and transactions.</p>
+        <p className="mt-2 text-fg-secondary">Each account keeps its own currency and transactions.</p>
       </div>
 
-      <ul className="grid gap-3 sm:grid-cols-2">
-        {accountRows.map(({ account, currency }) => (
-          <li key={account.id}>
-            <button
-              className="w-full rounded-lg border border-border bg-card p-4 text-left hover:bg-muted"
-              onClick={() => onSelectAccount(account.id)}
-              type="button"
-            >
-              <span className="block font-medium">{account.description}</span>
-              <span className="mt-1 block text-sm text-muted-foreground">
-                {currency.name} ({account.currencyCode})
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
+      <Card>
+        <ul className="grid gap-3 sm:grid-cols-2">
+          {accountRows.map(({ account, currency }) => (
+            <li className="min-w-0" key={account.id}>
+              <button
+                className="w-full cursor-pointer rounded-control bg-raised p-4 text-left transition-colors hover:bg-hover focus-visible:focus-ring"
+                onClick={() => onSelectAccount(account.id)}
+                type="button"
+              >
+                <span className="block break-words font-medium">{account.description}</span>
+                <span className="mt-1 block break-words text-sm text-fg-secondary">
+                  {currency.name} ({account.currencyCode})
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </Card>
 
-      <form className="max-w-xl space-y-4 rounded-lg border border-border bg-card p-5" onSubmit={submit}>
-        <h2 className="text-lg font-semibold">Add an account</h2>
-        <div className="space-y-2">
-          <label htmlFor="account-description" className="block text-sm font-medium">Account description</label>
-          <input
-            id="account-description"
-            autoComplete="off"
-            className="w-full rounded-md border border-input bg-background px-3 py-2"
-            maxLength={200}
-            required
-            value={description}
-            onChange={(event) => setDescription(event.currentTarget.value)}
-          />
-        </div>
-        <div className="space-y-2">
-          <label htmlFor="account-currency" className="block text-sm font-medium">Currency</label>
-          <select
-            id="account-currency"
-            className="w-full rounded-md border border-input bg-background px-3 py-2"
-            required
-            value={currencyCode}
-            onChange={(event) => setCurrencyCode(event.currentTarget.value)}
-          >
-            <option value="">Select a currency</option>
-            {currenciesQuery.data.map((currency) => (
-              <option key={currency.code} value={currency.code}>
-                {currency.name} ({currency.code})
-              </option>
-            ))}
-          </select>
-        </div>
-        <button
-          className="rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
-          disabled={createMutation.isPending}
-          type="submit"
+      <Card as="form" className="max-w-xl space-y-4" onSubmit={submit}>
+        <CardTitle as="h2">Add an account</CardTitle>
+        <FloatingField
+          autoComplete="off"
+          id="account-description"
+          label="Account description"
+          maxLength={200}
+          onChange={(event) => setDescription(event.currentTarget.value)}
+          required
+          value={description}
+        />
+        <FloatingField
+          as="select"
+          id="account-currency"
+          label="Currency"
+          onChange={(event) => setCurrencyCode(event.currentTarget.value)}
+          required
+          value={currencyCode}
         >
+          <option value="">Select a currency</option>
+          {currenciesQuery.data.map((currency) => (
+            <option key={currency.code} value={currency.code}>
+              {currency.name} ({currency.code})
+            </option>
+          ))}
+        </FloatingField>
+        <Button disabled={createMutation.isPending} type="submit">
           {createMutation.isPending ? 'Saving…' : 'Add account'}
-        </button>
-        {createMutation.isError && <p role="alert">{getErrorMessage(createMutation.error)}</p>}
-      </form>
+        </Button>
+        {createMutation.isError && <ErrorMessage>{getErrorMessage(createMutation.error)}</ErrorMessage>}
+      </Card>
     </section>
   )
 }

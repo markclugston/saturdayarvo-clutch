@@ -1,5 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { ErrorMessage } from '@/components/ui/error-message'
+import { FloatingField } from '@/components/ui/floating-field'
 import { PageHeading } from '@/components/ui/page-heading'
 import { ApiError } from '@/lib/api/client'
 import type { ImportLimits } from '@/lib/api/schemas'
@@ -26,16 +30,16 @@ export function ImportLimitsPage({ onBack }: ImportLimitsPageProps) {
   })
 
   if (limitsQuery.isPending) {
-    return <p role="status">Loading import limits…</p>
+    return <p className="text-fg-secondary" role="status">Loading import limits…</p>
   }
 
   if (limitsQuery.isError) {
-    return <p role="alert">{getErrorMessage(limitsQuery.error)}</p>
+    return <ErrorMessage>{getErrorMessage(limitsQuery.error)}</ErrorMessage>
   }
 
   const limits = limitsQuery.data
   if (!limits) {
-    return <p role="alert">Import limits are unavailable.</p>
+    return <ErrorMessage>Import limits are unavailable.</ErrorMessage>
   }
 
   const displayedValues = values ?? limits
@@ -56,23 +60,19 @@ export function ImportLimitsPage({ onBack }: ImportLimitsPageProps) {
   }
 
   return (
-    <section aria-labelledby="admin-limits-heading" className="max-w-xl space-y-6">
-      <button
-        className="rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
-        onClick={onBack}
-        type="button"
-      >
+    <section aria-labelledby="admin-limits-heading" className="max-w-xl space-y-4">
+      <Button onClick={onBack} type="button" variant="secondary">
         Back to the application
-      </button>
+      </Button>
       <div>
-        <PageHeading id="admin-limits-heading" className="text-2xl font-semibold">
+        <PageHeading id="admin-limits-heading">
           Import limits
         </PageHeading>
-        <p className="mt-2 text-muted-foreground">
+        <p className="mt-2 text-fg-secondary">
           These shared settings take effect immediately for all imports.
         </p>
       </div>
-      <form className="space-y-4 rounded-lg border border-border bg-card p-5" onSubmit={submit}>
+      <Card as="form" className="space-y-4" onSubmit={submit}>
         <LimitInput
           id="max-file-size"
           label="Maximum file size (bytes)"
@@ -91,15 +91,11 @@ export function ImportLimitsPage({ onBack }: ImportLimitsPageProps) {
           value={displayedValues.maxImportAttemptsPerUserPerMinute}
           onChange={(value) => changeValue('maxImportAttemptsPerUserPerMinute', value)}
         />
-        <button
-          className="rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
-          disabled={!values || updateMutation.isPending}
-          type="submit"
-        >
+        <Button disabled={!values || updateMutation.isPending} type="submit">
           {updateMutation.isPending ? 'Saving…' : 'Save limits'}
-        </button>
-        {updateMutation.isError && <p role="alert">{getErrorMessage(updateMutation.error)}</p>}
-      </form>
+        </Button>
+        {updateMutation.isError && <ErrorMessage>{getErrorMessage(updateMutation.error)}</ErrorMessage>}
+      </Card>
     </section>
   )
 }
@@ -113,19 +109,16 @@ type LimitInputProps = {
 
 function LimitInput({ id, label, value, onChange }: LimitInputProps) {
   return (
-    <div className="space-y-2">
-      <label className="block text-sm font-medium" htmlFor={id}>{label}</label>
-      <input
-        className="w-full rounded-md border border-input bg-background px-3 py-2"
-        id={id}
-        min={1}
-        onChange={(event) => onChange(event.currentTarget.value)}
-        required
-        step={1}
-        type="number"
-        value={value}
-      />
-    </div>
+    <FloatingField
+      id={id}
+      label={label}
+      min={1}
+      onChange={(event) => onChange(event.currentTarget.value)}
+      required
+      step={1}
+      type="number"
+      value={value}
+    />
   )
 }
 

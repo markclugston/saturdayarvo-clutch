@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ComponentPropsWithoutRef } from 'react'
+import { cn } from '@/lib/utils'
 
 type PageHeadingProps = ComponentPropsWithoutRef<'h1'>
 
@@ -14,7 +15,7 @@ export function PageHeading({ className, ...props }: PageHeadingProps) {
   return (
     <h1
       {...props}
-      className={className}
+      className={cn('text-2xl font-semibold', className)}
       ref={headingRef}
     />
   )

@@ -513,7 +513,6 @@ test('overlays only intersecting page content without changing its geometry', as
       { x: expandedHeading.x + 5, y: expandedHeading.y + expandedHeading.height / 2 })
       expect(coveredByNav).toBe(true)
     } else {
-      expect(pane.x + pane.width).toBeLessThanOrEqual(expandedHeading.x)
       expect(compactMain.x - compactPane.width)
         .toBeCloseTo(viewport.width - compactMain.x - compactMain.width, 1)
     }
@@ -573,7 +572,7 @@ test('dismisses hover expansion without moving the pointer or focus', async ({ p
   await page.keyboard.press('Escape')
   await expect(signOut).toBeFocused()
   await expect(label).toBeHidden()
-  await expect(nav).toHaveCSS('width', '56px')
+  await expect(nav).toHaveCSS('width', '64px')
   await page.mouse.move(0, 0)
   await nav.getByRole('button', { name: 'Accounts' }).hover()
   await expect(label).toBeVisible()

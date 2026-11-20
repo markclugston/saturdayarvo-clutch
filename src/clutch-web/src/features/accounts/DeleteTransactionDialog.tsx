@@ -7,6 +7,8 @@ import {
   DialogPortal,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { ErrorMessage } from '@/components/ui/error-message'
 import { ApiError } from '@/lib/api/client'
 import { useDeleteTransaction } from './useTransactions'
 
@@ -59,7 +61,7 @@ export function DeleteTransactionDialog({
       <DialogPortal>
         <DialogBackdrop />
         <DialogPopup
-          className="space-y-3 border-destructive p-4"
+          className="space-y-3 p-4"
           initialFocus={cancelRef}
           role="alertdialog"
         >
@@ -70,31 +72,31 @@ export function DeleteTransactionDialog({
             This will permanently delete this transaction. This cannot be undone.
           </DialogDescription>
           {isNotFound && (
-            <p role="alert">This transaction no longer exists.</p>
+            <ErrorMessage>This transaction no longer exists.</ErrorMessage>
           )}
           {deleteMutation.isError && !isNotFound && (
-            <p role="alert">The transaction could not be deleted.</p>
+            <ErrorMessage>The transaction could not be deleted.</ErrorMessage>
           )}
           <div className="flex gap-2">
             {!isNotFound && (
-              <button
-                className="cursor-pointer rounded-md bg-destructive px-3 py-2 text-sm text-destructive-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              <Button
                 disabled={isPending}
                 onClick={handleDelete}
                 type="button"
+                variant="danger"
               >
                 {showBusy ? 'Deleting…' : 'Delete'}
-              </button>
+              </Button>
             )}
-            <button
-              className="cursor-pointer rounded-md border border-border px-3 py-2 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            <Button
               disabled={isPending}
               onClick={onClose}
               ref={cancelRef}
               type="button"
+              variant="secondary"
             >
               {isNotFound ? 'Close' : 'Cancel'}
-            </button>
+            </Button>
           </div>
         </DialogPopup>
       </DialogPortal>

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FolderTree, Wallet } from 'lucide-react'
-import { useEffect, useRef, useState, type PropsWithChildren } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AccountDetails } from '@/features/accounts/AccountDetails'
 import { AccountsPage } from '@/features/accounts/AccountsPage'
 import { ImportLimitsPage } from '@/features/admin/ImportLimitsPage'
@@ -12,6 +12,12 @@ import { ImportPage } from '@/features/imports/ImportPage'
 import { ApiError } from '@/lib/api/client'
 import { ThemeSelector } from '@/components/theme/ThemeSelector'
 import { useTheme } from '@/components/theme/ThemeProvider'
+import { AppShell } from '@/components/ui/app-shell'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { ContentPanel } from '@/components/ui/content-panel'
+import { ErrorMessage } from '@/components/ui/error-message'
+import { SideNav, SideNavItem } from '@/components/ui/side-nav'
 import { cn } from '@/lib/utils'
 
 export default function App() {
@@ -86,52 +92,27 @@ export default function App() {
     return (
       <>
         <AuthPage />
-        <section className="mx-auto max-w-4xl px-5 py-6">
-          <p role="alert">Unable to load your session. Please try again.</p>
-          <button
-            className="mt-4 rounded-md border border-border px-4 py-2"
+        <Card as="section" className="mx-auto mb-6 w-full max-w-md space-y-4">
+          <ErrorMessage>Unable to load your session. Please try again.</ErrorMessage>
+          <Button
             onClick={() => {
               sessionAttemptActive.current = false
               sessionAttemptStartedAt.current = performance.now()
               void sessionQuery.refetch()
             }}
             type="button"
+            variant="secondary"
           >
             Try again
-          </button>
-        </section>
+          </Button>
+        </Card>
       </>
     )
   }
 
   return (
-    <SignedInShell>
-      <header className="border-b border-border">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-5 py-4">
-          <p className="font-semibold">SaturdayArvo Clutch</p>
-          <div className="flex flex-wrap items-center gap-3">
-            {sessionQuery.data.id && <ThemeSelector userId={sessionQuery.data.id} />}
-            {sessionQuery.data.roles?.includes('Administrator') && (
-              <button
-                className="rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
-                onClick={() => setShowAdminSettings(true)}
-                type="button"
-              >
-                Import limits
-              </button>
-            )}
-            <button
-              className="rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
-              disabled={signOutMutation.isPending}
-              onClick={() => signOutMutation.mutate()}
-              type="button"
-            >
-              {signOutMutation.isPending ? 'Signing out…' : 'Sign out'}
-            </button>
-          </div>
-        </div>
-      </header>
-      <div className="flex min-w-0">
+    <AppShell
+      nav={(
         <PrimaryNavigation
           accountsCurrent={!showCategories && !showAdminSettings}
           categoriesCurrent={showCategories && !showAdminSettings}
@@ -146,26 +127,52 @@ export default function App() {
             setShowAdminSettings(false)
           }}
         />
+      )}
+      header={(
+        <header className="flex flex-wrap items-center justify-between gap-4 px-5 py-3">
+          <p className="font-semibold">SaturdayArvo Clutch</p>
+          <div className="flex flex-wrap items-center gap-3">
+            {sessionQuery.data.id && <ThemeSelector userId={sessionQuery.data.id} />}
+            {sessionQuery.data.roles?.includes('Administrator') && (
+              <Button
+                onClick={() => setShowAdminSettings(true)}
+                type="button"
+                variant="secondary"
+              >
+                Import limits
+              </Button>
+            )}
+            <Button
+              disabled={signOutMutation.isPending}
+              onClick={() => signOutMutation.mutate()}
+              type="button"
+              variant="secondary"
+            >
+              {signOutMutation.isPending ? 'Signing out…' : 'Sign out'}
+            </Button>
+          </div>
+        </header>
+      )}
+    >
       {/* Keep keyboard focus visible while the pointer holds the overlay open. */}
-      <main className={cn(
-        'mx-auto min-w-0 w-full max-w-5xl px-5 py-8',
+      <ContentPanel className={cn(
         '[&_:is(button,input,select,textarea):not(.sr-only):focus-visible]:relative [&_:is(button,input,select,textarea):not(.sr-only):focus-visible]:z-20',
-        '[&_:focus-visible:not(.sr-only)]:outline-2 [&_:focus-visible:not(.sr-only)]:outline-offset-2 [&_:focus-visible:not(.sr-only)]:outline-primary',
+        '[&_:focus-visible:not(.sr-only)]:focus-ring',
       )}>
         {sessionQuery.isError && (
-          <div className="mb-5" role="alert">
+          <div className="mb-5 flex flex-wrap items-center gap-3" role="alert">
             Unable to refresh your session. Please try again.
-            <button
-              className="ml-3 rounded-md border border-border px-3 py-1"
+            <Button
               onClick={() => void sessionQuery.refetch()}
               type="button"
+              variant="secondary"
             >
               Retry session check
-            </button>
+            </Button>
           </div>
         )}
         {signOutMutation.isError && (
-          <p className="mb-5" role="alert">Unable to sign out. Please try again.</p>
+          <ErrorMessage className="mb-5">Unable to sign out. Please try again.</ErrorMessage>
         )}
         {showAdminSettings ? (
           <ImportLimitsPage onBack={() => setShowAdminSettings(false)} />
@@ -187,14 +194,9 @@ export default function App() {
         ) : (
           <AccountsPage onSelectAccount={setSelectedAccountId} />
         )}
-      </main>
-      </div>
-    </SignedInShell>
+      </ContentPanel>
+    </AppShell>
   )
-}
-
-function SignedInShell({ children }: PropsWithChildren) {
-  return <div className="min-h-svh">{children}</div>
 }
 
 type PrimaryNavigationProps = {
@@ -215,7 +217,6 @@ function PrimaryNavigation({
   const [dismissed, setDismissed] = useState(false)
   const pointerFocus = useRef(false)
   const expanded = (hovered || keyboardFocused) && !dismissed
-  const buttonClass = 'flex w-full cursor-pointer items-center gap-2 rounded-md border border-border px-2.5 py-2 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary aria-[current=page]:bg-primary aria-[current=page]:text-primary-foreground'
 
   useEffect(() => {
     if (!expanded) return
@@ -228,61 +229,49 @@ function PrimaryNavigation({
   }, [expanded])
 
   return (
-    <div className="relative w-14 shrink-0">
-      <nav
-        aria-label="Primary"
-        className={cn(
-          'absolute inset-y-0 left-0 z-10 flex flex-col gap-2 border-r border-border bg-background p-2',
-          expanded ? 'w-36' : 'w-14',
-        )}
-        onPointerEnter={(event) => {
-          if (event.pointerType === 'mouse') {
-            setHovered(true)
-            setDismissed(false)
-          }
-        }}
-        onPointerLeave={(event) => {
-          pointerFocus.current = false
-          if (event.pointerType === 'mouse') setHovered(false)
-        }}
-        onPointerDownCapture={() => {
-          pointerFocus.current = true
-          setKeyboardFocused(false)
-        }}
-        onPointerUpCapture={() => { pointerFocus.current = false }}
-        onPointerCancelCapture={() => { pointerFocus.current = false }}
-        onFocusCapture={() => {
-          if (!pointerFocus.current) {
-            setKeyboardFocused(true)
-            setDismissed(false)
-          }
-        }}
-        onBlurCapture={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget)) setKeyboardFocused(false)
-        }}
-      >
-      <button
-        aria-current={accountsCurrent ? 'page' : undefined}
-        aria-label="Accounts"
-        className={buttonClass}
+    <SideNav
+      expanded={expanded}
+      onPointerEnter={(event) => {
+        if (event.pointerType === 'mouse') {
+          setHovered(true)
+          setDismissed(false)
+        }
+      }}
+      onPointerLeave={(event) => {
+        pointerFocus.current = false
+        if (event.pointerType === 'mouse') setHovered(false)
+      }}
+      onPointerDownCapture={() => {
+        pointerFocus.current = true
+        setKeyboardFocused(false)
+      }}
+      onPointerUpCapture={() => { pointerFocus.current = false }}
+      onPointerCancelCapture={() => { pointerFocus.current = false }}
+      onFocusCapture={() => {
+        if (!pointerFocus.current) {
+          setKeyboardFocused(true)
+          setDismissed(false)
+        }
+      }}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setKeyboardFocused(false)
+      }}
+    >
+      <SideNavItem
+        current={accountsCurrent}
+        expanded={expanded}
+        icon={Wallet}
+        label="Accounts"
         onClick={onAccounts}
-        type="button"
-      >
-        <Wallet aria-hidden="true" className="size-4 shrink-0" />
-        <span hidden={!expanded}>Accounts</span>
-      </button>
-      <button
-        aria-current={categoriesCurrent ? 'page' : undefined}
-        aria-label="Categories"
-        className={buttonClass}
+      />
+      <SideNavItem
+        current={categoriesCurrent}
+        expanded={expanded}
+        icon={FolderTree}
+        label="Categories"
         onClick={onCategories}
-        type="button"
-      >
-        <FolderTree aria-hidden="true" className="size-4 shrink-0" />
-        <span hidden={!expanded}>Categories</span>
-      </button>
-      </nav>
-    </div>
+      />
+    </SideNav>
   )
 }
 
