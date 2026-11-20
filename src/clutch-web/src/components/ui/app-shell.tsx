@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
+import logoLight from '@/assets/logo-light.jpg'
+import logoDark from '@/assets/logo-dark.jpg'
 
 type AppShellProps = {
   /** Page title, pinned beside the collapsed navigation column so it never moves when the navigation expands. */
@@ -24,8 +26,10 @@ export function AppShell({ title, header, nav, navExpanded, children }: AppShell
         navExpanded ? 'md:grid-cols-[10rem_minmax(0,1fr)]' : 'md:grid-cols-[3.5rem_minmax(0,1fr)]',
       )}
     >
-      <h1 className="pointer-events-none fixed left-[4.5rem] top-0 z-30 flex h-16 items-center text-4xl font-semibold leading-none text-fg">
-        {title}
+      <h1 className="pointer-events-none sticky top-0 z-30 col-span-2 col-start-1 row-start-1 ml-[4.5rem] min-w-0">
+        {/* Absolutely positioned so the header row, not the image, sets the height the logo fills. */}
+        <img alt={title} className="absolute left-0 top-[8%] h-[104%] w-auto max-w-none dark:hidden" src={logoLight} />
+        <img alt={title} className="absolute left-0 top-[8%] hidden h-[104%] w-auto max-w-none dark:block" src={logoDark} />
       </h1>
       <div className="sticky top-0 z-20 col-start-2 row-start-1 min-w-0 bg-canvas">{header}</div>
       <div className="col-start-1 row-span-2 row-start-1">{nav}</div>
