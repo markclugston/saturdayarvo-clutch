@@ -1,16 +1,6 @@
-# UI Design Instructions
+---
+applyTo: "src/clutch-web/**/*.tsx,src/clutch-web/**/*.css,src/clutch-web/index.html"
+---
+# WEB-001 UI design
 
-Read docs/style-guide.md before UI work.
-
-Required:
-- Apply applicable style-guide sections.
-- Add Compliance Checklist to Constitution Check.
-- Validate Compliance Checklist before completion.
-
-Review failures:
-- Raw colours
-- Non-token radii
-- Pure black dark surfaces
-- Pure white dark text
-- Borders on layout containers
-- External labels without justification
+Load the `clutch-ui-style` skill and only the style guide sections this change needs. Use tokens only: no raw colours, no non-token radii, and no borders on layout containers.

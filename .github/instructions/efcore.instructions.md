@@ -1,16 +1,6 @@
-# DOT-002 / AUD-001 Instructions
+---
+applyTo: "src/Clutch.API/Infrastructure/Persistence/**,src/Clutch.API/Domain/Audit/**,tests/Clutch.API.Tests/Integration/Persistence/**"
+---
+# DOT-002 / AUD-001 Data access
 
-- EF Core is mandatory.
-- Use asynchronous APIs.
-- Use AsNoTracking for read-only queries when suitable.
-- Review query shape.
-- Review indexing impact.
-- Review avoidable round-trips.
-- Review generated SQL.
-- Resolve known performance bottlenecks before acceptance.
-- Use production-provider integration testing for critical behaviour.
-- Store audit records in Audit table only.
-- Never update or delete Audit rows.
-- Corrections require new Audit records.
-- Review migrations for data-loss risk.
-- Include rollback/backfill planning when required.
+Load the `clutch-data-access` skill before writing or reviewing this code. Audit rows are append-only: never update or delete them. Every database change needs the independent query review, and every migration needs the migration review.

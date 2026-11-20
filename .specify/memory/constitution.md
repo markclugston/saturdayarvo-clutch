@@ -1,11 +1,11 @@
 # SaturdayArvo Clutch Constitution
 
-## Governance Hierarchy
-1. Constitution
-2. Path-scoped Instructions
-3. Reference Documentation
+**Version**: 1.2.0 | **Last Amended**: 2026-11-20
 
-This constitution governs all implementation and review decisions. Conflicts must be raised and must not be silently waived.
+## Governance
+Precedence: 1. Constitution 2. `clutch-*` skills and path-scoped instructions 3. Reference documentation.
+Conflicts must be raised and must not be silently waived. Constitutional violations are CRITICAL findings.
+Implementation detail for each requirement lives in the skill named in its heading. The procedure for applying this constitution is in `clutch-constitution-check`.
 
 ## ARC-001 Architecture Boundaries
 - Specifications govern implementation.
@@ -14,102 +14,61 @@ This constitution governs all implementation and review decisions. Conflicts mus
 - UI belongs in clutch-web.
 - .NET UI applications are prohibited.
 
-## DOT-001 .NET Services
+## DOT-001 .NET Services · `clutch-dotnet-service`
 - Target .NET 10 or newer.
 - Projects must build and pass tests for supported targets.
 
-## DOT-002 Data Access
+## DOT-002 Data Access · `clutch-data-access`
 - EF Core is the only database access mechanism.
 - Database changes require independent query review.
 - Critical database behaviour requires provider-backed integration tests.
 
-## AUD-001 Audit Data
+## AUD-001 Audit Data · `clutch-data-access`
 - Audit data must be stored only in the Audit table.
-- Audit records are append-only.
-- Existing audit rows must never be updated or deleted.
+- Audit records are append-only; existing audit rows must never be updated or deleted.
 
-## ENG-001 Testing And Quality Gates
+## ENG-001 Testing And Quality Gates · `clutch-constitution-check`
 - Behaviour changes require automated tests.
-- Completion requires all applicable tests and checks to pass.
-- Blocking findings prevent completion.
-- Manual testing is not a required gate.
-- Agent-executable validation is required.
+- Every feature explicitly requests tests: tasks.md must include test tasks for every behaviour change.
+- Completion requires all applicable tests and checks to pass; blocking findings prevent completion.
+- Agent-executable validation is required; manual testing is not a required gate.
 - Failed or blocked checks must be reported.
 
-## OPS-001 Operations
-- Structured logging required.
-- Appropriate health checks required.
-- Migration reviews required.
-- Rollback or backfill planning required when applicable.
+## OPS-001 Operations · `clutch-dotnet-service`, `clutch-data-access`
+- Structured logging and appropriate health checks required.
+- Migration reviews required, with rollback or backfill planning when applicable.
 
-## SEC-001 Security
+## SEC-001 Security · `clutch-security-review`
 - Security enforced at system boundaries.
 - Authorization required for protected operations.
 - Untrusted input validation required.
-- Independent OWASP Top 10 review required.
+- Independent OWASP Top 10 review and dependency vulnerability review required.
 - Security findings block completion until remediated and verified.
-- Dependency vulnerability review required.
 
-## SEC-002 Secrets
-- Secrets must not be committed.
-- Approved secret storage is required.
+## SEC-002 Secrets · `clutch-security-review`
+- Secrets must not be committed; approved secret storage is required.
 
-## SEC-003 Sensitive Data
-- Sensitive information must not be logged.
-- Error responses must not disclose sensitive information.
+## SEC-003 Sensitive Data · `clutch-security-review`
+- Sensitive information must not be logged or disclosed in error responses.
 - Payment and financial information requires approved handling controls.
 
-## WEB-001 Frontend Governance
+## WEB-001 Frontend · `clutch-frontend`, `clutch-ui-style`
 - TypeScript required.
-- Accessibility required.
-- WCAG 2.2 AA required.
+- Accessibility required: WCAG 2.2 AA.
 - Frontend tests and quality gates required.
 - Third-party UI code requires independent security review.
-- UI implementation standards are defined in instruction files and style guide.
-
-## Performance & Observability
-- User initiated actions must provide visible feedback within 500ms or show progress.
-- OpenTelemetry metrics required.
-
-## Spec Kit Workflow
-- /speckit-specify required.
-- /speckit-plan required.
-- Plans must include Constitution Check covering all applicable requirement IDs.
-- /speckit-tasks required.
-- /speckit-implement must follow constitution.
-- /speckit-converge required before completion.
-- /speckit.analyze and /speckit.checklist treat constitutional violations as CRITICAL.
-
-## Requirement Applicability Index
-ARC-001 Architecture
-DOT-001 .NET
-DOT-002 EF Core and database
-AUD-001 Audit immutability
-ENG-001 Testing and quality
-OPS-001 Operations
-SEC-001 Security
-SEC-002 Secrets
-SEC-003 Sensitive data
-WEB-001 Frontend
-
-## Continuous Governance
-- Identify applicable requirement IDs before planning.
-- Verify compliance during planning.
-- Execute relevant quality gates.
-- Verify compliance during review.
-
-## UI Governance
-- UI work must read docs/style-guide.md.
-- Plans must identify applicable style guide sections.
-- Compliance checklist from style guide section 11 must appear in Constitution Check and completion review.
+- UI work must apply the style guide. Plans must identify the applicable style guide sections, and its compliance checklist must appear in the Constitution Check and completion review.
 - Style-guide rule changes require synchronized updates.
 
-## Delivery Gates
-- Applicable requirements identified.
-- Constitution Check completed.
-- Tests pass.
-- Required database and security reviews completed.
+## Performance & Observability
+- User-initiated actions must provide visible feedback within 500ms or show progress.
+- OpenTelemetry metrics required.
+
+## Workflow and Delivery Gates
+- Spec Kit is mandatory: /speckit-specify, /speckit-plan, /speckit-tasks, /speckit-implement (following this constitution), and /speckit-converge before completion.
+- Plans must include a Constitution Check covering all applicable requirement IDs.
+- tasks.md must include a task for every gate the Constitution Check requires (tests, query and migration reviews, security review, UI compliance checklist, quality gates).
+- Delivery requires: applicable requirements identified, Constitution Check completed, tests pass, and required database and security reviews completed.
 
 ## Amendments
-Amendments require rationale, version update and review.
-Semantic versioning applies.
+Amendments require rationale, version update and review. Semantic versioning applies.
