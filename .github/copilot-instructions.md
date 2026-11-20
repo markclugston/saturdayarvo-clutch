@@ -4,6 +4,8 @@ Spec Kit workflow is mandatory. Outside Spec Kit commands, read `.specify/memory
 
 The code is the source of truth. Use `docs/code-map.md` to find the file that answers a question instead of exploring the repository.
 
+The Claude Code copies in `.claude/` are kept in sync. After editing a `clutch-*` skill or an instructions file, run `.\scripts\sync-agent-config.ps1 -From copilot`. Mirror any change to this file in `CLAUDE.md`.
+
 ## Workspace operations
 
 - Create, read, update and delete files inside this workspace without asking. Ask before touching anything outside it.
