@@ -224,3 +224,54 @@ export function mapServerErrors(
   }
   return mapped
 }
+
+/**
+ * The rate in force on `today`: the rate of the row with the latest valid Effective Date on or before
+ * `today`. Rows with an unreadable rate or date are ignored. Null when none applies.
+ */
+export function currentInterestRate(rows: RateRowDraft[], today: string): string | null {
+  let current: RateRowDraft | null = null
+  for (const row of rows) {
+    if (parseDate(row.date) === null || parseNumber(row.rate) === null || row.date > today) {
+      continue
+    }
+    if (current === null || row.date > current.date) {
+      current = row
+    }
+  }
+  return current ? current.rate.trim() : null
+}
+
+/** `2025-01-01` -> `1 Jan 2025`, read as a calendar date (no time zone shift). */
+export function formatDisplayDate(date: string): string {
+  return formatMessageDate(date)
+}
+
+/**
+ * Checks a change about to be added with 016's row rules by validating the draft with it appended,
+ * returning only the candidate's errors. The 60-change limit is enforced by disabling Add.
+ */
+export function validateNewRateChange(
+  draft: LoanDraft,
+  rate: string,
+  date: string,
+  today: string,
+): { newInterestRate?: string; effectiveDate?: string } {
+  // validateDraft skips fully empty rows; an unreadable date keeps a blank candidate in the checks.
+  const candidate: RateRowDraft = {
+    key: '__candidate',
+    rate,
+    date: rate.trim() === '' && date.trim() === '' ? 'blank' : date,
+  }
+  const errors = validateDraft({ ...draft, rows: [...draft.rows, candidate] }, today)
+  const result: { newInterestRate?: string; effectiveDate?: string } = {}
+  const rateError = errors[`${candidate.key}.newInterestRate`]
+  const dateError = errors[`${candidate.key}.effectiveDate`]
+  if (rateError) {
+    result.newInterestRate = rateError
+  }
+  if (dateError) {
+    result.effectiveDate = dateError
+  }
+  return result
+}

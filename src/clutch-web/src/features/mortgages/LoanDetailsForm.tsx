@@ -14,12 +14,11 @@ import {
 } from './api'
 import { DeleteMortgageControl } from './DeleteMortgageControl'
 import { FormattedNumberField, formatCurrency } from './FormattedNumberField'
-import { InterestRateChangesField } from './InterestRateChangesField'
+import { CurrentInterestRate } from './CurrentInterestRate'
 import {
   draftToInput,
   draftsEqual,
   emptyDraft,
-  headerIsValid,
   localToday,
   mapServerErrors,
   mortgageToDraft,
@@ -48,8 +47,10 @@ type LoanDetailsFormProps = {
   onReload: () => Promise<Mortgage | null>
 }
 
-// Errors without a field of their own; the set-level interestRateChanges message also shows under its group.
+// Errors without a field of their own; the set-level interestRateChanges message also shows in the
+// Change Interest Rate dialog.
 const nonFieldKeys = ['mortgages', 'version', 'interestRateChanges']
+const rateRowKey = /\.(newInterestRate|effectiveDate)$/
 
 export function LoanDetailsForm({
   mortgage,
@@ -91,7 +92,6 @@ export function LoanDetailsForm({
   useEffect(() => () => setDirty(false), [setDirty])
 
   const today = localToday()
-  const canAddRow = headerIsValid(draft, today)
 
   function change(patch: Partial<LoanDraft>) {
     setDraft((current) => ({ ...current, ...patch }))
@@ -163,7 +163,10 @@ export function LoanDetailsForm({
   const nonFieldMessages = nonFieldKeys
     .map((key) => errors[key])
     .filter((message): message is string => Boolean(message))
-  const hasFieldErrors = Object.keys(errors).some((key) => !nonFieldKeys.includes(key))
+  const fieldErrorKeys = Object.keys(errors).filter((key) => !nonFieldKeys.includes(key))
+  const hasFieldErrors = fieldErrorKeys.length > 0
+  // Rate rows are only visible in the dialog, so point there when they are the only fields to fix.
+  const onlyRateRowErrors = hasFieldErrors && fieldErrorKeys.every((key) => rateRowKey.test(key))
   const showSummary = hasFieldErrors || nonFieldMessages.length > 0
 
   return (
@@ -249,18 +252,23 @@ export function LoanDetailsForm({
         </FloatingField>
       </div>
 
-      <InterestRateChangesField
-        canAdd={canAddRow}
-        disabled={saving}
+      <CurrentInterestRate
+        draft={draft}
         errors={errors}
-        idPrefix={idPrefix}
-        onChange={(rows) => change({ rows })}
-        rows={draft.rows}
+        onRowsChange={(rows) => change({ rows })}
+        saving={saving}
+        today={today}
       />
 
       {showSummary && (
         <div className="space-y-1 text-sm text-danger" role="alert">
-          {hasFieldErrors && <p>Correct the highlighted fields and try again.</p>}
+          {hasFieldErrors && (
+            <p>
+              {onlyRateRowErrors
+                ? 'Correct the interest rate changes in Change Interest Rate and try again.'
+                : 'Correct the highlighted fields and try again.'}
+            </p>
+          )}
           {nonFieldMessages.map((message) => <p key={message}>{message}</p>)}
         </div>
       )}

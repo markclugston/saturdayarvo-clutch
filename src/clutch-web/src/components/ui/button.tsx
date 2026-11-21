@@ -12,6 +12,7 @@ const buttonVariants = cva(
         tertiary: "text-primary hover:bg-hover",
         danger: "bg-danger-solid text-danger-solid-contrast hover:opacity-90",
         icon: "bg-raised text-fg hover:bg-hover",
+        neutral: "bg-raised text-fg hover:bg-hover",
       },
       size: {
         default: "min-h-10 px-4 py-2",

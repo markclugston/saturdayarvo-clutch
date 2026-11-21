@@ -38,6 +38,7 @@ All text inputs, selects and textareas use an **in-field floating label**. Exter
 
 - **Primary button:** solid `primary`, `primary-contrast` text, `rounded-control`. A subtle top-to-bottom gradient is allowed on primary buttons only.
 - **Secondary button:** the `secondary-solid` / `secondary-solid-contrast` pair, which is `neutral-strong` in the light theme and `raised` in the dark theme, with no `dark:` variant.
+- **Neutral button:** `Button variant="neutral"`: `raised` fill, `fg` text, `hover` on hover, `rounded-control`, the shared focus ring and disabled rules, no border and no `dark:` variant. Use it for a standard grey action that is not the page's main (primary) or companion (secondary) action, such as "Change Interest Rate" beside a read-only value. Contrast of `fg` on `raised` is about 16:1 in Light and 8:1 in Dark. In Dark, `secondary-solid` already resolves to `raised`, so neutral and secondary look alike there; that is intended.
 - **Tertiary button:** text only. **Icon button:** square, rounded, tone-filled, no border.
 - **Status chips:** pale tinted background with saturated text of the same hue (see tokens). Status MUST NOT rely on colour alone; include text or an icon.
 - **Stat cards:** large number (28-32px/600) with a small coloured delta indicator.

@@ -67,7 +67,7 @@ const csv = {
 }
 
 type Session = 'ok' | 'unauthorized' | 'error' | 'hang'
-type MortgagesMode = 'ok' | 'empty' | 'many' | 'error' | 'hang'
+type MortgagesMode = 'ok' | 'empty' | 'many' | 'rates' | 'error' | 'hang'
 
 const longMortgageName = 'Family home loan with the offset account and the fixed rate period'
 const mortgageFixture = (index: number) => ({
@@ -83,6 +83,18 @@ const mortgageFixture = (index: number) => ({
   ],
   version: 1,
 })
+// Mortgage 1 has one change, Mortgage 2 has 60 (monthly from the first repayment date).
+const rateFixtures = () => [
+  { ...mortgageFixture(1), name: 'One rate', interestRateChanges: [{ newInterestRate: 5.25, effectiveDate: '2000-01-01' }] },
+  {
+    ...mortgageFixture(2),
+    name: 'Sixty rates',
+    interestRateChanges: Array.from({ length: 60 }, (_, index) => ({
+      newInterestRate: 5 + (index % 4) / 4,
+      effectiveDate: `${2000 + Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, '0')}-01`,
+    })),
+  },
+]
 
 type Mock = {
   theme: Theme | 'System'
@@ -117,6 +129,7 @@ async function mockApi(page: Page, options: Partial<Mock> = {}): Promise<Mock> {
     if (path === '/api/mortgages' && method === 'GET') {
       if (mock.mortgages === 'hang') return new Promise<void>(() => {})
       if (mock.mortgages === 'error') return route.fulfill({ status: 500, json: { title: 'Server error' } })
+      if (mock.mortgages === 'rates') return route.fulfill({ json: rateFixtures() })
       const count = mock.mortgages === 'empty' ? 0 : mock.mortgages === 'many' ? 10 : 3
       return route.fulfill({ json: Array.from({ length: count }, (_, index) => mortgageFixture(index)) })
     }
@@ -228,9 +241,21 @@ async function fillNewMortgage(page: Page) {
   await page.getByLabel('Number of Periods').fill('120')
   await page.getByLabel('First Repayment Date').fill('2020-01-01')
   await page.getByLabel('Repayment Frequency').selectOption('Monthly')
-  await page.getByRole('button', { name: 'Add interest rate change' }).click()
-  await page.getByLabel('New Interest Rate').fill('4.5')
-  await page.getByLabel('Effective Date').fill('2020-01-01')
+  await page.getByRole('button', { name: 'Change Interest Rate' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Change Interest Rate' })
+  await dialog.getByLabel('New Interest Rate').fill('4.5')
+  await dialog.getByLabel('Effective Date').fill('2020-01-01')
+  await dialog.getByRole('button', { name: 'Add', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Close' }).click()
+  await expect(dialog).toHaveCount(0)
+}
+
+const rateDialog = (page: Page) => page.getByRole('dialog', { name: 'Change Interest Rate' })
+
+async function openRateDialog(page: Page) {
+  await page.getByRole('button', { name: 'Change Interest Rate' }).click()
+  await expect(rateDialog(page)).toBeVisible()
+  await page.mouse.move(5, 5)
 }
 
 type StateDef = {
@@ -427,6 +452,33 @@ const states: StateDef[] = [
       await page.getByRole('button', { name: 'Mortgage 2', exact: true }).click()
       await page.getByRole('button', { name: 'Delete Mortgage 2' }).click()
       await expect(page.getByRole('dialog', { name: 'Delete Mortgage 2?' })).toBeVisible()
+    },
+  },
+  {
+    name: 'mortgages-rate-dialog', mock: signedIn,
+    reach: async (page) => {
+      await openMortgages(page)
+      await openRateDialog(page)
+    },
+  },
+  {
+    name: 'mortgages-rate-dialog-60', mock: { ...signedIn, mortgages: 'rates' },
+    reach: async (page) => {
+      await openMortgages(page)
+      await page.getByRole('button', { name: 'Sixty rates', exact: true }).click()
+      await openRateDialog(page)
+    },
+  },
+  {
+    name: 'mortgages-rate-dialog-errors', mock: signedIn,
+    reach: async (page) => {
+      await openMortgages(page)
+      await openRateDialog(page)
+      await rateDialog(page).getByRole('button', { name: 'Remove 5.25% from 1 Jan 2000' }).click()
+      await rateDialog(page).getByLabel('New Interest Rate').fill('100.5')
+      await rateDialog(page).getByLabel('Effective Date').fill('2005-06-01')
+      await rateDialog(page).getByRole('button', { name: 'Add', exact: true }).click()
+      await expect(rateDialog(page).getByText('Enter an interest rate from 0 to 100')).toBeVisible()
     },
   },
   {
@@ -798,6 +850,84 @@ test.describe('Mortgages layout and motion', () => {
       }
     }
   })
+
+  for (const width of [320, 1280]) {
+    test(`Change Interest Rate: value and button layout, 60-row dialog scrolling and focus at ${width} px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 700 })
+      await mockApi(page, { theme: 'Light', mortgages: 'rates' })
+      await page.goto('/')
+      await openMortgages(page)
+      const form = page.getByRole('form', { name: 'Loan Details' })
+
+      // SC-001: the Loan Details group is the same height with 1 and 60 changes.
+      await page.getByRole('button', { name: 'One rate', exact: true }).click()
+      await expect(page.getByLabel('Name', { exact: true })).toHaveValue('One rate')
+      const oneHeight = (await form.boundingBox())!.height
+      await page.getByRole('button', { name: 'Sixty rates', exact: true }).click()
+      await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Sixty rates')
+      expect((await form.boundingBox())!.height).toBeCloseTo(oneHeight, 0)
+
+      // FR-001: stacked under 768 px, side by side from 768 px; neither clipped.
+      const value = page.getByText('Current Interest Rate', { exact: true })
+      const button = page.getByRole('button', { name: 'Change Interest Rate' })
+      const valueBox = (await value.boundingBox())!
+      const buttonBox = (await button.boundingBox())!
+      for (const box of [valueBox, buttonBox]) {
+        expect(box.x).toBeGreaterThanOrEqual(0)
+        expect(box.x + box.width).toBeLessThanOrEqual(width)
+      }
+      expect(await button.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+      if (width < 768) {
+        expect(buttonBox.y).toBeGreaterThanOrEqual(valueBox.y + valueBox.height - 1)
+      } else {
+        expect(buttonBox.x).toBeGreaterThanOrEqual(valueBox.x + valueBox.width - 1)
+      }
+
+      // 60 rows: the list scrolls inside the dialog and the add inputs stay visible.
+      await button.click()
+      const dialog = rateDialog(page)
+      await expect(dialog).toBeVisible()
+      const list = dialog.getByRole('list', { name: 'Interest Rate Changes' })
+      expect(await list.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true)
+      await list.evaluate((element) => { element.scrollTop = element.scrollHeight })
+      await expect(dialog.getByLabel('New Interest Rate')).toBeInViewport()
+      await expect(dialog.getByRole('button', { name: 'Add', exact: true })).toBeInViewport()
+      await expect(dialog.getByRole('button', { name: 'Close' })).toBeInViewport()
+      await expectNoHorizontalScroll(page)
+
+      // Focus trap wraps both ways (FR-004).
+      const close = dialog.getByRole('button', { name: 'Close' })
+      const removes = dialog.getByRole('button', { name: /^Remove / })
+      await removes.last().focus()
+      await page.keyboard.press('Tab')
+      await expect(close).toBeFocused()
+      await page.keyboard.press('Shift+Tab')
+      await expect(removes.last()).toBeFocused()
+
+      // After a remove focus is on the dialog itself; the next Tab reaches Close (FR-005).
+      await removes.first().click()
+      await expect(dialog).toBeFocused()
+      await page.keyboard.press('Tab')
+      await expect(close).toBeFocused()
+
+      // Escape closes and returns focus to Change Interest Rate.
+      await page.keyboard.press('Escape')
+      await expect(dialog).toHaveCount(0)
+      await expect(button).toBeFocused()
+    })
+  }
+
+  for (const scheme of ['light', 'dark'] as const) {
+    test(`System theme: the Change Interest Rate dialog passes the checks with an emulated ${scheme} scheme`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme: scheme })
+      await mockApi(page, { theme: 'System' })
+      await page.goto('/')
+      await openMortgages(page)
+      await openRateDialog(page)
+      await expectTheme(page, scheme === 'dark' ? 'Dark' : 'Light')
+      await runChecks(page, `mortgages-rate-dialog-system-${scheme}`, scheme === 'dark' ? 'Dark' : 'Light')
+    })
+  }
 
   for (const scheme of ['light', 'dark'] as const) {
     test(`System theme follows an emulated ${scheme} colour scheme on the Mortgages screen`, async ({ page }) => {

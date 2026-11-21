@@ -1,7 +1,7 @@
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import type userEvent from '@testing-library/user-event'
 import type { ReactElement } from 'react'
-import { vi } from 'vitest'
+import { expect, vi } from 'vitest'
 import { ToastProvider } from '@/components/ui/toast'
 import { UnsavedChangesProvider } from '@/components/unsaved-changes/UnsavedChangesProvider'
 import { ApiError, apiRequest } from '@/lib/api/client'
@@ -129,7 +129,7 @@ export type FormValues = {
   periods?: string
   first?: string
   frequency?: string
-  /** [rate, date] pairs, filled into new rows. */
+  /** [rate, date] pairs, added through the Change Interest Rate dialog. */
   rates?: Array<[string, string]>
 }
 
@@ -138,7 +138,7 @@ export function setDate(label: string | RegExp, value: string, index = 0) {
   fireEvent.change(fields[index] as HTMLElement, { target: { value } })
 }
 
-/** Types into the Loan Details form. Rows are appended after any existing ones. */
+/** Types into the Loan Details form. Rates are added after any existing ones. */
 export async function fillForm(user: ReturnType<typeof userEvent.setup>, values: FormValues) {
   if (values.name !== undefined) {
     await user.clear(screen.getByLabelText('Name'))
@@ -158,15 +158,37 @@ export async function fillForm(user: ReturnType<typeof userEvent.setup>, values:
   if (values.frequency !== undefined) {
     await user.selectOptions(screen.getByLabelText('Repayment Frequency'), values.frequency)
   }
-  for (const [rate, date] of values.rates ?? []) {
-    await user.click(screen.getByRole('button', { name: 'Add interest rate change' }))
-    const rateFields = screen.getAllByLabelText('New Interest Rate')
-    const dateFields = screen.getAllByLabelText('Effective Date')
-    if (rate !== '') {
-      await user.type(rateFields[rateFields.length - 1] as HTMLElement, rate)
-    }
-    setDate('Effective Date', date, dateFields.length - 1)
+  if (values.rates && values.rates.length > 0) {
+    await addRates(user, values.rates)
   }
+}
+
+/** Opens "Change Interest Rate", adds each [rate, date] pair, then closes the dialog. */
+export async function addRates(user: ReturnType<typeof userEvent.setup>, rates: Array<[string, string]>) {
+  await user.click(screen.getByRole('button', { name: 'Change Interest Rate' }))
+  const dialog = await screen.findByRole('dialog', { name: 'Change Interest Rate' })
+  for (const [rate, date] of rates) {
+    const rateField = within(dialog).getByLabelText('New Interest Rate')
+    await user.clear(rateField)
+    if (rate !== '') {
+      await user.type(rateField, rate)
+    }
+    fireEvent.change(within(dialog).getByLabelText('Effective Date'), { target: { value: date } })
+    await user.click(within(dialog).getByRole('button', { name: 'Add' }))
+  }
+  await user.click(within(dialog).getByRole('button', { name: 'Close' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+}
+
+/** The "{rate} {date}" text of each listed change in the open dialog, in list order. */
+export function listedRates(): string[] {
+  const list = within(screen.getByRole('dialog')).queryByRole('list', { name: 'Interest Rate Changes' })
+  return list
+    ? within(list).getAllByRole('listitem').map((item) => {
+      const remove = within(item).getByRole('button', { name: /^Remove / })
+      return (remove.getAttribute('aria-label') ?? '').replace(/^Remove /, '').replace(' from ', ' ')
+    })
+    : []
 }
 
 export const validValues: FormValues = {

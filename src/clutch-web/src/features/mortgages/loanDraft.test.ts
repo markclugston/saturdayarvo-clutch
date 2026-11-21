@@ -1,0 +1,85 @@
+import { describe, expect, it } from 'vitest'
+import {
+  currentInterestRate,
+  emptyDraft,
+  formatDisplayDate,
+  newRow,
+  validateNewRateChange,
+  type LoanDraft,
+} from './loanDraft'
+
+const today = '2025-06-15'
+
+describe('currentInterestRate', () => {
+  it('is the rate with the latest Effective Date on or before today, ignoring future changes', () => {
+    const rows = [newRow('5', '2020-01-01'), newRow('6', '2024-01-01'), newRow('7', '2030-01-01')]
+    expect(currentInterestRate(rows, today)).toBe('6')
+  })
+
+  it('counts a change effective today', () => {
+    const rows = [newRow('5', '2020-01-01'), newRow('6.5', today)]
+    expect(currentInterestRate(rows, today)).toBe('6.5')
+  })
+
+  it('does not depend on row order', () => {
+    const rows = [newRow('6', '2024-01-01'), newRow('7', '2030-01-01'), newRow('5', '2020-01-01')]
+    expect(currentInterestRate(rows, today)).toBe('6')
+  })
+
+  it('ignores rows with an unparseable rate or date', () => {
+    const rows = [newRow('5', '2020-01-01'), newRow('abc', '2024-01-01'), newRow('9', '2024-13-01'), newRow('', '')]
+    expect(currentInterestRate(rows, today)).toBe('5')
+  })
+
+  it('is null when no change is effective on or before today', () => {
+    expect(currentInterestRate([], today)).toBeNull()
+    expect(currentInterestRate([newRow('7', '2030-01-01')], today)).toBeNull()
+  })
+})
+
+describe('formatDisplayDate', () => {
+  it('formats as day, short month and year without a UTC day shift', () => {
+    expect(formatDisplayDate('2025-01-01')).toBe('1 Jan 2025')
+    expect(formatDisplayDate('2025-12-31')).toBe('31 Dec 2025')
+  })
+})
+
+describe('validateNewRateChange', () => {
+  function draft(rows = [newRow('5.25', '2000-01-01')]): LoanDraft {
+    return {
+      ...emptyDraft(),
+      name: 'Home',
+      startingBalance: '500000',
+      numberOfPeriods: '120',
+      firstRepaymentDate: '2000-01-01',
+      repaymentFrequency: 'Monthly',
+      rows,
+    }
+  }
+
+  it.each([
+    ['rate above 100', '100.5', '2001-01-01', { newInterestRate: 'Enter an interest rate from 0 to 100' }],
+    ['negative rate', '-1', '2001-01-01', { newInterestRate: 'Enter an interest rate from 0 to 100' }],
+    ['3 decimal places', '5.005', '2001-01-01', { newInterestRate: 'Enter an interest rate with up to 2 decimal places' }],
+    ['missing rate', '', '2001-01-01', { newInterestRate: 'Enter an interest rate' }],
+    ['invalid date', '5', '', { effectiveDate: 'Enter a valid date' }],
+    ['both empty', '', '', { newInterestRate: 'Enter an interest rate', effectiveDate: 'Enter a valid date' }],
+    ['date before first repayment', '5', '1999-12-01', { effectiveDate: 'Choose a date from 1 Jan 2000 to 1 Dec 2009' }],
+    ['date after final repayment', '5', '2010-01-01', { effectiveDate: 'Choose a date from 1 Jan 2000 to 1 Dec 2009' }],
+    ['duplicate date', '6', '2000-01-01', { effectiveDate: 'This effective date is already used' }],
+  ])('%s is refused with the 016 message', (_label, rate, date, expected) => {
+    expect(validateNewRateChange(draft(), rate, date, today)).toEqual(expected)
+  })
+
+  it('accepts a valid change', () => {
+    expect(validateNewRateChange(draft(), '6', '2001-01-01', today)).toEqual({})
+  })
+
+  it('does not check the opening rate', () => {
+    expect(validateNewRateChange(draft([]), '6', '2001-01-01', today)).toEqual({})
+  })
+
+  it('ignores problems on existing rows', () => {
+    expect(validateNewRateChange(draft([newRow('101', '2000-01-01')]), '6', '2001-01-01', today)).toEqual({})
+  })
+})

@@ -35,10 +35,30 @@ async function fillHeader(page: Page, name: string, balance: string, periods: st
   await page.getByLabel('Repayment Frequency').selectOption('Monthly')
 }
 
-async function addRate(page: Page, rate: string, date: string) {
-  await page.getByRole('button', { name: 'Add interest rate change' }).click()
-  await page.getByLabel('New Interest Rate').last().fill(rate)
-  await page.getByLabel('Effective Date').last().fill(date)
+const rateDialog = (page: Page) => page.getByRole('dialog', { name: 'Change Interest Rate' })
+
+/** Opens "Change Interest Rate", adds each [rate, date] pair, then closes it. */
+async function addRates(page: Page, rates: Array<[string, string]>) {
+  await page.getByRole('button', { name: 'Change Interest Rate' }).click()
+  const dialog = rateDialog(page)
+  for (const [rate, date] of rates) {
+    await dialog.getByLabel('New Interest Rate').fill(rate)
+    await dialog.getByLabel('Effective Date').fill(date)
+    await dialog.getByRole('button', { name: 'Add', exact: true }).click()
+  }
+  await dialog.getByRole('button', { name: 'Close' }).click()
+  await expect(dialog).toHaveCount(0)
+}
+
+/** The listed changes in the dialog, read from their remove buttons ("5.25% 1 Jan 2000"). */
+async function listedRates(page: Page): Promise<string[]> {
+  await page.getByRole('button', { name: 'Change Interest Rate' }).click()
+  const labels = await rateDialog(page).getByRole('button', { name: /^Remove / }).evaluateAll(
+    (buttons) => buttons.map((button) => button.getAttribute('aria-label') ?? ''),
+  )
+  await rateDialog(page).getByRole('button', { name: 'Close' }).click()
+  await expect(rateDialog(page)).toHaveCount(0)
+  return labels.map((label) => label.replace(/^Remove /, '').replace(' from ', ' '))
 }
 
 const tab = (page: Page, name: string) =>
@@ -59,8 +79,7 @@ test('mortgages journey: add, reload, sign out and in, switch, rename, guard and
 
     // Add a mortgage with two rate changes entered latest-first (US2-AS6).
     await fillHeader(page, 'Home loan', '500000.50', '360')
-    await addRate(page, '6', '2005-06-01')
-    await addRate(page, '5.25', '2000-01-01')
+    await addRates(page, [['6', '2005-06-01'], ['5.25', '2000-01-01']])
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByRole('status').filter({ hasText: 'Mortgage saved' })).toBeVisible()
     await expect(tab(page, 'Home loan')).toHaveAttribute('aria-current', 'true')
@@ -70,9 +89,7 @@ test('mortgages journey: add, reload, sign out and in, switch, rename, guard and
     await page.reload()
     await openMortgages(page)
     await expect(page.getByLabel('Starting Balance')).toHaveValue('$500,000.50')
-    await expect(page.getByLabel('New Interest Rate').first()).toHaveValue('5.25%')
-    await expect(page.getByLabel('Effective Date').first()).toHaveValue('2000-01-01')
-    await expect(page.getByLabel('New Interest Rate').last()).toHaveValue('6.00%')
+    expect(await listedRates(page)).toEqual(['5.25% 1 Jan 2000', '6.00% 1 Jun 2005'])
 
     // Sign out and back in: the values are unchanged (SC-002).
     await page.getByRole('button', { name: 'Sign out' }).click()
@@ -88,7 +105,7 @@ test('mortgages journey: add, reload, sign out and in, switch, rename, guard and
     await page.getByRole('button', { name: 'Add mortgage' }).click()
     await expect(page.getByLabel('Name', { exact: true })).toHaveValue('')
     await fillHeader(page, 'Car loan', '20000', '48')
-    await addRate(page, '7.5', '2000-01-01')
+    await addRates(page, [['7.5', '2000-01-01']])
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(tab(page, 'Car loan')).toHaveAttribute('aria-current', 'true')
     await tab(page, 'Home loan').click()
@@ -120,6 +137,38 @@ test('mortgages journey: add, reload, sign out and in, switch, rename, guard and
     await tab(page, 'Shed').click()
     await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Shed', { timeout: 1000 })
     expect(Date.now() - started).toBeLessThan(1000)
+
+    // Change Interest Rate: add one change and remove another, Save, reload, reopen (SC-005).
+    await tab(page, 'Home loan').click()
+    await page.getByRole('button', { name: 'Change Interest Rate' }).click()
+    await rateDialog(page).getByLabel('New Interest Rate').fill('6.5')
+    await rateDialog(page).getByLabel('Effective Date').fill('2010-01-01')
+    await rateDialog(page).getByRole('button', { name: 'Add', exact: true }).click()
+    await rateDialog(page).getByRole('button', { name: 'Remove 6.00% from 1 Jun 2005' }).click()
+    await rateDialog(page).getByRole('button', { name: 'Close' }).click()
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Mortgage saved' }).first()).toBeVisible()
+    await page.reload()
+    await openMortgages(page)
+    expect(await listedRates(page)).toEqual(['5.25% 1 Jan 2000', '6.50% 1 Jan 2010'])
+
+    // Cancel discards dialog edits.
+    await addRates(page, [['7', '2012-01-01']])
+    await expect(page.getByText('7.00%', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Cancel' }).click()
+    expect(await listedRates(page)).toEqual(['5.25% 1 Jan 2000', '6.50% 1 Jan 2010'])
+
+    // One add journey in exactly 6 actions: open, New Interest Rate, Effective Date, Add, Close, Save (SC-002).
+    await page.getByRole('button', { name: 'Change Interest Rate' }).click()
+    await rateDialog(page).getByLabel('New Interest Rate').fill('7.25')
+    await rateDialog(page).getByLabel('Effective Date').fill('2015-01-01')
+    await rateDialog(page).getByRole('button', { name: 'Add', exact: true }).click()
+    await rateDialog(page).getByRole('button', { name: 'Close' }).click()
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Mortgage saved' }).first()).toBeVisible()
+    await page.reload()
+    await openMortgages(page)
+    expect(await listedRates(page)).toEqual(['5.25% 1 Jan 2000', '6.50% 1 Jan 2010', '7.25% 1 Jan 2015'])
 
     // Rename.
     await tab(page, 'Car loan').click()

@@ -5,6 +5,7 @@ import {
   conflictError,
   fillForm,
   installFakeApi,
+  listedRates,
   makeMortgage,
   problem,
   renderWithProviders,
@@ -153,9 +154,11 @@ describe('MortgagesPage', () => {
       })])
       renderWithProviders(<MortgagesPage />)
 
+      const user = userEvent.setup()
       await screen.findByRole('button', { name: 'Ordered' })
-      expect(screen.getAllByLabelText('New Interest Rate').map((field) => (field as HTMLInputElement).value))
-        .toEqual(['9.00%', '7.00%', '8.00%'])
+      await user.click(screen.getByRole('button', { name: 'Change Interest Rate' }))
+      await screen.findByRole('dialog', { name: 'Change Interest Rate' })
+      expect(listedRates()).toEqual(['9.00% 1 Jan 2000', '7.00% 1 Feb 2000', '8.00% 1 Mar 2000'])
     })
 
     it('disables Add mortgage at 20 mortgages without making it unfocusable, and ignores activation', async () => {
@@ -220,6 +223,40 @@ describe('MortgagesPage', () => {
       expect(await screen.findByText('Discard unsaved changes?')).toBeInTheDocument()
       await user.click(screen.getByRole('button', { name: 'Discard changes' }))
       expect(screen.getByLabelText('Name')).toHaveValue('')
+    })
+
+    it('values typed in the dialog but not added leave the form clean, so switching tabs does not ask', async () => {
+      server = installFakeApi([makeMortgage({ name: 'Home' }), makeMortgage({ name: 'Car' })])
+      const user = userEvent.setup()
+      renderWithProviders(<MortgagesPage />)
+      await screen.findByRole('button', { name: 'Home' })
+      await user.click(screen.getByRole('button', { name: 'Change Interest Rate' }))
+      const dialog = await screen.findByRole('dialog', { name: 'Change Interest Rate' })
+      await user.type(within(dialog).getByLabelText('New Interest Rate'), '7')
+      setDate('Effective Date', '2001-01-01')
+      await user.click(within(dialog).getByRole('button', { name: 'Close' }))
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+      await user.click(screen.getByRole('button', { name: 'Car' }))
+
+      expect(screen.queryByText('Discard unsaved changes?')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Car' })).toHaveAttribute('aria-current', 'true')
+    })
+
+    it('asks before switching away after a dialog remove (the unsaved-changes prompt covers dialog edits)', async () => {
+      server = installFakeApi([makeMortgage({ name: 'Home' }), makeMortgage({ name: 'Car' })])
+      const user = userEvent.setup()
+      renderWithProviders(<MortgagesPage />)
+      await screen.findByRole('button', { name: 'Home' })
+      await user.click(screen.getByRole('button', { name: 'Change Interest Rate' }))
+      const dialog = await screen.findByRole('dialog', { name: 'Change Interest Rate' })
+      await user.click(within(dialog).getByRole('button', { name: 'Remove 5.25% from 1 Jan 2000' }))
+      await user.click(within(dialog).getByRole('button', { name: 'Close' }))
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+      await user.click(screen.getByRole('button', { name: 'Car' }))
+
+      expect(await screen.findByText('Discard unsaved changes?')).toBeInTheDocument()
     })
 
     it('Cancel restores the saved values', async () => {
