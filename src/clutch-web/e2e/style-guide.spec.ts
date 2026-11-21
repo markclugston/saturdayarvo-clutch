@@ -320,7 +320,8 @@ const states: StateDef[] = [
     name: 'nav-expanded', mock: signedIn,
     reach: async (page) => {
       await expect(page.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
-      await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: 'Accounts' }).focus()
+      // The rail expands on mouse hover (keyboard focus no longer expands it; see layout-navigation.md).
+      await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: 'Accounts' }).hover()
       await expect(page.getByRole('navigation', { name: 'Primary' }).getByText('Categories')).toBeVisible()
     },
   },
@@ -381,7 +382,7 @@ const states: StateDef[] = [
     name: 'categories', mock: signedIn,
     reach: async (page) => {
       await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: 'Categories' }).click()
-      await expect(page.getByRole('list', { name: 'Groups and categories' })).toBeVisible()
+      await expect(page.getByRole('group', { name: 'Groups and categories' })).toBeVisible()
       await page.mouse.move(600, 400)
     },
   },
@@ -714,12 +715,12 @@ for (const theme of ['Light', 'Dark'] as const) {
         })
         return 0.2126 * r + 0.7152 * g + 0.0722 * b
       }
-      const background = (selector: string) => {
-        const element = document.querySelector(selector)
-        return element ? luminance(getComputedStyle(element).backgroundColor) : Number.NaN
-      }
+      const backgroundOf = (element: Element | null | undefined) =>
+        element ? luminance(getComputedStyle(element).backgroundColor) : Number.NaN
+      const background = (selector: string) => backgroundOf(document.querySelector(selector))
       return {
-        canvas: background('nav[aria-label="Primary"]'),
+        // The navigation is transparent; its canvas comes from the backing layer rendered just before it.
+        canvas: backgroundOf(document.querySelector('nav[aria-label="Primary"]')?.previousElementSibling),
         content: background('main'),
         card: background('[data-slot="card"]'),
         raised: background('#account-description')

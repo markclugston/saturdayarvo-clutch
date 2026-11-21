@@ -26,7 +26,7 @@ test('categories journey: create, nest, rename, reload, themes and delete', asyn
     expect(signIn.status(), await signIn.text()).toBe(204)
 
     const page = await context.newPage()
-    const list = () => page.getByRole('list', { name: 'Groups and categories' })
+    const list = () => page.getByRole('group', { name: 'Groups and categories' })
     const item = (name: string) => list().getByText(name, { exact: true })
 
     await page.goto('/')
@@ -46,7 +46,7 @@ test('categories journey: create, nest, rename, reload, themes and delete', asyn
     await addNode('Groceries', 'Food')
     await addNode('Produce', 'Groceries')
 
-    const names = await list().getByRole('listitem').evaluateAll((elements) =>
+    const names = await list().getByRole('row').evaluateAll((elements) =>
       elements.map((element) => element.querySelector('span')?.textContent))
     expect(names).toEqual(['Food', 'Groceries', 'Produce', 'Home'])
 
