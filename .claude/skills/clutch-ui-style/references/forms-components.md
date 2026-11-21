@@ -12,6 +12,11 @@ All text inputs, selects and textareas use an **in-field floating label**. Exter
 - **Error:** label and ring use `danger`, with helper text below. **Disabled:** reduced opacity, no pointer events.
 - **Multi-select and tag fields:** selections render as removable chips (with an x) inside the field, plus a ghost "+ Add" chip.
 - Every field MUST have `id`/`htmlFor`, and `aria-invalid` and `aria-describedby` when in error.
+- **Percentage (%) and currency ($) fields (WEB-001):**
+  - **Restricted entry:** only characters that can form a valid value are accepted (digits, one decimal separator, and a leading minus only where negative values are valid). Any other typed or pasted character is rejected before it renders, so it never appears in the field. Use `inputMode="decimal"` and filter in the change handler, not with a post-hoc error message.
+  - **Format on blur:** when focus leaves the field, reformat the text to the canonical percentage or currency format (currency symbol, thousands separators and decimal places for `$`; `%` suffix for percentages). Use one shared formatter (`Intl.NumberFormat`) so every field formats identically; the decimal places for each field come from its spec.
+  - **Focus:** show the raw editable value without symbols or separators, so the user can edit it. Parse and format only through the shared helpers.
+  - An empty field stays empty on blur. A value outside the field's allowed range still shows the standard error state.
 
 ```tsx
 // FloatingField (sketch). The label floats with transform, so only colour and transform transition.

@@ -50,6 +50,7 @@ MUST / MUST NOT / SHOULD are used in the RFC 2119 sense.
 - `dark:` variants used for colour.
 - External field labels without documented justification.
 - Labels, headings or button text not in Title Case (for example "Add category" instead of "Add Category").
+- Percentage or currency fields that display invalid characters, or that do not reformat on blur.
 
 ## Changing the style guide
 

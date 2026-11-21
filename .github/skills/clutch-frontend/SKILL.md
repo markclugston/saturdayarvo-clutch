@@ -34,6 +34,12 @@ For visual design (tokens, layout, forms, themes, UI checklist) also load `clutc
 - File-selection controls must be accessible buttons.
 - shadcn/ui is the default primitive source. Third-party UI registries require an independent security review (see `clutch-security-review`).
 
+## Percentage and currency inputs
+
+- Every % and $ entry control (including the mortgages screen) filters input so invalid characters are never displayed, and reformats its text on blur (WEB-001). Field detail is in `clutch-ui-style` `references/forms-components.md`.
+- Build them on one shared input component and one shared parse/format helper. Do not hand-roll per field.
+- Component tests must type and paste invalid characters and assert the field value excludes them, then blur and assert the formatted text.
+
 ## Testing
 
 - Unit and component tests are required. Test user-visible behaviour, not implementation details.
