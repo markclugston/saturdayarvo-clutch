@@ -12,6 +12,6 @@
 [] what do i need to do to be compliant with regulations and best practice for storing transaction data?
 [] are there any awards i can get that are low barriers of entry.  e.g. dont need many or any customers to win.
 [] do i need to put the transaction import off to a background process or thread?  especially when categorization is part of the import.
-[] make sure Title Case rule has been retrofitted.
+[x] make sure Title Case rule has been retrofitted.
 [] make sure the constitution recognises % and $ inputs and proper validation occurs
-[] address the poor ux for the delete confirmation in categories
+[x] address the poor ux for the delete confirmation in categories

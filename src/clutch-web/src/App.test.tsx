@@ -41,7 +41,7 @@ vi.mock('@/features/accounts/AccountsPage', () => ({
     })
     return (
       <>
-        <h1>Your accounts</h1>
+        <h1>Your Accounts</h1>
         <button onClick={() => onSelectAccount('account-1')} type="button">Open account</button>
         {accountsQuery.data?.map((account) =>
           <p key={account.description}>{account.description}</p>)}
@@ -53,7 +53,7 @@ vi.mock('@/features/accounts/AccountsPage', () => ({
 
 vi.mock('@/features/accounts/AccountDetails', () => ({
   AccountDetails: ({ onImport }: { onImport: () => void }) => (
-    <button onClick={onImport} type="button">Import transactions</button>
+    <button onClick={onImport} type="button">Import Transactions</button>
   ),
 }))
 
@@ -72,7 +72,7 @@ vi.mock('@/features/imports/api', () => ({
 }))
 
 vi.mock('@/features/categories/CategoriesPage', () => ({
-  CategoriesPage: () => <h1>Categories and groups</h1>,
+  CategoriesPage: () => <h1>Categories and Groups</h1>,
 }))
 
 vi.mock('@/features/mortgages/MortgagesPage', () => ({
@@ -90,14 +90,14 @@ vi.mock('@/features/mortgages/MortgagesPage', () => ({
 
 async function startImportReview(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole('button', { name: 'Open account' }))
-  await user.click(screen.getByRole('button', { name: 'Import transactions' }))
+  await user.click(screen.getByRole('button', { name: 'Import Transactions' }))
   await user.upload(
-    await screen.findByLabelText('CSV file'),
+    await screen.findByLabelText('CSV File'),
     new File(['Date,Description,Amount\n2025-01-15,Market,10.00'], 'transactions.csv', {
       type: 'text/csv',
     }),
   )
-  await user.click(await screen.findByRole('button', { name: 'Review import with saved settings' }))
+  await user.click(await screen.findByRole('button', { name: 'Review Import with Saved Settings' }))
   expect(await screen.findByText('Market')).toBeInTheDocument()
 }
 
@@ -176,9 +176,9 @@ describe('session loading', () => {
 
     renderWithQueryClient(<App />)
 
-    expect(screen.getByRole('status')).toHaveTextContent('Checking your session')
+    expect(screen.getByRole('status')).toHaveTextContent('Checking Your Session')
     expect(screen.queryByRole('navigation', { name: 'Primary' })).not.toBeInTheDocument()
-    expect(document.querySelector('h1')).toHaveTextContent('Sign in')
+    expect(document.querySelector('h1')).toHaveTextContent('Sign In')
     expect(document.querySelector('main')).toHaveAttribute('inert')
     expect(screen.queryByRole('combobox', { name: 'Theme' })).not.toBeInTheDocument()
 
@@ -198,7 +198,7 @@ describe('session loading', () => {
     await waitFor(() => expect(getSession).toHaveBeenCalledTimes(1))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument(), { timeout: 3000 })
-    expect(await screen.findByRole('heading', { name: 'Sign in' }, { timeout: 3000 }))
+    expect(await screen.findByRole('heading', { name: 'Sign In' }, { timeout: 3000 }))
       .toBeInTheDocument()
     expect(getSession).toHaveBeenCalledTimes(2)
   })
@@ -212,8 +212,8 @@ describe('session loading', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load your session')
     expect(getSession).toHaveBeenCalledTimes(1)
-    await user.click(screen.getByRole('button', { name: 'Try again' }))
-    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Try Again' }))
+    expect(await screen.findByRole('heading', { name: 'Sign In' })).toBeInTheDocument()
   })
 
   it('does not retry a signed-out response and unlocks the sign-in page', async () => {
@@ -222,7 +222,7 @@ describe('session loading', () => {
     renderWithQueryClient(<App />)
 
     await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument())
-    expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Sign In' })).toBeInTheDocument()
     expect(screen.queryByRole('navigation', { name: 'Primary' })).not.toBeInTheDocument()
     expect(getSession).toHaveBeenCalledTimes(1)
   })
@@ -271,10 +271,10 @@ describe('session loading', () => {
     renderWithQueryClient(<App />)
     await screen.findByRole('alert')
     const retryStartedAt = performance.now()
-    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    await user.click(screen.getByRole('button', { name: 'Try Again' }))
 
     expect(performance.now() - retryStartedAt).toBeLessThan(500)
-    expect(screen.getByRole('status')).toHaveTextContent('Checking your session')
+    expect(screen.getByRole('status')).toHaveTextContent('Checking Your Session')
     expect(getSession).toHaveBeenCalledTimes(2)
   })
 
@@ -284,7 +284,7 @@ describe('session loading', () => {
     renderWithQueryClient(<App />)
 
     expect(await screen.findByRole('combobox', { name: 'Theme' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Your accounts' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Your Accounts' })).toBeInTheDocument()
   })
 
   it('keeps the import review mounted while the session refreshes on returning to the browser', async () => {
@@ -298,20 +298,20 @@ describe('session loading', () => {
 
     renderWithQueryClient(<App />)
     await startImportReview(user)
-    expect(screen.getByRole('heading', { name: 'Review transactions' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Review Transactions' })).toBeInTheDocument()
 
     await act(async () => {
       focusManager.setFocused(false)
       focusManager.setFocused(true)
     })
     await waitFor(() => expect(getSession).toHaveBeenCalledTimes(2))
-    expect(screen.getByRole('heading', { name: 'Review transactions' })).toBeInTheDocument()
-    expect(screen.queryByText('Checking your session')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Review Transactions' })).toBeInTheDocument()
+    expect(screen.queryByText('Checking Your Session')).not.toBeInTheDocument()
 
     await act(async () => resolveRefresh?.({ id: 'user-1', roles: [] }))
-    expect(screen.getByRole('heading', { name: 'Review transactions' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Review Transactions' })).toBeInTheDocument()
     expect(screen.getByText('Market')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Confirm import' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm Import' }))
     await waitFor(() => expect(confirmImportReview).toHaveBeenCalledWith(
       '550e8400-e29b-41d4-a716-446655440002',
       false,
@@ -335,10 +335,10 @@ describe('session loading', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Unable to refresh your session')
     expect(within(screen.getByRole('button', { name: 'Categories' })).getByText('Categories')).toBeVisible()
-    expect(screen.getByRole('heading', { name: 'Review transactions' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Retry session check' }))
+    expect(screen.getByRole('heading', { name: 'Review Transactions' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Retry Session Check' }))
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
-    expect(screen.getByRole('heading', { name: 'Review transactions' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Review Transactions' })).toBeInTheDocument()
   })
 
   it('hides the review when a background session refresh returns unauthorized', async () => {
@@ -355,9 +355,9 @@ describe('session loading', () => {
       focusManager.setFocused(true)
     })
 
-    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Sign In' })).toBeInTheDocument()
     expect(screen.queryByRole('navigation', { name: 'Primary' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Review transactions' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Review Transactions' })).not.toBeInTheDocument()
   })
 
   it('exposes application actions as named buttons without hyperlink controls', async () => {
@@ -368,8 +368,8 @@ describe('session loading', () => {
 
     renderWithQueryClient(<App />)
 
-    const importLimitsButton = await screen.findByRole('button', { name: 'Import limits' })
-    const signOutButton = screen.getByRole('button', { name: 'Sign out' })
+    const importLimitsButton = await screen.findByRole('button', { name: 'Import Limits' })
+    const signOutButton = screen.getByRole('button', { name: 'Sign Out' })
     expect(importLimitsButton.tagName).toBe('BUTTON')
     expect(signOutButton.tagName).toBe('BUTTON')
     expect(document.querySelectorAll('a[href]')).toHaveLength(0)
@@ -387,11 +387,11 @@ describe('session loading', () => {
     expect(accountsButton).toHaveClass('cursor-pointer')
     expect(categoriesButton).toHaveClass('cursor-pointer')
     await user.click(categoriesButton)
-    expect(screen.getByRole('heading', { name: 'Categories and groups' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Categories and Groups' })).toBeInTheDocument()
     expect(categoriesButton).toHaveAttribute('aria-current', 'page')
 
     await user.click(accountsButton)
-    expect(screen.getByRole('heading', { name: 'Your accounts' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Your Accounts' })).toBeInTheDocument()
   })
 
   it('lists Mortgages directly above Categories and marks it current when shown', async () => {
@@ -419,14 +419,14 @@ describe('session loading', () => {
     await user.click(screen.getByRole('button', { name: 'Make dirty' }))
 
     await user.click(screen.getByRole('button', { name: 'Accounts' }))
-    expect(await screen.findByText('Discard unsaved changes?')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Stay on this page' }))
+    expect(await screen.findByText('Discard Unsaved Changes?')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Stay on This Page' }))
     expect(screen.getByRole('heading', { name: 'Mortgages page' })).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Sign out' }))
-    expect(await screen.findByText('Discard unsaved changes?')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Sign Out' }))
+    expect(await screen.findByText('Discard Unsaved Changes?')).toBeInTheDocument()
     expect(signOut).not.toHaveBeenCalled()
-    await user.click(screen.getByRole('button', { name: 'Discard changes' }))
+    await user.click(screen.getByRole('button', { name: 'Discard Changes' }))
     await waitFor(() => expect(signOut).toHaveBeenCalled())
   })
 
@@ -469,8 +469,8 @@ describe('session loading', () => {
     await user.click(categories)
     expect(categories).toHaveAttribute('aria-current', 'page')
     await user.click(accounts)
-    expect(screen.getByRole('heading', { name: 'Your accounts' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Import limits' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Your Accounts' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Import Limits' })).not.toBeInTheDocument()
   })
 
   it('expands on toggle across screens and starts compact after sign-out', async () => {
@@ -490,12 +490,12 @@ describe('session loading', () => {
     expect(label).toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Categories' }))
     expect(label).toBeVisible()
-    await user.click(screen.getByRole('button', { name: 'Sign out' }))
-    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Sign Out' }))
+    expect(await screen.findByRole('heading', { name: 'Sign In' })).toBeInTheDocument()
     expect(screen.queryByRole('navigation', { name: 'Primary' })).not.toBeInTheDocument()
     await user.type(screen.getByLabelText('Email'), 'user@example.test')
     await user.type(screen.getByLabelText('Password'), 'password')
-    await user.click(screen.getByRole('button', { name: 'Sign in' }))
+    await user.click(screen.getByRole('button', { name: 'Sign In' }))
     const newNav = await screen.findByRole('navigation', { name: 'Primary' })
     expect(within(newNav).getByText('Categories')).not.toBeVisible()
   })
@@ -508,7 +508,7 @@ describe('session loading', () => {
 
     await screen.findByRole('navigation', { name: 'Primary' })
     await user.click(screen.getByRole('button', { name: 'Toggle navigation' }))
-    await user.click(screen.getByRole('button', { name: 'Sign out' }))
+    await user.click(screen.getByRole('button', { name: 'Sign Out' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Unable to sign out')
     expect(within(screen.getByRole('button', { name: 'Categories' })).getByText('Categories')).toBeVisible()
   })
@@ -528,7 +528,7 @@ describe('session loading', () => {
 
     await screen.findByRole('navigation', { name: 'Primary' })
     await user.click(screen.getByRole('button', { name: 'Toggle navigation' }))
-    await user.click(screen.getByRole('button', { name: 'Sign out' }))
+    await user.click(screen.getByRole('button', { name: 'Sign Out' }))
     await waitFor(() => expect(getSession).toHaveBeenCalledTimes(2))
     expect(screen.queryByRole('navigation', { name: 'Primary' })).not.toBeInTheDocument()
     await act(async () => rejectSession?.(new ApiError(500, { title: 'Server error' })))
@@ -537,7 +537,7 @@ describe('session loading', () => {
 
     await user.type(screen.getByLabelText('Email'), 'user@example.test')
     await user.type(screen.getByLabelText('Password'), 'password')
-    await user.click(screen.getByRole('button', { name: 'Sign in' }))
+    await user.click(screen.getByRole('button', { name: 'Sign In' }))
     const nav = await screen.findByRole('navigation', { name: 'Primary' })
     expect(within(nav).getByText('Categories')).not.toBeVisible()
   })
@@ -596,7 +596,7 @@ describe('session loading', () => {
 
     renderWithQueryClient(<App />)
 
-    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Sign In' })).toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: 'Theme' })).not.toBeInTheDocument()
   })
 
@@ -612,11 +612,11 @@ describe('session loading', () => {
     await user.selectOptions(selector, 'Dark')
     await waitFor(() => expect(document.documentElement).toHaveClass('dark'))
 
-    await user.click(screen.getByRole('button', { name: 'Sign out' }))
+    await user.click(screen.getByRole('button', { name: 'Sign Out' }))
 
     await waitFor(() => expect(document.documentElement).not.toHaveClass('dark'))
-    expect(await screen.findByRole('heading', { name: 'Sign in' })).not.toHaveFocus()
-    expect(screen.getByRole('heading', { name: 'Sign in' })).not.toHaveAttribute('tabindex')
+    expect(await screen.findByRole('heading', { name: 'Sign In' })).not.toHaveFocus()
+    expect(screen.getByRole('heading', { name: 'Sign In' })).not.toHaveAttribute('tabindex')
   })
 
   it('does not expose cached account or import data after another user signs in', async () => {
@@ -640,8 +640,8 @@ describe('session loading', () => {
     expect(await screen.findByText('Owner private account')).toBeInTheDocument()
     expect(screen.getByText('Owner private import settings')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Sign out' }))
-    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Sign Out' }))
+    expect(await screen.findByRole('heading', { name: 'Sign In' })).toBeInTheDocument()
     expect(screen.queryByText('Owner private account')).not.toBeInTheDocument()
     expect(screen.queryByText('Owner private import settings')).not.toBeInTheDocument()
     expect(queryClient.getQueryData(['account', 'account-1'])).toBeUndefined()
@@ -651,9 +651,9 @@ describe('session loading', () => {
 
     await user.type(screen.getByLabelText('Email'), 'other@example.test')
     await user.type(screen.getByLabelText('Password'), 'Other-user!Password-123')
-    await user.click(screen.getByRole('button', { name: 'Sign in' }))
+    await user.click(screen.getByRole('button', { name: 'Sign In' }))
 
-    expect(await screen.findByRole('heading', { name: 'Your accounts' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Your Accounts' })).toBeInTheDocument()
     expect(screen.queryByText('Owner private account')).not.toBeInTheDocument()
     expect(screen.queryByText('Owner private import settings')).not.toBeInTheDocument()
   })

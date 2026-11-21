@@ -50,7 +50,7 @@ describe('TransactionsTable', () => {
     )
     expect(screen.getByText(formatCurrencyAmount('12.3', 'AUD'))).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Load more' }))
+    await user.click(screen.getByRole('button', { name: 'Load More' }))
     await waitFor(() => expect(screen.getByText('Salary')).toBeInTheDocument())
     expect(screen.getByText('Incoming')).toBeInTheDocument()
     expect(getTransactions).toHaveBeenNthCalledWith(2, 'account-id', 'next-page')

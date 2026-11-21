@@ -17,13 +17,13 @@ export function DiscardChangesDialog({ onDiscard, onStay }: DiscardChangesDialog
       <DialogPortal>
         <DialogBackdrop />
         <DialogPopup className="space-y-4 p-6" initialFocus={stay}>
-          <DialogTitle>Discard unsaved changes?</DialogTitle>
+          <DialogTitle>Discard Unsaved Changes?</DialogTitle>
           <DialogDescription>
             You have changes that have not been saved. If you continue they will be lost.
           </DialogDescription>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={onDiscard} type="button" variant="danger">Discard changes</Button>
-            <Button onClick={onStay} ref={stay} type="button" variant="secondary">Stay on this page</Button>
+            <Button onClick={onDiscard} type="button" variant="danger">Discard Changes</Button>
+            <Button onClick={onStay} ref={stay} type="button" variant="secondary">Stay on This Page</Button>
           </div>
         </DialogPopup>
       </DialogPortal>

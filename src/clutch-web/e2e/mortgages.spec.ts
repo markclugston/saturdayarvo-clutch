@@ -92,17 +92,17 @@ test('mortgages journey: add, reload, sign out and in, switch, rename, guard and
     expect(await listedRates(page)).toEqual(['5.25% 1 Jan 2000', '6.00% 1 Jun 2005'])
 
     // Sign out and back in: the values are unchanged (SC-002).
-    await page.getByRole('button', { name: 'Sign out' }).click()
-    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
+    await page.getByRole('button', { name: 'Sign Out' }).click()
+    await expect(page.getByRole('heading', { name: 'Sign In' })).toBeVisible()
     await page.getByLabel('Email').fill(email)
     await page.getByLabel('Password').fill(testPassword)
-    await page.getByRole('button', { name: 'Sign in' }).click()
+    await page.getByRole('button', { name: 'Sign In' }).click()
     await openMortgages(page)
     await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Home loan')
     await expect(page.getByLabel('Starting Balance')).toHaveValue('$500,000.50')
 
     // A second mortgage, then switch.
-    await page.getByRole('button', { name: 'Add mortgage' }).click()
+    await page.getByRole('button', { name: 'Add Mortgage' }).click()
     await expect(page.getByLabel('Name', { exact: true })).toHaveValue('')
     await fillHeader(page, 'Car loan', '20000', '48')
     await addRates(page, [['7.5', '2000-01-01']])
@@ -180,12 +180,12 @@ test('mortgages journey: add, reload, sign out and in, switch, rename, guard and
     // Unsaved changes: Stay, then Discard.
     await page.getByLabel('Name', { exact: true }).fill('Edited but not saved')
     await tab(page, 'Home loan').click()
-    const discard = page.getByRole('dialog', { name: 'Discard unsaved changes?' })
+    const discard = page.getByRole('dialog', { name: 'Discard Unsaved Changes?' })
     await expect(discard).toBeVisible()
-    await discard.getByRole('button', { name: 'Stay on this page' }).click()
+    await discard.getByRole('button', { name: 'Stay on This Page' }).click()
     await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Edited but not saved')
     await tab(page, 'Home loan').click()
-    await page.getByRole('dialog', { name: 'Discard unsaved changes?' }).getByRole('button', { name: 'Discard changes' }).click()
+    await page.getByRole('dialog', { name: 'Discard Unsaved Changes?' }).getByRole('button', { name: 'Discard Changes' }).click()
     await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Home loan')
 
     // Delete (from the Loan Details header): cancel, then confirm.

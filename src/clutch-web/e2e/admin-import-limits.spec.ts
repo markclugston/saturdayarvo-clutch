@@ -17,24 +17,24 @@ test.describe('administrator import limits', () => {
 
     try {
       await expect(page.locator('a[href]')).toHaveCount(0)
-      await page.getByRole('button', { name: 'Import limits' }).click()
-      await expect(page.getByRole('heading', { name: 'Import limits' })).toBeVisible()
-      await expect(page.getByRole('button', { name: 'Back to the application' })).toBeFocused()
+      await page.getByRole('button', { name: 'Import Limits' }).click()
+      await expect(page.getByRole('heading', { name: 'Import Limits' })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Back to the Application' })).toBeFocused()
       const accessibility = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
         .analyze()
       expect(accessibility.violations).toEqual([])
 
-      const rowLimit = page.getByLabel('Maximum rows per import')
+      const rowLimit = page.getByLabel('Maximum Rows per Import')
       const originalLimit = Number(await rowLimit.inputValue())
       await rowLimit.fill(String(originalLimit + 1))
-      await page.getByRole('button', { name: 'Save limits' }).click()
+      await page.getByRole('button', { name: 'Save Limits' }).click()
       await expect(rowLimit).toHaveValue(String(originalLimit + 1))
 
       await rowLimit.fill(String(originalLimit))
-      await page.getByRole('button', { name: 'Save limits' }).click()
+      await page.getByRole('button', { name: 'Save Limits' }).click()
       await expect(rowLimit).toHaveValue(String(originalLimit))
-      await page.getByRole('button', { name: 'Back to the application' }).click()
+      await page.getByRole('button', { name: 'Back to the Application' }).click()
       await expect(page.locator('main h1')).not.toBeFocused()
     } finally {
       await context.close()

@@ -106,7 +106,7 @@ describe('MortgagesPage', () => {
       await screen.findByRole('button', { name: 'Home' })
       expect(screen.queryByText(PLEASE_ENTER)).not.toBeInTheDocument()
 
-      await user.click(screen.getByRole('button', { name: 'Add mortgage' }))
+      await user.click(screen.getByRole('button', { name: 'Add Mortgage' }))
 
       expect(screen.getAllByText(PLEASE_ENTER)).toHaveLength(2)
       expect(screen.getByLabelText('Name')).toHaveValue('')
@@ -166,7 +166,7 @@ describe('MortgagesPage', () => {
       const user = userEvent.setup()
       renderWithProviders(<MortgagesPage />)
 
-      const add = await screen.findByRole('button', { name: 'Add mortgage' })
+      const add = await screen.findByRole('button', { name: 'Add Mortgage' })
       expect(add).toHaveAttribute('aria-disabled', 'true')
       expect(add).not.toBeDisabled()
       expect(add).toHaveAttribute('title', 'You can save up to 20 mortgages')
@@ -215,13 +215,13 @@ describe('MortgagesPage', () => {
       await user.type(screen.getByLabelText('Name'), ' edited')
 
       await user.click(screen.getByRole('button', { name: 'Car' }))
-      expect(await screen.findByText('Discard unsaved changes?')).toBeInTheDocument()
-      await user.click(screen.getByRole('button', { name: 'Stay on this page' }))
+      expect(await screen.findByText('Discard Unsaved Changes?')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Stay on This Page' }))
       expect(screen.getByLabelText('Name')).toHaveValue('Home edited')
 
-      await user.click(screen.getByRole('button', { name: 'Add mortgage' }))
-      expect(await screen.findByText('Discard unsaved changes?')).toBeInTheDocument()
-      await user.click(screen.getByRole('button', { name: 'Discard changes' }))
+      await user.click(screen.getByRole('button', { name: 'Add Mortgage' }))
+      expect(await screen.findByText('Discard Unsaved Changes?')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Discard Changes' }))
       expect(screen.getByLabelText('Name')).toHaveValue('')
     })
 
@@ -239,7 +239,7 @@ describe('MortgagesPage', () => {
 
       await user.click(screen.getByRole('button', { name: 'Car' }))
 
-      expect(screen.queryByText('Discard unsaved changes?')).not.toBeInTheDocument()
+      expect(screen.queryByText('Discard Unsaved Changes?')).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Car' })).toHaveAttribute('aria-current', 'true')
     })
 
@@ -256,7 +256,7 @@ describe('MortgagesPage', () => {
 
       await user.click(screen.getByRole('button', { name: 'Car' }))
 
-      expect(await screen.findByText('Discard unsaved changes?')).toBeInTheDocument()
+      expect(await screen.findByText('Discard Unsaved Changes?')).toBeInTheDocument()
     })
 
     it('Cancel restores the saved values', async () => {
@@ -334,9 +334,9 @@ describe('MortgagesPage', () => {
       await screen.findByText('This mortgage was changed elsewhere; reload to see the latest')
 
       await user.click(screen.getByRole('button', { name: 'Reload' }))
-      expect(await screen.findByText('Discard unsaved changes?')).toBeInTheDocument()
+      expect(await screen.findByText('Discard Unsaved Changes?')).toBeInTheDocument()
       const release = server.hold('GET')
-      await user.click(screen.getByRole('button', { name: 'Discard changes' }))
+      await user.click(screen.getByRole('button', { name: 'Discard Changes' }))
 
       const busy = await screen.findByRole('button', { name: 'Reloading…' })
       expect(busy).toBeDisabled()
@@ -410,9 +410,9 @@ describe('MortgagesPage', () => {
 
       await user.click(screen.getByRole('button', { name: 'Save' }))
 
-      expect(await screen.findByText('Your sign-in has expired')).toBeInTheDocument()
+      expect(await screen.findByText('Your Sign-In Has Expired')).toBeInTheDocument()
       expect(reset).not.toHaveBeenCalled()
-      await user.click(screen.getByRole('button', { name: 'Stay on this page' }))
+      await user.click(screen.getByRole('button', { name: 'Stay on This Page' }))
       expect(screen.getByLabelText('Name')).toHaveValue('Home edited')
     })
 
@@ -425,7 +425,7 @@ describe('MortgagesPage', () => {
       await user.type(screen.getByLabelText('Name'), ' edited')
       server.failNext('PUT', problem(401))
       await user.click(screen.getByRole('button', { name: 'Save' }))
-      await user.click(await screen.findByRole('button', { name: 'Sign in again' }))
+      await user.click(await screen.findByRole('button', { name: 'Sign In Again' }))
       await waitFor(() => expect(reset).toHaveBeenCalledWith({ queryKey: ['session'], exact: true }))
 
       reset.mockClear()
@@ -433,7 +433,7 @@ describe('MortgagesPage', () => {
       server.failNext('PUT', problem(401))
       await user.click(screen.getByRole('button', { name: 'Save' }))
       await waitFor(() => expect(reset).toHaveBeenCalled())
-      expect(screen.queryByText('Your sign-in has expired')).not.toBeInTheDocument()
+      expect(screen.queryByText('Your Sign-In Has Expired')).not.toBeInTheDocument()
     })
   })
 

@@ -62,11 +62,11 @@ export function ImportLimitsPage({ onBack }: ImportLimitsPageProps) {
   return (
     <section aria-labelledby="admin-limits-heading" className="max-w-xl space-y-4">
       <Button onClick={onBack} type="button" variant="secondary">
-        Back to the application
+        Back to the Application
       </Button>
       <div>
         <PageHeading id="admin-limits-heading">
-          Import limits
+          Import Limits
         </PageHeading>
         <p className="mt-2 text-fg-secondary">
           These shared settings take effect immediately for all imports.
@@ -75,24 +75,24 @@ export function ImportLimitsPage({ onBack }: ImportLimitsPageProps) {
       <Card as="form" className="space-y-4" onSubmit={submit}>
         <LimitInput
           id="max-file-size"
-          label="Maximum file size (bytes)"
+          label="Maximum File Size (Bytes)"
           value={displayedValues.maxFileSizeBytes}
           onChange={(value) => changeValue('maxFileSizeBytes', value)}
         />
         <LimitInput
           id="max-rows"
-          label="Maximum rows per import"
+          label="Maximum Rows per Import"
           value={displayedValues.maxRowsPerImport}
           onChange={(value) => changeValue('maxRowsPerImport', value)}
         />
         <LimitInput
           id="max-attempts"
-          label="Maximum attempts per user per minute"
+          label="Maximum Attempts per User per Minute"
           value={displayedValues.maxImportAttemptsPerUserPerMinute}
           onChange={(value) => changeValue('maxImportAttemptsPerUserPerMinute', value)}
         />
         <Button disabled={!values || updateMutation.isPending} type="submit">
-          {updateMutation.isPending ? 'Saving…' : 'Save limits'}
+          {updateMutation.isPending ? 'Saving…' : 'Save Limits'}
         </Button>
         {updateMutation.isError && <ErrorMessage>{getErrorMessage(updateMutation.error)}</ErrorMessage>}
       </Card>

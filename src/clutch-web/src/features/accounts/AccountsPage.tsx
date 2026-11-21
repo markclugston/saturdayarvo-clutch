@@ -70,7 +70,7 @@ export function AccountsPage({ onSelectAccount }: AccountsPageProps) {
     <section aria-labelledby="accounts-heading" className="space-y-4">
       <div>
         <PageHeading id="accounts-heading">
-          Your accounts
+          Your Accounts
         </PageHeading>
         <p className="mt-2 text-fg-secondary">Each account keeps its own currency and transactions.</p>
       </div>
@@ -97,11 +97,11 @@ export function AccountsPage({ onSelectAccount }: AccountsPageProps) {
       )}
 
       <Card as="form" className="max-w-xl space-y-4" onSubmit={submit}>
-        <CardTitle as="h2">Add an account</CardTitle>
+        <CardTitle as="h2">Add an Account</CardTitle>
         <FloatingField
           autoComplete="off"
           id="account-description"
-          label="Account description"
+          label="Account Description"
           maxLength={200}
           onChange={(event) => setDescription(event.currentTarget.value)}
           required
@@ -123,7 +123,7 @@ export function AccountsPage({ onSelectAccount }: AccountsPageProps) {
           ))}
         </FloatingField>
         <Button disabled={createMutation.isPending} type="submit">
-          {createMutation.isPending ? 'Saving…' : 'Add account'}
+          {createMutation.isPending ? 'Saving…' : 'Add Account'}
         </Button>
         {createMutation.isError && <ErrorMessage>{getErrorMessage(createMutation.error)}</ErrorMessage>}
       </Card>

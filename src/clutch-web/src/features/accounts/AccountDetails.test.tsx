@@ -58,10 +58,10 @@ describe('AccountDetails', () => {
     }).format(new Date(existingAccount.lastSuccessfulImportAtUtc))
     expect(screen.getByText(/Last successful import:/)).toHaveTextContent(expectedTimestamp)
 
-    const descriptionInput = screen.getByLabelText('Account description')
+    const descriptionInput = screen.getByLabelText('Account Description')
     await user.clear(descriptionInput)
     await user.type(descriptionInput, 'Household expenses')
-    await user.click(screen.getByRole('button', { name: 'Save description' }))
+    await user.click(screen.getByRole('button', { name: 'Save Description' }))
 
     await waitFor(() =>
       expect(updateAccountDescription).toHaveBeenCalledWith(
@@ -80,10 +80,10 @@ describe('AccountDetails', () => {
       <AccountDetails accountId={existingAccount.id} onBack={onBack} onImport={onImport} />,
     )
 
-    await screen.findByRole('heading', { name: 'Account details' })
-    expect(screen.getByRole('button', { name: 'Back to accounts' })).toHaveFocus()
-    await user.click(screen.getByRole('button', { name: 'Back to accounts' }))
-    await user.click(screen.getByRole('button', { name: 'Import transactions' }))
+    await screen.findByRole('heading', { name: 'Account Details' })
+    expect(screen.getByRole('button', { name: 'Back to Accounts' })).toHaveFocus()
+    await user.click(screen.getByRole('button', { name: 'Back to Accounts' }))
+    await user.click(screen.getByRole('button', { name: 'Import Transactions' }))
 
     expect(onBack).toHaveBeenCalledOnce()
     expect(onImport).toHaveBeenCalledOnce()

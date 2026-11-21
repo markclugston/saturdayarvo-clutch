@@ -16,42 +16,42 @@ test.describe('account import settings', () => {
     const context = await browser.newContext({ storageState: storageState! })
     const page = await context.newPage()
     await page.goto(baseUrl)
-    await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
     const description = `Import settings ${Date.now()}`
-    await page.getByLabel('Account description').fill(description)
+    await page.getByLabel('Account Description').fill(description)
     await page.getByLabel('Currency').selectOption('AUD')
     const accountCreation = page.waitForResponse((response) =>
       response.url().endsWith('/api/accounts')
       && response.request().method() === 'POST')
-    await page.getByRole('button', { name: 'Add account' }).click()
+    await page.getByRole('button', { name: 'Add Account' }).click()
     const accountResponse = await accountCreation
     expect(accountResponse.ok()).toBeTruthy()
     const account = await accountResponse.json() as { id: string }
     const accountId = account.id
-    await expect(page.getByRole('heading', { name: 'Account details' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Account Details' })).toBeVisible()
 
-    await page.getByRole('button', { name: 'Import transactions' }).click()
+    await page.getByRole('button', { name: 'Import Transactions' }).click()
     await page.locator('#csv-file').setInputFiles({
       name: 'first-import.csv',
       mimeType: 'text/csv',
       buffer: Buffer.from('Date,Description,Amount\n2025-01-15,Market first,10.00'),
     })
-    await page.getByLabel('Transaction date column').selectOption('0')
-    await page.getByLabel('Description column').selectOption('1')
-    await page.getByLabel('Date format').selectOption('yyyy-MM-dd')
-    await page.getByLabel('Signed amount column').selectOption('2')
-    await page.getByLabel('Incoming transactions use').selectOption('Positive')
-    await page.getByLabel('Number format used in this file')
+    await page.getByLabel('Transaction Date Column').selectOption('0')
+    await page.getByLabel('Description Column').selectOption('1')
+    await page.getByLabel('Date Format').selectOption('yyyy-MM-dd')
+    await page.getByLabel('Signed Amount Column').selectOption('2')
+    await page.getByLabel('Incoming Transactions Use').selectOption('Positive')
+    await page.getByLabel('Number Format Used in This File')
       .selectOption('dot-decimal-comma-grouping')
-    await page.getByRole('button', { name: 'Review import' }).click()
-    await expect(page.getByRole('button', { name: 'Confirm import' })).toBeVisible()
+    await page.getByRole('button', { name: 'Review Import' }).click()
+    await expect(page.getByRole('button', { name: 'Confirm Import' })).toBeVisible()
     await expectAccessibleAcrossThemeAndViewports(page)
-    await page.getByRole('button', { name: 'Confirm import' }).click()
+    await page.getByRole('button', { name: 'Confirm Import' }).click()
     await expect(page.getByRole('status')).toContainText('1 transactions imported successfully')
     await expectAccessibleAcrossThemeAndViewports(page)
 
-    await page.getByRole('button', { name: 'Return to account' }).click()
-    await page.getByRole('button', { name: 'Import transactions' }).click()
+    await page.getByRole('button', { name: 'Return to Account' }).click()
+    await page.getByRole('button', { name: 'Import Transactions' }).click()
     await page.locator('#csv-file').setInputFiles({
       name: 'second-import.csv',
       mimeType: 'text/csv',
@@ -61,7 +61,7 @@ test.describe('account import settings', () => {
     await expect(page.getByRole('status')).toContainText(
       'Using this account’s saved import settings.',
     )
-    await expect(page.getByRole('heading', { name: 'Map CSV columns' })).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Map CSV Columns' })).toHaveCount(0)
     await page.setViewportSize({ width: 375, height: 812 })
     await page.emulateMedia({ colorScheme: 'dark' })
     const accessibility = await new AxeBuilder({ page })
@@ -79,31 +79,31 @@ test.describe('account import settings', () => {
       element.classList.contains('dark'))).toBe(themePreference.mode === 'Dark')
 
     const reviewWithSettingsButton = page.getByRole('button', {
-      name: 'Review import with saved settings',
+      name: 'Review Import with Saved Settings',
     })
     await reviewWithSettingsButton.focus()
     await page.keyboard.press('Enter')
-    const confirmSavedImport = page.getByRole('button', { name: 'Confirm import' })
+    const confirmSavedImport = page.getByRole('button', { name: 'Confirm Import' })
     await confirmSavedImport.focus()
     await page.keyboard.press('Enter')
     await expect(page.getByRole('status')).toContainText('1 transactions imported successfully')
 
-    await page.getByRole('button', { name: 'Return to account' }).click()
-    await page.getByRole('button', { name: 'Import transactions' }).click()
+    await page.getByRole('button', { name: 'Return to Account' }).click()
+    await page.getByRole('button', { name: 'Import Transactions' }).click()
     await page.locator('#csv-file').setInputFiles({
       name: 'edited-import.csv',
       mimeType: 'text/csv',
       buffer: Buffer.from('Date,Description,Amount\n2025-01-17,Market third,30.00'),
     })
 
-    const changeSettingsButton = page.getByRole('button', { name: 'View or change settings' })
+    const changeSettingsButton = page.getByRole('button', { name: 'View or Change Settings' })
     await changeSettingsButton.focus()
     await page.keyboard.press('Enter')
-    await expect(page.getByLabel('Transaction date column')).toHaveValue('0')
-    await expect(page.getByLabel('Description column')).toHaveValue('1')
-    await page.getByLabel('Incoming transactions use').selectOption('Negative')
-    await page.getByRole('button', { name: 'Review import' }).click()
-    const confirmButton = page.getByRole('button', { name: 'Confirm import' })
+    await expect(page.getByLabel('Transaction Date Column')).toHaveValue('0')
+    await expect(page.getByLabel('Description Column')).toHaveValue('1')
+    await page.getByLabel('Incoming Transactions Use').selectOption('Negative')
+    await page.getByRole('button', { name: 'Review Import' }).click()
+    const confirmButton = page.getByRole('button', { name: 'Confirm Import' })
     await confirmButton.focus()
     await page.keyboard.press('Enter')
     await expect(page.getByRole('status')).toContainText('1 transactions imported successfully')
@@ -161,56 +161,56 @@ test.describe('account import settings', () => {
     try {
       await page.goto(baseUrl)
       await createAccount(page, `Balance ${Date.now()}`)
-      await page.getByRole('button', { name: 'Import transactions' }).click()
+      await page.getByRole('button', { name: 'Import Transactions' }).click()
       await page.locator('#csv-file').setInputFiles({
         name: 'balance-import.csv',
         mimeType: 'text/csv',
         buffer: Buffer.from('Date,Description,Amount,Balance\n2025-01-15,Market,10.00,90.00'),
       })
-      await page.getByLabel('Transaction date column').selectOption('0')
-      await page.getByLabel('Description column').selectOption('1')
-      await page.getByLabel('Date format').selectOption('yyyy-MM-dd')
-      await page.getByLabel('Signed amount column').selectOption('2')
-      await page.getByLabel('Incoming transactions use').selectOption('Positive')
-      await page.getByLabel('Balance column (optional)').selectOption('3')
-      await page.getByLabel('Number format used in this file')
+      await page.getByLabel('Transaction Date Column').selectOption('0')
+      await page.getByLabel('Description Column').selectOption('1')
+      await page.getByLabel('Date Format').selectOption('yyyy-MM-dd')
+      await page.getByLabel('Signed Amount Column').selectOption('2')
+      await page.getByLabel('Incoming Transactions Use').selectOption('Positive')
+      await page.getByLabel('Balance Column (Optional)').selectOption('3')
+      await page.getByLabel('Number Format Used in This File')
         .selectOption('dot-decimal-comma-grouping')
-      await page.getByRole('button', { name: 'Review import' }).click()
-      await page.getByRole('button', { name: 'Confirm import' }).click()
+      await page.getByRole('button', { name: 'Review Import' }).click()
+      await page.getByRole('button', { name: 'Confirm Import' }).click()
       await expect(page.getByRole('status')).toContainText('1 transactions imported successfully')
 
-      await page.getByRole('button', { name: 'Return to account' }).click()
+      await page.getByRole('button', { name: 'Return to Account' }).click()
       const headers = page.getByRole('columnheader')
       await expect(headers.last()).toHaveText('Balance')
 
-      await page.getByRole('button', { name: 'Import transactions' }).click()
+      await page.getByRole('button', { name: 'Import Transactions' }).click()
       await page.locator('#csv-file').setInputFiles({
         name: 'balance-import-2.csv',
         mimeType: 'text/csv',
         buffer: Buffer.from('Date,Description,Amount,Balance\n2025-01-16,Market 2,5.00,85.00'),
       })
-      await page.getByRole('button', { name: 'View or change settings' }).click()
-      await expect(page.getByLabel('Balance column (optional)')).toHaveValue('3')
+      await page.getByRole('button', { name: 'View or Change Settings' }).click()
+      await expect(page.getByLabel('Balance Column (Optional)')).toHaveValue('3')
 
       await page.goto(baseUrl)
       await createAccount(page, `No balance ${Date.now()}`)
-      await page.getByRole('button', { name: 'Import transactions' }).click()
+      await page.getByRole('button', { name: 'Import Transactions' }).click()
       await page.locator('#csv-file').setInputFiles({
         name: 'plain-import.csv',
         mimeType: 'text/csv',
         buffer: Buffer.from('Date,Description,Amount\n2025-01-15,Plain,10.00'),
       })
-      await page.getByLabel('Transaction date column').selectOption('0')
-      await page.getByLabel('Description column').selectOption('1')
-      await page.getByLabel('Date format').selectOption('yyyy-MM-dd')
-      await page.getByLabel('Signed amount column').selectOption('2')
-      await page.getByLabel('Incoming transactions use').selectOption('Positive')
-      await page.getByLabel('Number format used in this file')
+      await page.getByLabel('Transaction Date Column').selectOption('0')
+      await page.getByLabel('Description Column').selectOption('1')
+      await page.getByLabel('Date Format').selectOption('yyyy-MM-dd')
+      await page.getByLabel('Signed Amount Column').selectOption('2')
+      await page.getByLabel('Incoming Transactions Use').selectOption('Positive')
+      await page.getByLabel('Number Format Used in This File')
         .selectOption('dot-decimal-comma-grouping')
-      await page.getByRole('button', { name: 'Review import' }).click()
-      await page.getByRole('button', { name: 'Confirm import' }).click()
+      await page.getByRole('button', { name: 'Review Import' }).click()
+      await page.getByRole('button', { name: 'Confirm Import' }).click()
       await expect(page.getByRole('status')).toContainText('1 transactions imported successfully')
-      await page.getByRole('button', { name: 'Return to account' }).click()
+      await page.getByRole('button', { name: 'Return to Account' }).click()
       await expect(page.getByRole('columnheader', { name: 'Amount' })).toBeVisible()
       await expect(page.getByRole('columnheader', { name: 'Balance' })).toHaveCount(0)
     } finally {
@@ -350,77 +350,77 @@ test.describe('account import settings', () => {
     })
 
     await page.goto(baseUrl)
-    await expect(page.getByLabel('Account description')).toBeFocused()
-    await page.getByRole('heading', { name: 'Your accounts' }).evaluate((heading) => heading.focus())
-    await expect(page.getByLabel('Account description')).toBeFocused()
+    await expect(page.getByLabel('Account Description')).toBeFocused()
+    await page.getByRole('heading', { name: 'Your Accounts' }).evaluate((heading) => heading.focus())
+    await expect(page.getByLabel('Account Description')).toBeFocused()
     await expect(page.locator('a[href]')).toHaveCount(0)
     await expectAccessibleAcrossThemeAndViewports(page)
-    await page.getByLabel('Account description').fill(account.description)
+    await page.getByLabel('Account Description').fill(account.description)
     await page.getByLabel('Currency').selectOption('AUD')
-    await page.getByRole('button', { name: 'Add account' }).click()
-    await expect(page.getByRole('button', { name: 'Back to accounts' })).toBeFocused()
+    await page.getByRole('button', { name: 'Add Account' }).click()
+    await expect(page.getByRole('button', { name: 'Back to Accounts' })).toBeFocused()
     await expectAccessibleAcrossThemeAndViewports(page)
-    await page.getByRole('button', { name: 'Import transactions' }).click()
-    await expect(page.getByRole('button', { name: 'Back to account' })).toBeFocused()
+    await page.getByRole('button', { name: 'Import Transactions' }).click()
+    await expect(page.getByRole('button', { name: 'Back to Account' })).toBeFocused()
     await expectAccessibleAcrossThemeAndViewports(page)
     const firstFileChooser = page.waitForEvent('filechooser')
-    await page.getByRole('button', { name: 'Choose CSV file' }).click()
+    await page.getByRole('button', { name: 'Choose CSV File' }).click()
     await (await firstFileChooser).setFiles({
       name: 'first-import.csv',
       mimeType: 'text/csv',
       buffer: Buffer.from('Date,Description,Amount\n2025-01-15,Market,10.00'),
     })
     await expectAccessibleAcrossThemeAndViewports(page)
-    await page.getByLabel('Transaction date column').selectOption('0')
-    await page.getByLabel('Description column').selectOption('1')
-    await page.getByLabel('Date format').selectOption('yyyy-MM-dd')
-    await page.getByLabel('Signed amount column').selectOption('2')
-    await page.getByLabel('Incoming transactions use').selectOption('Positive')
-    await page.getByLabel('Number format used in this file')
+    await page.getByLabel('Transaction Date Column').selectOption('0')
+    await page.getByLabel('Description Column').selectOption('1')
+    await page.getByLabel('Date Format').selectOption('yyyy-MM-dd')
+    await page.getByLabel('Signed Amount Column').selectOption('2')
+    await page.getByLabel('Incoming Transactions Use').selectOption('Positive')
+    await page.getByLabel('Number Format Used in This File')
       .selectOption('dot-decimal-comma-grouping')
-    await page.getByRole('button', { name: 'Review import' }).click()
-    await page.getByRole('button', { name: 'Confirm import' }).click()
+    await page.getByRole('button', { name: 'Review Import' }).click()
+    await page.getByRole('button', { name: 'Confirm Import' }).click()
     await expect(page.getByRole('status')).toContainText('1 transactions imported successfully')
 
-    await page.getByRole('button', { name: 'Return to account' }).click()
-    await expect(page.getByRole('button', { name: 'Back to accounts' })).toBeFocused()
-    await page.getByRole('button', { name: 'Import transactions' }).click()
-    await expect(page.getByRole('button', { name: 'Back to account' })).toBeFocused()
-    await page.getByRole('button', { name: 'View or change settings' }).click()
-    await expect(page.getByLabel('Transaction date column')).toHaveValue('0')
-    await expect(page.getByRole('button', { name: 'Review import', exact: true })).toBeDisabled()
-    await page.getByLabel('Incoming transactions use').selectOption('Negative')
+    await page.getByRole('button', { name: 'Return to Account' }).click()
+    await expect(page.getByRole('button', { name: 'Back to Accounts' })).toBeFocused()
+    await page.getByRole('button', { name: 'Import Transactions' }).click()
+    await expect(page.getByRole('button', { name: 'Back to Account' })).toBeFocused()
+    await page.getByRole('button', { name: 'View or Change Settings' }).click()
+    await expect(page.getByLabel('Transaction Date Column')).toHaveValue('0')
+    await expect(page.getByRole('button', { name: 'Review Import', exact: true })).toBeDisabled()
+    await page.getByLabel('Incoming Transactions Use').selectOption('Negative')
     await page.locator('#csv-file').setInputFiles({
       name: 'second-import.csv',
       mimeType: 'text/csv',
       buffer: Buffer.from('Date,Description,Amount\n2025-01-16,Market second,20.00'),
     })
-    await expect(page.getByLabel('Incoming transactions use')).toHaveValue('Negative')
-    await page.getByRole('button', { name: 'Use saved settings' }).click()
+    await expect(page.getByLabel('Incoming Transactions Use')).toHaveValue('Negative')
+    await page.getByRole('button', { name: 'Use Saved Settings' }).click()
     await expect(page.getByRole('status')).toContainText(
       'Using this account’s saved import settings.',
     )
-    await expect(page.getByRole('heading', { name: 'Map CSV columns' })).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Map CSV Columns' })).toHaveCount(0)
     await expect(page.getByText('Selected file: second-import.csv')).toBeVisible()
     await expectAccessibleAcrossThemeAndViewports(page)
 
-    await page.getByRole('button', { name: 'Import limits' }).click()
-    await expect(page.getByRole('button', { name: 'Back to the application' })).toBeFocused()
+    await page.getByRole('button', { name: 'Import Limits' }).click()
+    await expect(page.getByRole('button', { name: 'Back to the Application' })).toBeFocused()
     await expectAccessibleAcrossThemeAndViewports(page)
-    await page.getByLabel('Maximum rows per import').fill('12000')
-    await page.getByRole('button', { name: 'Save limits' }).click()
-    await expect(page.getByLabel('Maximum rows per import')).toHaveValue('12000')
-    await page.getByRole('button', { name: 'Back to the application' }).click()
-    await expect(page.getByRole('button', { name: 'Back to account' })).toBeFocused()
+    await page.getByLabel('Maximum Rows per Import').fill('12000')
+    await page.getByRole('button', { name: 'Save Limits' }).click()
+    await expect(page.getByLabel('Maximum Rows per Import')).toHaveValue('12000')
+    await page.getByRole('button', { name: 'Back to the Application' }).click()
+    await expect(page.getByRole('button', { name: 'Back to Account' })).toBeFocused()
   })
 })
 
 async function createAccount(page: Page, description: string) {
-  await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
-  await page.getByLabel('Account description').fill(description)
+  await expect(page.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
+  await page.getByLabel('Account Description').fill(description)
   await page.getByLabel('Currency').selectOption('AUD')
-  await page.getByRole('button', { name: 'Add account' }).click()
-  await expect(page.getByRole('heading', { name: 'Account details' })).toBeVisible()
+  await page.getByRole('button', { name: 'Add Account' }).click()
+  await expect(page.getByRole('heading', { name: 'Account Details' })).toBeVisible()
 }
 
 async function expectAccessibleAcrossThemeAndViewports(page: Page) {

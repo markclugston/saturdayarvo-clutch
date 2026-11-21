@@ -17,13 +17,13 @@ export function SessionExpiredDialog({ onStay, onSignInAgain }: SessionExpiredDi
       <DialogPortal>
         <DialogBackdrop />
         <DialogPopup className="space-y-4 p-6" initialFocus={stay}>
-          <DialogTitle>Your sign-in has expired</DialogTitle>
+          <DialogTitle>Your Sign-In Has Expired</DialogTitle>
           <DialogDescription>
             Signing in again will lose your unsaved changes. Stay on this page to copy them first.
           </DialogDescription>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={onStay} ref={stay} type="button" variant="secondary">Stay on this page</Button>
-            <Button onClick={onSignInAgain} type="button">Sign in again</Button>
+            <Button onClick={onStay} ref={stay} type="button" variant="secondary">Stay on This Page</Button>
+            <Button onClick={onSignInAgain} type="button">Sign In Again</Button>
           </div>
         </DialogPopup>
       </DialogPortal>

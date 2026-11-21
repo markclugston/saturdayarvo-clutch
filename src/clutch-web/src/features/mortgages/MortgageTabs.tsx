@@ -5,7 +5,7 @@ import { MAX_MORTGAGES } from './loanDraft'
 
 export const LIMIT_MESSAGE = 'You can save up to 20 mortgages'
 
-/** `'new'` is the "Add mortgage" tab. */
+/** `'new'` is the "Add Mortgage" tab. */
 export type TabSelection = string
 
 type MortgageTabsProps = {
@@ -60,7 +60,7 @@ export function MortgageTabs({
             title={atLimit ? LIMIT_MESSAGE : undefined}
             type="button"
           >
-            Add mortgage
+            Add Mortgage
           </button>
           {atLimit && <span className="sr-only" id="mortgage-limit-hint">{LIMIT_MESSAGE}</span>}
         </li>

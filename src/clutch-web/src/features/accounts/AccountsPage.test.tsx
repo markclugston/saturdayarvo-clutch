@@ -49,9 +49,9 @@ describe('AccountsPage', () => {
 
     renderWithQueryClient(<AccountsPage onSelectAccount={onSelectAccount} />)
 
-    await user.type(await screen.findByLabelText('Account description'), 'Everyday spending')
+    await user.type(await screen.findByLabelText('Account Description'), 'Everyday spending')
     await user.selectOptions(screen.getByLabelText('Currency'), 'AUD')
-    const submitButton = screen.getByRole('button', { name: 'Add account' })
+    const submitButton = screen.getByRole('button', { name: 'Add Account' })
     await user.tab()
     expect(submitButton).toHaveFocus()
     await user.keyboard('{Enter}')
@@ -68,11 +68,11 @@ describe('AccountsPage', () => {
   it('focuses an interactive control rather than the accounts heading after loading', async () => {
     renderWithQueryClient(<AccountsPage onSelectAccount={vi.fn()} />)
 
-    const heading = await screen.findByRole('heading', { name: 'Your accounts' })
+    const heading = await screen.findByRole('heading', { name: 'Your Accounts' })
 
     expect(heading).not.toHaveAttribute('tabindex')
     expect(heading).not.toHaveFocus()
-    expect(screen.getByLabelText('Account description')).toHaveFocus()
+    expect(screen.getByLabelText('Account Description')).toHaveFocus()
     expect(screen.queryByRole('heading', { name: 'Your Family' })).not.toBeInTheDocument()
   })
 
@@ -120,10 +120,10 @@ describe('AccountsPage', () => {
 
     renderWithQueryClient(<AccountsPage onSelectAccount={vi.fn()} />)
 
-    const descriptionInput = await screen.findByLabelText('Account description')
+    const descriptionInput = await screen.findByLabelText('Account Description')
     await user.type(descriptionInput, 'BSB 123456')
     await user.selectOptions(screen.getByLabelText('Currency'), 'AUD')
-    await user.click(screen.getByRole('button', { name: 'Add account' }))
+    await user.click(screen.getByRole('button', { name: 'Add Account' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'The account description is invalid.',

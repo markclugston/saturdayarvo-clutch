@@ -124,21 +124,21 @@ export function ImportMappingForm({
 
   return (
     <form id="import-mapping" className="space-y-5" onSubmit={submit}>
-      <CardTitle as="h2">Map CSV columns</CardTitle>
+      <CardTitle as="h2">Map CSV Columns</CardTitle>
       {!headers && (
         <p>Choose a CSV file to see its column names and review the import.</p>
       )}
       <div className="grid gap-4 sm:grid-cols-2">
         <ColumnSelect
           id="import-date-column"
-          label="Transaction date column"
+          label="Transaction Date Column"
           value={dateColumn}
           onChange={setDateColumn}
           renderOptions={renderColumnOptions}
         />
         <ColumnSelect
           id="import-description-column"
-          label="Description column"
+          label="Description Column"
           value={descriptionColumn}
           onChange={setDescriptionColumn}
           renderOptions={renderColumnOptions}
@@ -146,7 +146,7 @@ export function ImportMappingForm({
         <FloatingField
           as="select"
           id="import-date-format"
-          label="Date format"
+          label="Date Format"
           required
           value={dateFormat}
           onChange={(event) => setDateFormat(event.currentTarget.value)}
@@ -159,15 +159,15 @@ export function ImportMappingForm({
         <FloatingField
           as="select"
           id="import-amount-mode"
-          label="Amount mapping"
+          label="Amount Mapping"
           value={amountMode}
           onChange={(event) =>
             setAmountMode(event.currentTarget.value as ImportMapping['amountMode'])
           }
         >
-          <option value="Signed">One signed amount</option>
-          <option value="SeparateIncomingOutgoing">Separate incoming and outgoing amounts</option>
-          <option value="AmountWithDirection">Amount and direction columns</option>
+          <option value="Signed">One Signed Amount</option>
+          <option value="SeparateIncomingOutgoing">Separate Incoming and Outgoing Amounts</option>
+          <option value="AmountWithDirection">Amount and Direction Columns</option>
         </FloatingField>
       </div>
 
@@ -175,7 +175,7 @@ export function ImportMappingForm({
         <div className="grid gap-4 sm:grid-cols-2">
           <ColumnSelect
             id="signed-amount-column"
-            label="Signed amount column"
+            label="Signed Amount Column"
             value={signedAmountColumn}
             onChange={setSignedAmountColumn}
             renderOptions={renderColumnOptions}
@@ -183,7 +183,7 @@ export function ImportMappingForm({
           <FloatingField
             as="select"
             id="incoming-sign"
-            label="Incoming transactions use"
+            label="Incoming Transactions Use"
             required
             value={incomingSign}
             onChange={(event) =>
@@ -191,8 +191,8 @@ export function ImportMappingForm({
             }
           >
             <option value="">Confirm the incoming sign</option>
-            <option value="Positive">Positive amounts</option>
-            <option value="Negative">Negative amounts</option>
+            <option value="Positive">Positive Amounts</option>
+            <option value="Negative">Negative Amounts</option>
           </FloatingField>
           <p className="text-sm text-fg-secondary sm:col-span-2">
             Zero amounts are treated as outgoing.
@@ -205,14 +205,14 @@ export function ImportMappingForm({
           <div className="grid gap-4 sm:grid-cols-2">
             <ColumnSelect
               id="incoming-amount-column"
-              label="Incoming amount column"
+              label="Incoming Amount Column"
               value={incomingAmountColumn}
               onChange={setIncomingAmountColumn}
               renderOptions={renderColumnOptions}
             />
             <ColumnSelect
               id="outgoing-amount-column"
-              label="Outgoing amount column"
+              label="Outgoing Amount Column"
               value={outgoingAmountColumn}
               onChange={setOutgoingAmountColumn}
               renderOptions={renderColumnOptions}
@@ -230,21 +230,21 @@ export function ImportMappingForm({
         <div className="grid gap-4 sm:grid-cols-2">
           <ColumnSelect
             id="amount-column"
-            label="Amount column"
+            label="Amount Column"
             value={amountColumn}
             onChange={setAmountColumn}
             renderOptions={renderColumnOptions}
           />
           <ColumnSelect
             id="direction-column"
-            label="Direction column"
+            label="Direction Column"
             value={directionColumn}
             onChange={setDirectionColumn}
             renderOptions={renderColumnOptions}
           />
           <FloatingField
             id="incoming-direction-value"
-            label="Incoming direction value"
+            label="Incoming Direction Value"
             maxLength={100}
             required
             value={incomingDirectionValue}
@@ -252,7 +252,7 @@ export function ImportMappingForm({
           />
           <FloatingField
             id="outgoing-direction-value"
-            label="Outgoing direction value"
+            label="Outgoing Direction Value"
             maxLength={100}
             required
             value={outgoingDirectionValue}
@@ -268,7 +268,7 @@ export function ImportMappingForm({
           text: 'The balance is read from the file as supplied and is not calculated.',
         }}
         id="import-balance-column"
-        label="Balance column (optional)"
+        label="Balance Column (Optional)"
         value={balanceColumn}
         onChange={(event) => setBalanceColumn(event.currentTarget.value)}
       >
@@ -283,7 +283,7 @@ export function ImportMappingForm({
           text: `Format registry: ${amountFormats[0]?.reference} ${amountFormats[0]?.version}.`,
         }}
         id="number-format"
-        label="Number format used in this file"
+        label="Number Format Used in This File"
         required
         value={numberFormat}
         onChange={(event) => setNumberFormat(event.currentTarget.value)}
@@ -297,7 +297,7 @@ export function ImportMappingForm({
       </FloatingField>
 
       <Button disabled={disabled || !headers} type="submit">
-        {disabled ? 'Creating review…' : 'Review import'}
+        {disabled ? 'Creating Review…' : 'Review Import'}
       </Button>
     </form>
   )

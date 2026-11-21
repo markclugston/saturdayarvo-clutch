@@ -126,7 +126,7 @@ function AppContent() {
             type="button"
             variant="secondary"
           >
-            Try again
+            Try Again
           </Button>
         </Card>
       </>
@@ -172,7 +172,7 @@ function AppContent() {
                 type="button"
                 variant="secondary"
               >
-                Import limits
+                Import Limits
               </Button>
             )}
             <Button
@@ -181,7 +181,7 @@ function AppContent() {
               type="button"
               variant="secondary"
             >
-              {signOutMutation.isPending ? 'Signing out…' : 'Sign out'}
+              {signOutMutation.isPending ? 'Signing Out…' : 'Sign Out'}
             </Button>
           </div>
         </header>
@@ -201,7 +201,7 @@ function AppContent() {
               type="button"
               variant="secondary"
             >
-              Retry session check
+              Retry Session Check
             </Button>
           </div>
         )}

@@ -44,7 +44,7 @@ export function AuthPage({ inert = false }: { inert?: boolean }) {
               className="text-2xl font-semibold"
               id="auth-heading"
             >
-              {isRegistering ? 'Create your account' : 'Sign in'}
+              {isRegistering ? 'Create Your Account' : 'Sign In'}
             </h1>
             <p className="mt-2 text-sm text-fg-secondary">
               Your account and transaction data are private to you.
@@ -85,8 +85,8 @@ export function AuthPage({ inert = false }: { inert?: boolean }) {
               {authMutation.isPending
                 ? 'Please wait…'
                 : isRegistering
-                  ? 'Create account'
-                  : 'Sign in'}
+                  ? 'Create Account'
+                  : 'Sign In'}
             </Button>
             {authMutation.isError && <ErrorMessage>{getErrorMessage(authMutation.error)}</ErrorMessage>}
           </form>
@@ -98,7 +98,7 @@ export function AuthPage({ inert = false }: { inert?: boolean }) {
             type="button"
             variant="tertiary"
           >
-            {isRegistering ? 'Already registered? Sign in' : 'New here? Create an account'}
+            {isRegistering ? 'Already Registered? Sign In' : 'New Here? Create an Account'}
           </Button>
         </Card>
       </ContentPanel>

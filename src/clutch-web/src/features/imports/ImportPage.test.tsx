@@ -74,10 +74,10 @@ async function showOwnReview(onBack = vi.fn()) {
   vi.mocked(getAccountImportSettings).mockResolvedValue({ mapping: savedMapping })
   const rendered = renderWithQueryClient(<ImportPage accountId={account.id} onBack={onBack} />)
   const user = userEvent.setup()
-  await user.upload(await screen.findByLabelText('CSV file'),
+  await user.upload(await screen.findByLabelText('CSV File'),
     new File(['Date,Description,Amount\n2026-01-15,Market,10.00'], 'transactions.csv', { type: 'text/csv' }))
-  await user.click(await screen.findByRole('button', { name: 'Review import with saved settings' }))
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Confirm import' })).toBeEnabled())
+  await user.click(await screen.findByRole('button', { name: 'Review Import with Saved Settings' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Confirm Import' })).toBeEnabled())
   return { ...rendered, user }
 }
 
@@ -127,8 +127,8 @@ describe('ImportPage', () => {
   it('checks availability before file selection and never interprets a pending read as available', async () => {
     vi.mocked(getImportStatus).mockReturnValue(new Promise(() => {}))
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
-    expect(await screen.findByText('Checking import availability…')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeDisabled()
+    expect(await screen.findByText('Checking Import Availability…')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Choose CSV File' })).toBeDisabled()
     expect(createImportReview).not.toHaveBeenCalled()
   })
 
@@ -136,10 +136,10 @@ describe('ImportPage', () => {
     vi.mocked(getImportStatus).mockRejectedValueOnce(new Error('Network failed'))
     const user = userEvent.setup()
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
-    const retry = await screen.findByRole('button', { name: 'Retry availability check' })
-    expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeDisabled()
+    const retry = await screen.findByRole('button', { name: 'Retry Availability Check' })
+    expect(screen.getByRole('button', { name: 'Choose CSV File' })).toBeDisabled()
     await user.click(retry)
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeEnabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Choose CSV File' })).toBeEnabled())
     expect(createImportReview).not.toHaveBeenCalled()
   })
 
@@ -148,41 +148,41 @@ describe('ImportPage', () => {
       signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
     }))
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
-    expect(await screen.findByText('Checking import availability…')).toBeInTheDocument()
-    expect(await screen.findByRole('button', { name: 'Retry availability check' }, { timeout: 3500 })).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeDisabled()
+    expect(await screen.findByText('Checking Import Availability…')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Retry Availability Check' }, { timeout: 3500 })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Choose CSV File' })).toBeDisabled()
     expect(createImportReview).not.toHaveBeenCalled()
   })
 
   it('shows checking feedback while retrying a failed refresh with cached availability', async () => {
     const user = userEvent.setup()
     const { queryClient } = renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeEnabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Choose CSV File' })).toBeEnabled())
     vi.mocked(getImportStatus).mockRejectedValueOnce(new Error('Network failed'))
       .mockReturnValueOnce(new Promise(() => {}))
     await act(async () => { await queryClient.invalidateQueries({ queryKey: ['importStatus', account.id] }) })
-    await user.click(await screen.findByRole('button', { name: 'Retry availability check' }))
-    expect(await screen.findByRole('button', { name: 'Checking import availability…' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeDisabled()
+    await user.click(await screen.findByRole('button', { name: 'Retry Availability Check' }))
+    expect(await screen.findByRole('button', { name: 'Checking Import Availability…' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Choose CSV File' })).toBeDisabled()
   })
 
   it('retains a selected file and validated controls while a background recheck is pending', async () => {
     vi.mocked(getAccountImportSettings).mockResolvedValue({ mapping: savedMapping })
     const user = userEvent.setup()
     const { queryClient } = renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeEnabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Choose CSV File' })).toBeEnabled())
     let release = () => {}
     vi.mocked(getImportStatus).mockReturnValueOnce(new Promise((resolve) => {
       release = () => resolve({ accountId: account.id, availability: 'Available', activeImport: null, watchedImport: null })
     }))
     act(() => { void queryClient.invalidateQueries({ queryKey: ['importStatus', account.id] }) })
     const file = new File(['Date,Description,Amount\n2026-01-15,Market,10.00'], 'selected.csv', { type: 'text/csv' })
-    fireEvent.change(screen.getByLabelText('CSV file'), { target: { files: [file] } })
+    fireEvent.change(screen.getByLabelText('CSV File'), { target: { files: [file] } })
     expect(await screen.findByText('Selected file: selected.csv')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Review import with saved settings' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Review Import with Saved Settings' })).toBeEnabled()
     expect(createImportReview).not.toHaveBeenCalled()
     await act(async () => release())
-    await user.click(screen.getByRole('button', { name: 'Review import with saved settings' }))
+    await user.click(screen.getByRole('button', { name: 'Review Import with Saved Settings' }))
     expect(createImportReview).toHaveBeenCalledTimes(1)
   })
 
@@ -190,7 +190,7 @@ describe('ImportPage', () => {
     const { container, queryClient } = preview
       ? await showOwnReview()
       : renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
-    const buttonName = preview ? 'Confirm import' : 'Choose CSV file'
+    const buttonName = preview ? 'Confirm Import' : 'Choose CSV File'
     const button = await screen.findByRole('button', { name: buttonName })
     await waitFor(() => expect(button).toBeEnabled())
     button.focus()
@@ -212,7 +212,7 @@ describe('ImportPage', () => {
       await waitFor(() => expect(vi.mocked(getImportStatus).mock.calls.length).toBeGreaterThan(requests), { timeout: 3500 })
       expect(button).toBeEnabled()
       expect(button).toHaveFocus()
-      expect(screen.queryByText('Checking import availability…')).not.toBeInTheDocument()
+      expect(screen.queryByText('Checking Import Availability…')).not.toBeInTheDocument()
       await act(async () => finish())
       await waitFor(() => expect(queryClient.isFetching({ queryKey: ['importStatus', account.id] })).toBe(0))
       expect(mutations).toHaveLength(0)
@@ -241,8 +241,8 @@ describe('ImportPage', () => {
     })
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
     expect(await screen.findByText(/Another import is/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeDisabled()
-    expect(screen.queryByRole('button', { name: 'End other import' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Choose CSV File' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'End Other Import' })).not.toBeInTheDocument()
     expect(cancelActiveImportReview).not.toHaveBeenCalled()
     expect(createImportReview).not.toHaveBeenCalled()
   })
@@ -255,19 +255,19 @@ describe('ImportPage', () => {
     })
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
     await screen.findByText(/Another import is/)
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeEnabled(), { timeout: 5000 })
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Choose CSV File' })).toBeEnabled(), { timeout: 5000 })
     expect(createImportReview).not.toHaveBeenCalled()
   })
 
   it.each(['focus', 'online'])('requires fresh availability after %s restoration', async (kind) => {
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeEnabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Choose CSV File' })).toBeEnabled())
     const setActive = (active: boolean) => kind === 'focus' ? focusManager.setFocused(active) : onlineManager.setOnline(active)
     act(() => setActive(false))
     vi.mocked(getImportStatus).mockReturnValue(new Promise(() => {}))
     act(() => setActive(true))
     await waitFor(() => expect(vi.mocked(getImportStatus).mock.calls.length).toBeGreaterThanOrEqual(2))
-    expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Choose CSV File' })).toBeDisabled()
   })
 
   it('rechecks a stale create conflict instead of offering blind cancellation or automatically retrying', async () => {
@@ -282,11 +282,11 @@ describe('ImportPage', () => {
     })
     const user = userEvent.setup()
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
-    await user.upload(await screen.findByLabelText('CSV file'),
+    await user.upload(await screen.findByLabelText('CSV File'),
       new File(['Date,Description,Amount\n2026-01-15,Market,10.00'], 'transactions.csv', { type: 'text/csv' }))
-    await user.click(await screen.findByRole('button', { name: 'Review import with saved settings' }))
+    await user.click(await screen.findByRole('button', { name: 'Review Import with Saved Settings' }))
     expect(await screen.findByText(/Another import is processing/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Choose CSV File' })).toBeDisabled()
     expect(screen.queryByRole('button', { name: 'Discard active review' })).not.toBeInTheDocument()
     expect(createImportReview).toHaveBeenCalledTimes(1)
   })
@@ -306,15 +306,15 @@ describe('ImportPage', () => {
     })
     const user = userEvent.setup()
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
-    const end = await screen.findByRole('button', { name: 'End other import' })
+    const end = await screen.findByRole('button', { name: 'End Other Import' })
     expect(cancelActiveImportReview).not.toHaveBeenCalled()
     await user.click(end)
     await waitFor(() => expect(cancelActiveImportReview).toHaveBeenCalledWith(account.id, target))
-    expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Choose CSV File' })).toBeDisabled()
     await waitFor(() => expect(vi.mocked(getImportStatus).mock.calls.length).toBeGreaterThanOrEqual(2))
     vi.mocked(getImportStatus).mockResolvedValue({ accountId: account.id, availability: 'Available', activeImport: null, watchedImport: null })
     await act(async () => releaseCheck())
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeEnabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Choose CSV File' })).toBeEnabled())
     expect(createImportReview).not.toHaveBeenCalled()
   })
 
@@ -335,12 +335,12 @@ describe('ImportPage', () => {
     })
     const user = userEvent.setup()
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
-    await user.click(await screen.findByRole('button', { name: 'End other import' }))
+    await user.click(await screen.findByRole('button', { name: 'End Other Import' }))
     expect(await screen.findByText('The import changed. Check its current status.')).toBeInTheDocument()
     expect(await screen.findByText(/Another import is processing/)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'End other import' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Choose CSV file' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Retry availability check' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'End Other Import' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Choose CSV File' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Retry Availability Check' })).toBeInTheDocument()
   })
 
   it('latches the ended notice despite a replacement and stops polling until acknowledgement', async () => {
@@ -354,13 +354,13 @@ describe('ImportPage', () => {
       watchedImport: { id: watchedId, state: 'Ended', endedAtUtc: '2026-11-17T09:00:00Z', endedBy: { userId: 'owner', userName: 'owner@example.test' } },
     })
     await act(async () => { await queryClient.invalidateQueries({ queryKey: ['importStatus', account.id] }) })
-    expect(await screen.findByRole('dialog', { name: 'Import ended' })).toHaveTextContent('owner@example.test')
-    expect(screen.queryByRole('button', { name: 'Confirm import' })).not.toBeInTheDocument()
+    expect(await screen.findByRole('dialog', { name: 'Import Ended' })).toHaveTextContent('owner@example.test')
+    expect(screen.queryByRole('button', { name: 'Confirm Import' })).not.toBeInTheDocument()
     const reads = vi.mocked(getImportStatus).mock.calls.length
     await act(async () => { await queryClient.invalidateQueries({ queryKey: ['importStatus', account.id] }) })
     expect(getImportStatus).toHaveBeenCalledTimes(reads)
     expect(onBack).not.toHaveBeenCalled()
-    await user.click(screen.getByRole('button', { name: 'Return to transactions' }))
+    await user.click(screen.getByRole('button', { name: 'Return to Transactions' }))
     await waitFor(() => expect(onBack).toHaveBeenCalledOnce())
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['account', account.id] })
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['transactions', account.id] })
@@ -377,8 +377,8 @@ describe('ImportPage', () => {
     await act(async () => { await queryClient.invalidateQueries({ queryKey: ['importStatus', account.id] }) })
     expect(await screen.findByText(state === 'Expired' ? 'This import preview has expired.' : 'This import preview is no longer available.')).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Confirm import' })).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Return to transactions' }))
+    expect(screen.queryByRole('button', { name: 'Confirm Import' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Return to Transactions' }))
     await waitFor(() => expect(onBack).toHaveBeenCalledOnce())
     expect(cancelImportReview).not.toHaveBeenCalled()
   })
@@ -392,8 +392,8 @@ describe('ImportPage', () => {
       })
       throw new ApiError(409, { errors: { code: ['ImportEndedElsewhere'] } })
     })
-    await user.click(screen.getByRole('button', { name: 'Confirm import' }))
-    expect(await screen.findByRole('dialog', { name: 'Import ended' })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Confirm Import' }))
+    expect(await screen.findByRole('dialog', { name: 'Import Ended' })).toBeVisible()
     expect(confirmImportReview).toHaveBeenCalledTimes(1)
   })
 
@@ -407,9 +407,9 @@ describe('ImportPage', () => {
     })
     act(() => focusManager.setFocused(true))
     expect(await screen.findByText('This import is processing transactions. Wait for it to finish.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Confirm import' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Cancel review' })).toBeDisabled()
-    expect(screen.queryByRole('button', { name: 'End other import' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Confirm Import' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Cancel Review' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'End Other Import' })).not.toBeInTheDocument()
     expect(createImportReview).toHaveBeenCalledTimes(1)
     expect(confirmImportReview).not.toHaveBeenCalled()
   })
@@ -426,10 +426,10 @@ describe('ImportPage', () => {
         errors: { code: ['ImportOutcomeUnknown'] },
       })
     })
-    await user.click(screen.getByRole('button', { name: 'Confirm import' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm Import' }))
     expect(await screen.findByText('The import outcome could not be established. Check transactions before trying again.')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Confirm import' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Return to transactions' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: 'Confirm Import' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Return to Transactions' })).toBeEnabled()
     expect(confirmImportReview).toHaveBeenCalledTimes(1)
   })
 
@@ -441,21 +441,21 @@ describe('ImportPage', () => {
     const user = userEvent.setup()
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
     await user.upload(
-      await screen.findByLabelText('CSV file'),
+      await screen.findByLabelText('CSV File'),
       new File(['Date,Description,Amount\n15/01/2025,Market,10.00'], 'transactions.csv', {
         type: 'text/csv',
       }),
     )
-    await user.selectOptions(await screen.findByLabelText('Transaction date column'), '0')
-    await user.selectOptions(screen.getByLabelText('Description column'), '1')
-    await user.selectOptions(screen.getByLabelText('Date format'), 'yyyy-MM-dd')
-    await user.selectOptions(screen.getByLabelText('Signed amount column'), '2')
-    await user.selectOptions(screen.getByLabelText('Incoming transactions use'), 'Positive')
+    await user.selectOptions(await screen.findByLabelText('Transaction Date Column'), '0')
+    await user.selectOptions(screen.getByLabelText('Description Column'), '1')
+    await user.selectOptions(screen.getByLabelText('Date Format'), 'yyyy-MM-dd')
+    await user.selectOptions(screen.getByLabelText('Signed Amount Column'), '2')
+    await user.selectOptions(screen.getByLabelText('Incoming Transactions Use'), 'Positive')
     await user.selectOptions(
-      screen.getByLabelText('Number format used in this file'),
+      screen.getByLabelText('Number Format Used in This File'),
       'dot-decimal-comma-grouping',
     )
-    await user.click(screen.getByRole('button', { name: 'Review import' }))
+    await user.click(screen.getByRole('button', { name: 'Review Import' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'A transaction date does not match the selected date format. (Row 2, field: TransactionDate)',
@@ -466,11 +466,11 @@ describe('ImportPage', () => {
     const user = userEvent.setup()
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
 
-    await screen.findByRole('heading', { name: 'Import transactions' })
-    expect(screen.getByRole('button', { name: 'Back to account' })).toHaveFocus()
-    expect(await screen.findByRole('button', { name: 'Choose CSV file' })).toBeInTheDocument()
+    await screen.findByRole('heading', { name: 'Import Transactions' })
+    expect(screen.getByRole('button', { name: 'Back to Account' })).toHaveFocus()
+    expect(await screen.findByRole('button', { name: 'Choose CSV File' })).toBeInTheDocument()
     await user.upload(
-      await screen.findByLabelText('CSV file'),
+      await screen.findByLabelText('CSV File'),
       new File(
         ['Date,Description,Amount\n2025-01-15,Market,-1234.50'],
         'transactions.csv',
@@ -478,16 +478,16 @@ describe('ImportPage', () => {
       ),
     )
 
-    await user.selectOptions(await screen.findByLabelText('Transaction date column'), '0')
-    await user.selectOptions(screen.getByLabelText('Description column'), '1')
-    await user.selectOptions(screen.getByLabelText('Date format'), 'yyyy-MM-dd')
-    await user.selectOptions(screen.getByLabelText('Signed amount column'), '2')
-    await user.selectOptions(screen.getByLabelText('Incoming transactions use'), 'Positive')
+    await user.selectOptions(await screen.findByLabelText('Transaction Date Column'), '0')
+    await user.selectOptions(screen.getByLabelText('Description Column'), '1')
+    await user.selectOptions(screen.getByLabelText('Date Format'), 'yyyy-MM-dd')
+    await user.selectOptions(screen.getByLabelText('Signed Amount Column'), '2')
+    await user.selectOptions(screen.getByLabelText('Incoming Transactions Use'), 'Positive')
     await user.selectOptions(
-      screen.getByLabelText('Number format used in this file'),
+      screen.getByLabelText('Number Format Used in This File'),
       'dot-decimal-comma-grouping',
     )
-    await user.click(screen.getByRole('button', { name: 'Review import' }))
+    await user.click(screen.getByRole('button', { name: 'Review Import' }))
 
     await waitFor(() =>
       expect(createImportReview).toHaveBeenCalledWith(
@@ -507,7 +507,7 @@ describe('ImportPage', () => {
     expect(await screen.findByText('Market')).toBeInTheDocument()
     expect(screen.getByText(formatCurrencyAmount('1234.50', 'AUD'))).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Confirm import' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm Import' }))
 
     await waitFor(() =>
       expect(confirmImportReview).toHaveBeenCalledWith(
@@ -524,7 +524,7 @@ describe('ImportPage', () => {
     const user = userEvent.setup()
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
     await user.upload(
-      await screen.findByLabelText('CSV file'),
+      await screen.findByLabelText('CSV File'),
       new File(
         ['Date,Description,Amount\n2025-01-15,Market,-10.00'],
         'transactions.csv',
@@ -535,8 +535,8 @@ describe('ImportPage', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Using this account’s saved import settings.',
     )
-    expect(screen.queryByRole('heading', { name: 'Map CSV columns' })).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Review import with saved settings' }))
+    expect(screen.queryByRole('heading', { name: 'Map CSV Columns' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Review Import with Saved Settings' }))
     await waitFor(() => expect(createImportReview).toHaveBeenCalledWith(
       account.id,
       expect.any(File),
@@ -551,7 +551,7 @@ describe('ImportPage', () => {
     const user = userEvent.setup()
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
     await user.upload(
-      await screen.findByLabelText('CSV file'),
+      await screen.findByLabelText('CSV File'),
       new File(
         ['Date,Description,Amount\n2025-01-15,Market,-10.00'],
         'transactions.csv',
@@ -562,7 +562,7 @@ describe('ImportPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Saved import settings could not be retrieved.',
     )
-    expect(await screen.findByRole('heading', { name: 'Map CSV columns' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Map CSV Columns' })).toBeInTheDocument()
   })
 
   it('prefills saved settings and submits edits made before review', async () => {
@@ -570,22 +570,22 @@ describe('ImportPage', () => {
     const user = userEvent.setup()
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
     await user.upload(
-      await screen.findByLabelText('CSV file'),
+      await screen.findByLabelText('CSV File'),
       new File(
         ['Date,Description,Amount\n15/01/2025,Market,-10.00'],
         'transactions.csv',
         { type: 'text/csv' },
       ),
     )
-    const changeSettingsButton = screen.getByRole('button', { name: 'View or change settings' })
+    const changeSettingsButton = screen.getByRole('button', { name: 'View or Change Settings' })
     changeSettingsButton.focus()
     await user.keyboard('{Enter}')
-    expect(screen.getByLabelText('Transaction date column')).toHaveValue('0')
-    expect(screen.getByLabelText('Description column')).toHaveValue('1')
-    expect(screen.getByLabelText('Signed amount column')).toHaveValue('2')
+    expect(screen.getByLabelText('Transaction Date Column')).toHaveValue('0')
+    expect(screen.getByLabelText('Description Column')).toHaveValue('1')
+    expect(screen.getByLabelText('Signed Amount Column')).toHaveValue('2')
 
-    await user.selectOptions(screen.getByLabelText('Date format'), 'dd/MM/yyyy')
-    const reviewButton = screen.getByRole('button', { name: 'Review import' })
+    await user.selectOptions(screen.getByLabelText('Date Format'), 'dd/MM/yyyy')
+    const reviewButton = screen.getByRole('button', { name: 'Review Import' })
     reviewButton.focus()
     await user.keyboard('{Enter}')
 
@@ -601,25 +601,25 @@ describe('ImportPage', () => {
     const user = userEvent.setup()
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
 
-    const toggle = await screen.findByRole('button', { name: 'View or change settings' })
+    const toggle = await screen.findByRole('button', { name: 'View or Change Settings' })
     await user.click(toggle)
-    expect(screen.getByRole('heading', { name: 'Map CSV columns' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Transaction date column')).toHaveValue('0')
-    expect(screen.getByLabelText('Date format')).toHaveValue('yyyy-MM-dd')
-    expect(screen.getByRole('button', { name: 'Review import' })).toBeDisabled()
-    await user.selectOptions(screen.getByLabelText('Date format'), 'dd/MM/yyyy')
+    expect(screen.getByRole('heading', { name: 'Map CSV Columns' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Transaction Date Column')).toHaveValue('0')
+    expect(screen.getByLabelText('Date Format')).toHaveValue('yyyy-MM-dd')
+    expect(screen.getByRole('button', { name: 'Review Import' })).toBeDisabled()
+    await user.selectOptions(screen.getByLabelText('Date Format'), 'dd/MM/yyyy')
 
     await user.upload(
-      screen.getByLabelText('CSV file'),
+      screen.getByLabelText('CSV File'),
       new File(['Date,Description,Amount\n15/01/2025,Market,-10.00'], 'transactions.csv', {
         type: 'text/csv',
       }),
     )
-    await waitFor(() => expect(screen.getByLabelText('Transaction date column'))
+    await waitFor(() => expect(screen.getByLabelText('Transaction Date Column'))
       .toHaveTextContent('1: Date'))
-    expect(screen.getByLabelText('Date format')).toHaveValue('dd/MM/yyyy')
-    expect(screen.getByLabelText('Transaction date column')).toHaveValue('0')
-    await user.click(screen.getByRole('button', { name: 'Review import' }))
+    expect(screen.getByLabelText('Date Format')).toHaveValue('dd/MM/yyyy')
+    expect(screen.getByLabelText('Transaction Date Column')).toHaveValue('0')
+    await user.click(screen.getByRole('button', { name: 'Review Import' }))
     await waitFor(() => expect(createImportReview).toHaveBeenCalledWith(
       account.id, expect.any(File), { ...savedMapping, dateFormat: 'dd/MM/yyyy' },
     ))
@@ -632,7 +632,7 @@ describe('ImportPage', () => {
     const user = userEvent.setup()
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
     await user.upload(
-      await screen.findByLabelText('CSV file'),
+      await screen.findByLabelText('CSV File'),
       new File(
         ['Date,Description,Amount\n2025-01-15,Market,-10.00'],
         'transactions.csv',
@@ -643,9 +643,9 @@ describe('ImportPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'The saved settings do not match this file’s columns.',
     )
-    expect(screen.getByRole('heading', { name: 'Map CSV columns' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Review import' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'View or change settings' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Map CSV Columns' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Review Import' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'View or Change Settings' })).not.toBeInTheDocument()
   })
 
   it('prefills and submits the optional balance column, and allows clearing it', async () => {
@@ -655,17 +655,17 @@ describe('ImportPage', () => {
     const user = userEvent.setup()
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
     await user.upload(
-      await screen.findByLabelText('CSV file'),
+      await screen.findByLabelText('CSV File'),
       new File(
         ['Date,Description,Amount,Balance\n15/01/2025,Market,-10.00,90.00'],
         'transactions.csv',
         { type: 'text/csv' },
       ),
     )
-    await user.click(screen.getByRole('button', { name: 'View or change settings' }))
-    expect(screen.getByLabelText('Balance column (optional)')).toHaveValue('3')
+    await user.click(screen.getByRole('button', { name: 'View or Change Settings' }))
+    expect(screen.getByLabelText('Balance Column (Optional)')).toHaveValue('3')
 
-    await user.click(screen.getByRole('button', { name: 'Review import' }))
+    await user.click(screen.getByRole('button', { name: 'Review Import' }))
     await waitFor(() => expect(createImportReview).toHaveBeenLastCalledWith(
       account.id,
       expect.any(File),
@@ -680,16 +680,16 @@ describe('ImportPage', () => {
     const user = userEvent.setup()
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
     await user.upload(
-      await screen.findByLabelText('CSV file'),
+      await screen.findByLabelText('CSV File'),
       new File(
         ['Date,Description,Amount,Balance\n15/01/2025,Market,-10.00,90.00'],
         'transactions.csv',
         { type: 'text/csv' },
       ),
     )
-    await user.click(screen.getByRole('button', { name: 'View or change settings' }))
-    await user.selectOptions(screen.getByLabelText('Balance column (optional)'), '')
-    await user.click(screen.getByRole('button', { name: 'Review import' }))
+    await user.click(screen.getByRole('button', { name: 'View or Change Settings' }))
+    await user.selectOptions(screen.getByLabelText('Balance Column (Optional)'), '')
+    await user.click(screen.getByRole('button', { name: 'Review Import' }))
     await waitFor(() => expect(createImportReview).toHaveBeenLastCalledWith(
       account.id,
       expect.any(File),
@@ -704,7 +704,7 @@ describe('ImportPage', () => {
     const user = userEvent.setup()
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
     await user.upload(
-      await screen.findByLabelText('CSV file'),
+      await screen.findByLabelText('CSV File'),
       new File(
         ['Date,Description,Amount\n2025-01-15,Market,-10.00'],
         'transactions.csv',
@@ -727,15 +727,15 @@ describe('ImportPage', () => {
     const user = userEvent.setup()
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
     await user.upload(
-      await screen.findByLabelText('CSV file'),
+      await screen.findByLabelText('CSV File'),
       new File(
         ['Date,Description,Amount\n2025-01-15,Market,-10.00'],
         'transactions.csv',
         { type: 'text/csv' },
       ),
     )
-    await user.click(screen.getByRole('button', { name: 'Review import with saved settings' }))
-    await user.click(await screen.findByRole('button', { name: 'Confirm import' }))
+    await user.click(screen.getByRole('button', { name: 'Review Import with Saved Settings' }))
+    await user.click(await screen.findByRole('button', { name: 'Confirm Import' }))
 
     expect(await screen.findByRole('status')).toHaveTextContent(
       '1 transactions imported successfully.',
@@ -767,29 +767,29 @@ describe('ImportPage', () => {
     const user = userEvent.setup()
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
     await user.upload(
-      await screen.findByLabelText('CSV file'),
+      await screen.findByLabelText('CSV File'),
       new File(
         ['Date,Description,Amount\n2025-01-15,Market,-1234.50'],
         'transactions.csv',
         { type: 'text/csv' },
       ),
     )
-    await user.selectOptions(await screen.findByLabelText('Transaction date column'), '0')
-    await user.selectOptions(screen.getByLabelText('Description column'), '1')
-    await user.selectOptions(screen.getByLabelText('Date format'), 'yyyy-MM-dd')
-    await user.selectOptions(screen.getByLabelText('Signed amount column'), '2')
-    await user.selectOptions(screen.getByLabelText('Incoming transactions use'), 'Positive')
+    await user.selectOptions(await screen.findByLabelText('Transaction Date Column'), '0')
+    await user.selectOptions(screen.getByLabelText('Description Column'), '1')
+    await user.selectOptions(screen.getByLabelText('Date Format'), 'yyyy-MM-dd')
+    await user.selectOptions(screen.getByLabelText('Signed Amount Column'), '2')
+    await user.selectOptions(screen.getByLabelText('Incoming Transactions Use'), 'Positive')
     await user.selectOptions(
-      screen.getByLabelText('Number format used in this file'),
+      screen.getByLabelText('Number Format Used in This File'),
       'dot-decimal-comma-grouping',
     )
-    await user.click(screen.getByRole('button', { name: 'Review import' }))
+    await user.click(screen.getByRole('button', { name: 'Review Import' }))
 
     expect(await screen.findByText(/Confirming will import every valid row/))
       .toBeInTheDocument()
-    const confirmButton = screen.getByRole('button', { name: 'Confirm import' })
+    const confirmButton = screen.getByRole('button', { name: 'Confirm Import' })
     expect(confirmButton).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Cancel review' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Cancel Review' })).toBeEnabled()
 
     await user.click(screen.getByLabelText(
       /I reviewed the possible duplicates and want to import every valid row/,
@@ -826,25 +826,25 @@ describe('ImportPage', () => {
     const user = userEvent.setup()
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={onBack} />)
     await user.upload(
-      await screen.findByLabelText('CSV file'),
+      await screen.findByLabelText('CSV File'),
       new File(
         ['Date,Description,Amount\n2025-01-15,Market,-1234.50'],
         'transactions.csv',
         { type: 'text/csv' },
       ),
     )
-    await user.selectOptions(await screen.findByLabelText('Transaction date column'), '0')
-    await user.selectOptions(screen.getByLabelText('Description column'), '1')
-    await user.selectOptions(screen.getByLabelText('Date format'), 'yyyy-MM-dd')
-    await user.selectOptions(screen.getByLabelText('Signed amount column'), '2')
-    await user.selectOptions(screen.getByLabelText('Incoming transactions use'), 'Positive')
+    await user.selectOptions(await screen.findByLabelText('Transaction Date Column'), '0')
+    await user.selectOptions(screen.getByLabelText('Description Column'), '1')
+    await user.selectOptions(screen.getByLabelText('Date Format'), 'yyyy-MM-dd')
+    await user.selectOptions(screen.getByLabelText('Signed Amount Column'), '2')
+    await user.selectOptions(screen.getByLabelText('Incoming Transactions Use'), 'Positive')
     await user.selectOptions(
-      screen.getByLabelText('Number format used in this file'),
+      screen.getByLabelText('Number Format Used in This File'),
       'dot-decimal-comma-grouping',
     )
-    await user.click(screen.getByRole('button', { name: 'Review import' }))
+    await user.click(screen.getByRole('button', { name: 'Review Import' }))
     await screen.findByText(/Confirming will import every valid row/)
-    await user.click(screen.getByRole('button', { name: 'Cancel review' }))
+    await user.click(screen.getByRole('button', { name: 'Cancel Review' }))
 
     await waitFor(() =>
       expect(cancelImportReview).toHaveBeenCalledWith(

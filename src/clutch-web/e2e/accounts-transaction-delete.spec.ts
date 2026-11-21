@@ -32,8 +32,8 @@ async function registerAndSignIn(context: BrowserContext, email: string) {
 }
 
 async function importDeleteJourneyStatement(page: Page, { reimport = false } = {}) {
-  await page.getByRole('button', { name: 'Import transactions' }).click()
-  await expect(page.getByRole('button', { name: 'Choose CSV file' })).toBeEnabled()
+  await page.getByRole('button', { name: 'Import Transactions' }).click()
+  await expect(page.getByRole('button', { name: 'Choose CSV File' })).toBeEnabled()
   await page.locator('#csv-file').setInputFiles({
     name: 'delete-journey.csv',
     mimeType: 'text/csv',
@@ -43,18 +43,18 @@ async function importDeleteJourneyStatement(page: Page, { reimport = false } = {
   })
   if (reimport) {
     // A repeat import reuses the account's saved column mapping.
-    await page.getByRole('button', { name: 'Review import with saved settings' }).click()
+    await page.getByRole('button', { name: 'Review Import with Saved Settings' }).click()
   } else {
-    await page.getByLabel('Transaction date column').selectOption('0')
-    await page.getByLabel('Description column').selectOption('1')
-    await page.getByLabel('Date format').selectOption('yyyy-MM-dd')
-    await page.getByLabel('Signed amount column').selectOption('2')
-    await page.getByLabel('Incoming transactions use').selectOption('Positive')
-    await page.getByLabel('Number format used in this file')
+    await page.getByLabel('Transaction Date Column').selectOption('0')
+    await page.getByLabel('Description Column').selectOption('1')
+    await page.getByLabel('Date Format').selectOption('yyyy-MM-dd')
+    await page.getByLabel('Signed Amount Column').selectOption('2')
+    await page.getByLabel('Incoming Transactions Use').selectOption('Positive')
+    await page.getByLabel('Number Format Used in This File')
       .selectOption('dot-decimal-comma-grouping')
-    await page.getByRole('button', { name: 'Review import' }).click()
+    await page.getByRole('button', { name: 'Review Import' }).click()
   }
-  const confirm = page.getByRole('button', { name: 'Confirm import' })
+  const confirm = page.getByRole('button', { name: 'Confirm Import' })
   await expect(confirm).toBeVisible()
   const duplicateAck = page.getByRole('checkbox', { name: /possible duplicates/ })
   if (await duplicateAck.count() > 0) {
@@ -63,14 +63,14 @@ async function importDeleteJourneyStatement(page: Page, { reimport = false } = {
   await confirm.click()
   await expect(page.getByRole('status').filter({ hasText: 'transactions imported successfully' }))
     .toBeVisible()
-  await page.getByRole('button', { name: 'Return to account' }).click()
+  await page.getByRole('button', { name: 'Return to Account' }).click()
 }
 
 async function createAccountWithTransactions(page: Page, description: string) {
-  await page.getByLabel('Account description').fill(description)
+  await page.getByLabel('Account Description').fill(description)
   await page.getByLabel('Currency').selectOption('AUD')
-  await page.getByRole('button', { name: 'Add account' }).click()
-  await expect(page.getByRole('heading', { name: 'Account details' })).toBeVisible()
+  await page.getByRole('button', { name: 'Add Account' }).click()
+  await expect(page.getByRole('heading', { name: 'Account Details' })).toBeVisible()
 
   await importDeleteJourneyStatement(page)
   await expect(page.getByText('Delete me first')).toBeVisible()
@@ -78,7 +78,7 @@ async function createAccountWithTransactions(page: Page, description: string) {
 
 async function openAccountFromList(page: Page, description: string) {
   await page.getByRole('button', { name: description }).click()
-  await expect(page.getByRole('heading', { name: 'Account details' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Account Details' })).toBeVisible()
 }
 
 async function selectAndExpectTheme(page: Page, mode: 'Light' | 'Dark') {
@@ -181,7 +181,7 @@ test.describe('delete imported transaction', () => {
     await registerAndSignIn(context, `delete-${randomUUID()}@example.test`)
     const page = await context.newPage()
     await page.goto(baseUrl)
-    await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
     await createAccountWithTransactions(page, `Delete journey ${Date.now()}`)
 
     const deleteButtons = page.getByRole('button', { name: 'Delete transaction' })
@@ -222,7 +222,7 @@ test.describe('delete imported transaction', () => {
     await registerAndSignIn(context, `cancel-${randomUUID()}@example.test`)
     const page = await context.newPage()
     await page.goto(baseUrl)
-    await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
     await createAccountWithTransactions(page, `Cancel journey ${Date.now()}`)
 
     await page.getByRole('button', { name: 'Delete transaction' }).first().click()
@@ -242,7 +242,7 @@ test.describe('delete imported transaction', () => {
     await registerAndSignIn(context, `escape-${randomUUID()}@example.test`)
     const page = await context.newPage()
     await page.goto(baseUrl)
-    await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
     await createAccountWithTransactions(page, `Escape journey ${Date.now()}`)
 
     await page.getByRole('button', { name: 'Delete transaction' }).first().click()
@@ -263,7 +263,7 @@ test.describe('delete imported transaction', () => {
     await registerAndSignIn(context, `empty-${randomUUID()}@example.test`)
     const page = await context.newPage()
     await page.goto(baseUrl)
-    await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
     await createAccountWithTransactions(page, `Empty journey ${Date.now()}`)
 
     await expect(page.getByRole('checkbox')).toHaveCount(0)
@@ -288,7 +288,7 @@ test.describe('delete imported transaction', () => {
     await registerAndSignIn(context, `busy-${randomUUID()}@example.test`)
     const page = await context.newPage()
     await page.goto(baseUrl)
-    await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
     await createAccountWithTransactions(page, `Busy journey ${Date.now()}`)
 
     await page.route('**/api/accounts/*/transactions/*', async (route) => {
@@ -316,7 +316,7 @@ test.describe('delete imported transaction', () => {
     await registerAndSignIn(context, `reimport-${randomUUID()}@example.test`)
     const page = await context.newPage()
     await page.goto(baseUrl)
-    await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
     await createAccountWithTransactions(page, `Reimport journey ${Date.now()}`)
 
     await deleteButtonFor(page, 'Delete me first').click()
@@ -337,7 +337,7 @@ test.describe('delete imported transaction', () => {
     await registerAndSignIn(context, email)
     const page = await context.newPage()
     await page.goto(baseUrl)
-    await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
     const description = `Close journey ${Date.now()}`
     await createAccountWithTransactions(page, description)
 
@@ -349,7 +349,7 @@ test.describe('delete imported transaction', () => {
     await signIn(reopened, email)
     const reopenedPage = await reopened.newPage()
     await reopenedPage.goto(baseUrl)
-    await expect(reopenedPage.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
+    await expect(reopenedPage.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
     await openAccountFromList(reopenedPage, description)
     await expect(reopenedPage.getByText('Delete me first')).toBeVisible()
     await expect(reopenedPage.getByText('Keep me second')).toBeVisible()
@@ -363,7 +363,7 @@ test.describe('delete imported transaction', () => {
     await registerAndSignIn(context, `concurrent-${randomUUID()}@example.test`)
     const page = await context.newPage()
     await page.goto(baseUrl)
-    await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
     const description = `Concurrent journey ${Date.now()}`
     await createAccountWithTransactions(page, description)
 
@@ -373,7 +373,7 @@ test.describe('delete imported transaction', () => {
 
     const otherTab = await context.newPage()
     await otherTab.goto(baseUrl)
-    await expect(otherTab.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
+    await expect(otherTab.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
     await openAccountFromList(otherTab, description)
     await expect(otherTab.getByText('Delete me first')).toBeVisible()
     await otherTab.getByRole('row').filter({ hasText: 'Delete me first' })
@@ -399,7 +399,7 @@ test.describe('delete imported transaction', () => {
     for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
       await page.setViewportSize(viewport)
       await page.goto(baseUrl)
-      await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
       await createAccountWithTransactions(page, `Keyboard ${viewport.width} ${Date.now()}`)
 
       const trashButton = deleteButtonFor(page, 'Delete me first')
@@ -435,7 +435,7 @@ test.describe('delete imported transaction', () => {
     await registerAndSignIn(context, `system-${randomUUID()}@example.test`)
     const page = await context.newPage()
     await page.goto(baseUrl)
-    await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
     await createAccountWithTransactions(page, `System theme ${Date.now()}`)
 
     const isDark = () => page.evaluate<boolean>('document.documentElement.classList.contains("dark")')
@@ -466,7 +466,7 @@ test.describe('delete imported transaction', () => {
       for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
         await page.setViewportSize(viewport)
         await page.goto(baseUrl)
-        await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
+        await expect(page.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
         await selectAndExpectTheme(page, scheme === 'dark' ? 'Dark' : 'Light')
         await createAccountWithTransactions(page, `Axe ${scheme} ${viewport.width} ${Date.now()}`)
 
@@ -488,7 +488,7 @@ test.describe('delete imported transaction', () => {
       await registerAndSignIn(context, `contrast-${scheme}-${randomUUID()}@example.test`)
       const page = await context.newPage()
       await page.goto(baseUrl)
-      await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
       await selectAndExpectTheme(page, scheme === 'dark' ? 'Dark' : 'Light')
       await createAccountWithTransactions(page, `Contrast ${scheme} ${Date.now()}`)
 

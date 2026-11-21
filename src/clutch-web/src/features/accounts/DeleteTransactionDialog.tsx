@@ -66,7 +66,7 @@ export function DeleteTransactionDialog({
           role="alertdialog"
         >
           <DialogTitle className="font-semibold">
-            Delete transaction “{transaction.description}”?
+            Delete Transaction “{transaction.description}”?
           </DialogTitle>
           <DialogDescription>
             This will permanently delete this transaction. This cannot be undone.

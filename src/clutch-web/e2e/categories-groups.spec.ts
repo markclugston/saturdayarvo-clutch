@@ -31,7 +31,7 @@ test('categories journey: create, nest, rename, reload, themes and delete', asyn
 
     await page.goto('/')
     await page.getByRole('button', { name: 'Categories' }).click()
-    await expect(page.getByRole('heading', { name: 'Categories and groups' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Categories and Groups' })).toBeVisible()
     await expect(page.getByText(/no groups or categories yet/i)).toBeVisible()
 
     const addNode = async (name: string, parent: string | null) => {

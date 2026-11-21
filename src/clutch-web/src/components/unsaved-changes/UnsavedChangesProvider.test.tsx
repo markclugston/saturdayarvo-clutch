@@ -28,7 +28,7 @@ describe('UnsavedChangesProvider', () => {
     await user.click(screen.getByRole('button', { name: 'Go' }))
 
     expect(action).toHaveBeenCalledTimes(1)
-    expect(screen.queryByText('Discard unsaved changes?')).not.toBeInTheDocument()
+    expect(screen.queryByText('Discard Unsaved Changes?')).not.toBeInTheDocument()
   })
 
   it('asks before running the action when dirty, and Stay keeps everything', async () => {
@@ -36,12 +36,12 @@ describe('UnsavedChangesProvider', () => {
     await user.click(screen.getByRole('button', { name: 'Edit' }))
     await user.click(screen.getByRole('button', { name: 'Go' }))
 
-    expect(await screen.findByText('Discard unsaved changes?')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Stay on this page' }))
+    expect(await screen.findByText('Discard Unsaved Changes?')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Stay on This Page' }))
 
     expect(action).not.toHaveBeenCalled()
     expect(screen.getByText('dirty')).toBeInTheDocument()
-    expect(screen.queryByText('Discard unsaved changes?')).not.toBeInTheDocument()
+    expect(screen.queryByText('Discard Unsaved Changes?')).not.toBeInTheDocument()
   })
 
   it('runs the action and becomes clean on Discard changes', async () => {
@@ -49,7 +49,7 @@ describe('UnsavedChangesProvider', () => {
     await user.click(screen.getByRole('button', { name: 'Edit' }))
     await user.click(screen.getByRole('button', { name: 'Go' }))
 
-    await user.click(await screen.findByRole('button', { name: 'Discard changes' }))
+    await user.click(await screen.findByRole('button', { name: 'Discard Changes' }))
 
     expect(action).toHaveBeenCalledTimes(1)
     expect(screen.getByText('clean')).toBeInTheDocument()
@@ -66,7 +66,7 @@ describe('UnsavedChangesProvider', () => {
     expect(add.mock.calls.some(([type]) => type === 'beforeunload')).toBe(true)
 
     await user.click(screen.getByRole('button', { name: 'Go' }))
-    await user.click(await screen.findByRole('button', { name: 'Discard changes' }))
+    await user.click(await screen.findByRole('button', { name: 'Discard Changes' }))
     expect(remove.mock.calls.some(([type]) => type === 'beforeunload')).toBe(true)
     expect(setItem).not.toHaveBeenCalled()
     add.mockRestore()

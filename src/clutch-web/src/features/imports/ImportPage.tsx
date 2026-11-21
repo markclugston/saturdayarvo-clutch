@@ -182,7 +182,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
   if (watched?.state === 'Expired' || watched?.state === 'Unavailable') {
     return (
       <section className="space-y-4" aria-labelledby="import-heading">
-        <PageHeading id="import-heading">Import transactions</PageHeading>
+        <PageHeading id="import-heading">Import Transactions</PageHeading>
         <Card className="space-y-4">
           <p className="text-fg-secondary" role="status">{watched.state === 'Expired'
             ? 'This import preview has expired.' : 'This import preview is no longer available.'}</p>
@@ -191,7 +191,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
           {returnMutation.isError && <ErrorMessage>{getErrorMessage(returnMutation.error)}</ErrorMessage>}
           <Button type="button" variant="secondary"
             disabled={returnMutation.isPending} onClick={() => returnMutation.mutate()}>
-            {returnMutation.isPending ? 'Returning to transactions…' : 'Return to transactions'}
+            {returnMutation.isPending ? 'Returning to Transactions…' : 'Return to Transactions'}
           </Button>
         </Card>
       </section>
@@ -261,11 +261,11 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
         type="button"
         variant="secondary"
       >
-        {review ? 'Cancel import review' : 'Back to account'}
+        {review ? 'Cancel Import Review' : 'Back to Account'}
       </Button>
       <div>
         <PageHeading id="import-heading">
-          Import transactions
+          Import Transactions
         </PageHeading>
         <p className="mt-2 text-fg-secondary">
           Destination: {account.description} — {currency.name} ({account.currencyCode})
@@ -280,11 +280,11 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
               recoverMutation.reset()
               void statusQuery.refetch()
             }} disabled={statusQuery.isFetching}>
-            {statusQuery.isFetching ? 'Checking import availability…' : 'Retry availability check'}
+            {statusQuery.isFetching ? 'Checking Import Availability…' : 'Retry Availability Check'}
           </Button>
         </Card>
       ) : importedCount === null && !statusQuery.fresh && !busy ? (
-        <p className="text-fg-secondary" role="status">Checking import availability…</p>
+        <p className="text-fg-secondary" role="status">Checking Import Availability…</p>
       ) : null}
       {!review && statusQuery.data?.availability === 'Blocked' && (
         <Card className="space-y-2">
@@ -301,7 +301,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
                   recoverMutation.mutate(statusQuery.data.activeImport.id)
                 }
               }}>
-              {recoverMutation.isPending ? 'Ending other import…' : 'End other import'}
+              {recoverMutation.isPending ? 'Ending Other Import…' : 'End Other Import'}
             </Button>
           )}
         </Card>
@@ -316,7 +316,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
             disabled={statusQuery.isFetching} onClick={() => {
               recoverMutation.reset()
               void statusQuery.refetch()
-            }}>{statusQuery.isFetching ? 'Checking import availability…' : 'Retry availability check'}</Button>}
+            }}>{statusQuery.isFetching ? 'Checking Import Availability…' : 'Retry Availability Check'}</Button>}
         </Card>
       )}
       {importedCount !== null ? (
@@ -333,7 +333,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
             type="button"
             variant="secondary"
           >
-            Return to account
+            Return to Account
           </Button>
         </Card>
       ) : review ? (
@@ -369,14 +369,14 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
                 }
                 onClick={() => confirmMutation.mutate(confirmDuplicates)}
               >
-                {confirmMutation.isPending ? 'Importing…' : 'Confirm import'}
+                {confirmMutation.isPending ? 'Importing…' : 'Confirm Import'}
               </Button>
               <Button
                 disabled={!canReview}
                 onClick={() => cancelMutation.mutate()}
                 variant="secondary"
               >
-                {cancelMutation.isPending ? 'Cancelling…' : 'Cancel review'}
+                {cancelMutation.isPending ? 'Cancelling…' : 'Cancel Review'}
               </Button>
             </div>
           </Card>
@@ -400,14 +400,14 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
                   type="button"
                   variant="secondary"
                 >
-                  {showSettings ? 'Use saved settings' : 'View or change settings'}
+                  {showSettings ? 'Use Saved Settings' : 'View or Change Settings'}
                 </Button>
               )}
             </div>
           )}
           <div className="space-y-2">
             <label className="block text-sm font-medium" htmlFor="csv-file">
-              CSV file
+              CSV File
             </label>
             <Button
               disabled={!canStart}
@@ -415,7 +415,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
               type="button"
               variant="secondary"
             >
-              Choose CSV file
+              Choose CSV File
             </Button>
             <input
               ref={fileInput}
@@ -458,7 +458,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
               }}
               type="button"
             >
-              {createReviewMutation.isPending ? 'Creating review…' : 'Review import with saved settings'}
+              {createReviewMutation.isPending ? 'Creating Review…' : 'Review Import with Saved Settings'}
             </Button>
           )}
           {((headers && (!savedMapping || !savedMappingCompatible)) || (savedMapping && showSettings)) && (

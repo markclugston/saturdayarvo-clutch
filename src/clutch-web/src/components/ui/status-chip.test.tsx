@@ -13,11 +13,11 @@ it.each(['danger', 'warning', 'success', 'info', 'neutral'] as const)(
 it('hides an optional icon and passes role and id through', () => {
   render(
     <StatusChip icon={<svg data-testid="icon" />} id="chip" role="status" status="warning">
-      Possible duplicate
+      Possible Duplicate
     </StatusChip>,
   )
   const chip = screen.getByRole('status')
   expect(chip).toHaveAttribute('id', 'chip')
-  expect(chip).toHaveTextContent('Possible duplicate')
+  expect(chip).toHaveTextContent('Possible Duplicate')
   expect(screen.getByTestId('icon').parentElement).toHaveAttribute('aria-hidden', 'true')
 })

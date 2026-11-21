@@ -71,7 +71,7 @@ export function DeleteCategoryDialog({ node, onClose }: DeleteCategoryDialogProp
           role="alertdialog"
         >
           <DialogTitle>
-            Delete {kind} “{node.name}”?
+            Delete {kind === 'group' ? 'Group' : 'Category'} “{node.name}”?
           </DialogTitle>
           {impactQuery.isPending && (
             <p className="text-fg-secondary" role="status">Checking what will be deleted…</p>

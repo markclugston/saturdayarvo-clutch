@@ -6,7 +6,7 @@ import { StartupLoadingDialog } from './StartupLoadingDialog'
 it('announces the active session check without focusing the message', () => {
   render(<StartupLoadingDialog open />)
 
-  expect(screen.getByRole('status')).toHaveTextContent('Checking your session')
+  expect(screen.getByRole('status')).toHaveTextContent('Checking Your Session')
   expect(screen.getByRole('status')).toHaveTextContent('Please wait while we check your session.')
   expect(screen.getByRole('status')).not.toHaveAttribute('tabindex')
   expect(screen.getByRole('status')).not.toHaveFocus()

@@ -13,7 +13,7 @@ export function ImportReviewTable({ review, currencyCode }: ImportReviewTablePro
   return (
     <Card aria-labelledby="import-review-heading" as="section" className="min-w-0 space-y-4">
       <div>
-        <CardTitle as="h2" id="import-review-heading">Review transactions</CardTitle>
+        <CardTitle as="h2" id="import-review-heading">Review Transactions</CardTitle>
         <p>
           {review.rowCount} transactions will be imported into this account in {currencyCode}.
         </p>
@@ -58,7 +58,7 @@ export function ImportReviewTable({ review, currencyCode }: ImportReviewTablePro
                 )}
                 <td className="px-3 py-2">
                   {row.isPossibleDuplicate
-                    ? <StatusChip status="warning">Possible duplicate</StatusChip>
+                    ? <StatusChip status="warning">Possible Duplicate</StatusChip>
                     : '—'}
                 </td>
               </tr>

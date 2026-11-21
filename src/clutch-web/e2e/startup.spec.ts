@@ -16,8 +16,8 @@ test('shows a blocking startup status without focusing non-interactive content',
 
   await page.goto('/')
   const status = page.getByRole('status')
-  await expect(status).toContainText('Checking your session')
-  await expect(page.locator('h1')).toHaveText('Sign in')
+  await expect(status).toContainText('Checking Your Session')
+  await expect(page.locator('h1')).toHaveText('Sign In')
   await expect(page.locator('main')).toHaveAttribute('inert')
   const backdrop = await page.locator('[data-slot="startup-backdrop"]').boundingBox()
   expect(backdrop).toMatchObject({ x: 0, y: 0, width: 1280, height: 720 })
@@ -35,10 +35,10 @@ test('shows a blocking startup status without focusing non-interactive content',
   await expect(page.locator('#email')).not.toBeFocused()
 
   releaseSession?.()
-  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Sign In' })).toBeVisible()
   await expect(status).toBeHidden()
-  await page.getByRole('heading', { name: 'Sign in' }).evaluate((heading) => heading.focus())
-  await expect(page.getByRole('heading', { name: 'Sign in' })).not.toBeFocused()
+  await page.getByRole('heading', { name: 'Sign In' }).evaluate((heading) => heading.focus())
+  await expect(page.getByRole('heading', { name: 'Sign In' })).not.toBeFocused()
   await page.keyboard.press('Tab')
   await expect(page.getByLabel('Email')).toBeFocused()
 })
@@ -63,7 +63,7 @@ test('recovers automatically from a temporary session failure', async ({ page })
   })
 
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible({ timeout: 5000 })
+  await expect(page.getByRole('heading', { name: 'Sign In' })).toBeVisible({ timeout: 5000 })
   expect(attempts).toBe(2)
 })
 
@@ -77,7 +77,7 @@ test('keeps sign-in buttons keyboard-accessible and responsive across themes and
   }))
   await page.goto('/')
 
-  const switchButton = page.getByRole('button', { name: 'New here? Create an account' })
+  const switchButton = page.getByRole('button', { name: 'New Here? Create an Account' })
   await expect(switchButton).toBeVisible()
   await expect(page.locator('a[href]')).toHaveCount(0)
   await switchButton.hover()
@@ -89,7 +89,7 @@ test('keeps sign-in buttons keyboard-accessible and responsive across themes and
   await expect(switchButton).toBeFocused()
   const startedAt = await page.evaluate(() => performance.now())
   await page.keyboard.press('Space')
-  await expect(page.getByRole('heading', { name: 'Create your account' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Create Your Account' })).toBeVisible()
   const responseTime = await page.evaluate((start) => performance.now() - start, startedAt)
   expect(responseTime).toBeLessThan(500)
 
@@ -127,8 +127,8 @@ test('allows retry after a non-transient startup error without reloading', async
   await expect(page.getByRole('alert')).toHaveText('Unable to load your session. Please try again.')
   const currentUrl = page.url()
   retrying = true
-  await page.getByRole('button', { name: 'Try again' }).click()
-  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
+  await page.getByRole('button', { name: 'Try Again' }).click()
+  await expect(page.getByRole('heading', { name: 'Sign In' })).toBeVisible()
   expect(attempts).toBeGreaterThanOrEqual(2)
   expect(page.url()).toBe(currentUrl)
 })
@@ -155,14 +155,14 @@ test('keeps startup loading accessible across supported viewport and color modes
       await page.locator('html').evaluate((html, scheme) => {
         html.classList.toggle('dark', scheme !== 'light')
       }, mode)
-      await expect(page.getByRole('status')).toContainText('Checking your session')
+      await expect(page.getByRole('status')).toContainText('Checking Your Session')
       const results = await new AxeBuilder({ page }).analyze()
       expect(results.violations).toEqual([])
     }
   }
 
   releaseSession?.()
-  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Sign In' })).toBeVisible()
 })
 
 test('keeps the retryable startup error accessible across supported viewport and color modes', async ({ page }) => {

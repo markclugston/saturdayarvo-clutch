@@ -27,16 +27,16 @@ describe('ImportLimitsPage', () => {
     const user = userEvent.setup()
     renderWithQueryClient(<ImportLimitsPage onBack={vi.fn()} />)
 
-    expect(await screen.findByLabelText('Maximum file size (bytes)'))
+    expect(await screen.findByLabelText('Maximum File Size (Bytes)'))
       .toHaveValue(10 * 1024 * 1024)
-    expect(screen.getByLabelText('Maximum rows per import')).toHaveValue(10_000)
+    expect(screen.getByLabelText('Maximum Rows per Import')).toHaveValue(10_000)
     expect(
-      screen.getByLabelText('Maximum attempts per user per minute'),
+      screen.getByLabelText('Maximum Attempts per User per Minute'),
     ).toHaveValue(5)
 
-    await user.clear(screen.getByLabelText('Maximum rows per import'))
-    await user.type(screen.getByLabelText('Maximum rows per import'), '20000')
-    await user.click(screen.getByRole('button', { name: 'Save limits' }))
+    await user.clear(screen.getByLabelText('Maximum Rows per Import'))
+    await user.type(screen.getByLabelText('Maximum Rows per Import'), '20000')
+    await user.click(screen.getByRole('button', { name: 'Save Limits' }))
 
     await waitFor(() => {
       expect(updateImportLimits).toHaveBeenCalledOnce()
@@ -51,10 +51,10 @@ describe('ImportLimitsPage', () => {
     const user = userEvent.setup()
     renderWithQueryClient(<ImportLimitsPage onBack={vi.fn()} />)
 
-    const rowLimit = await screen.findByLabelText('Maximum rows per import')
+    const rowLimit = await screen.findByLabelText('Maximum Rows per Import')
     await user.clear(rowLimit)
     await user.type(rowLimit, '0')
-    await user.click(screen.getByRole('button', { name: 'Save limits' }))
+    await user.click(screen.getByRole('button', { name: 'Save Limits' }))
 
     expect(rowLimit).toBeInvalid()
     expect(updateImportLimits).not.toHaveBeenCalled()
@@ -65,8 +65,8 @@ describe('ImportLimitsPage', () => {
     const onBack = vi.fn()
     renderWithQueryClient(<ImportLimitsPage onBack={onBack} />)
 
-    await screen.findByRole('heading', { name: 'Import limits' })
-    const backButton = screen.getByRole('button', { name: 'Back to the application' })
+    await screen.findByRole('heading', { name: 'Import Limits' })
+    const backButton = screen.getByRole('button', { name: 'Back to the Application' })
     expect(backButton).toHaveFocus()
     expect(backButton.tagName).toBe('BUTTON')
     await user.click(backButton)

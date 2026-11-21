@@ -74,15 +74,15 @@ export function AccountDetails({ accountId, onBack, onImport }: AccountDetailsPr
     <section aria-labelledby="account-details-heading" className="space-y-4">
       <div className="flex flex-wrap gap-3">
         <Button onClick={onBack} type="button" variant="secondary">
-          Back to accounts
+          Back to Accounts
         </Button>
         <Button onClick={onImport} type="button" variant="secondary">
-          Import transactions
+          Import Transactions
         </Button>
       </div>
       <div>
         <PageHeading id="account-details-heading">
-          Account details
+          Account Details
         </PageHeading>
         <p className="mt-2 text-fg-secondary">
           Currency: {currency.name} ({account.currencyCode})
@@ -100,7 +100,7 @@ export function AccountDetails({ accountId, onBack, onImport }: AccountDetailsPr
       <Card as="form" className="space-y-4" onSubmit={submit}>
         <FloatingField
           id="edit-account-description"
-          label="Account description"
+          label="Account Description"
           maxLength={200}
           onChange={(event) => setDescription(event.currentTarget.value)}
           required
@@ -110,7 +110,7 @@ export function AccountDetails({ accountId, onBack, onImport }: AccountDetailsPr
           disabled={updateMutation.isPending || displayedDescription === account.description}
           type="submit"
         >
-          {updateMutation.isPending ? 'Saving…' : 'Save description'}
+          {updateMutation.isPending ? 'Saving…' : 'Save Description'}
         </Button>
         {updateMutation.isError && <ErrorMessage>{getErrorMessage(updateMutation.error)}</ErrorMessage>}
       </Card>

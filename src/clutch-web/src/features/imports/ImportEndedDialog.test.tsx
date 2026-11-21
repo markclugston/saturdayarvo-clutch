@@ -7,10 +7,10 @@ it('names the actor as text and requires acknowledgement with trapped keyboard f
   const acknowledge = vi.fn()
   const user = userEvent.setup()
   render(<><button type="button">Outside</button><ImportEndedDialog userName="<script>owner@example.test</script>" onAcknowledge={acknowledge} /></>)
-  const dialog = screen.getByRole('dialog', { name: 'Import ended' })
+  const dialog = screen.getByRole('dialog', { name: 'Import Ended' })
   expect(dialog).toHaveAccessibleDescription(/<script>owner@example.test<\/script>.*another session/)
   expect(dialog.querySelector('script')).toBeNull()
-  const button = screen.getByRole('button', { name: 'Return to transactions' })
+  const button = screen.getByRole('button', { name: 'Return to Transactions' })
   await waitFor(() => expect(button).toHaveFocus())
   await user.keyboard('{Tab}')
   await waitFor(() => expect(button).toHaveFocus())
@@ -18,7 +18,7 @@ it('names the actor as text and requires acknowledgement with trapped keyboard f
   await waitFor(() => expect(button).toHaveFocus())
   fireEvent.pointerDown(document.body)
   fireEvent.click(document.body)
-  expect(screen.getByRole('dialog', { name: 'Import ended' })).toBeVisible()
+  expect(screen.getByRole('dialog', { name: 'Import Ended' })).toBeVisible()
   expect(acknowledge).not.toHaveBeenCalled()
   await user.keyboard('{Enter}')
   expect(acknowledge).toHaveBeenCalledTimes(1)
@@ -26,5 +26,5 @@ it('names the actor as text and requires acknowledgement with trapped keyboard f
 
 it('prevents repeated acknowledgement while navigation is pending', () => {
   render(<ImportEndedDialog userName="owner@example.test" busy onAcknowledge={vi.fn()} />)
-  expect(screen.getByRole('button', { name: 'Returning to transactions…' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Returning to Transactions…' })).toBeDisabled()
 })

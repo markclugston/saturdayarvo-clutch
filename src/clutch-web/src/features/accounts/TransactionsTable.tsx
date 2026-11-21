@@ -107,7 +107,7 @@ export function TransactionsTable({
           type="button"
           variant="secondary"
         >
-          {transactionsQuery.isFetchingNextPage ? 'Loading…' : 'Load more'}
+          {transactionsQuery.isFetchingNextPage ? 'Loading…' : 'Load More'}
         </Button>
       )}
       {transactionsQuery.isFetchNextPageError && (

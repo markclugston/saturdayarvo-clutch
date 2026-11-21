@@ -12,7 +12,7 @@ export function StartupLoadingDialog({ open }: StartupLoadingDialogProps) {
       <div className="w-full max-w-md space-y-4 rounded-card bg-card p-6 text-fg shadow-float" role="status">
         <div className="flex items-center gap-3">
           <LoaderCircle aria-hidden="true" className="size-5 shrink-0 animate-spin text-fg-secondary" />
-          <p className="text-lg font-semibold leading-none tracking-tight">Checking your session</p>
+          <p className="text-lg font-semibold leading-none tracking-tight">Checking Your Session</p>
         </div>
         <p className="text-sm text-fg-secondary">Please wait while we check your session.</p>
       </div>

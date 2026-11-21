@@ -27,7 +27,7 @@ describe('ImportReviewTable', () => {
     expect(screen.getByRole('status')).toHaveTextContent(
       'Confirming will import every valid row, including these possible duplicates.',
     )
-    expect(screen.getByText('Possible duplicate')).toBeInTheDocument()
+    expect(screen.getByText('Possible Duplicate')).toBeInTheDocument()
   })
 
   it('shows right-aligned Amount and Balance columns, with Warning last, using a plain $ symbol', () => {

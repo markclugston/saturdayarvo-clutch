@@ -41,7 +41,7 @@ export function AddCategoryForm() {
       className="m-2 mt-0 ml-0 shrink-0 space-y-3 rounded-panel bg-content p-4 lg:m-3 lg:mt-0 lg:ml-0 xl:p-6"
       onSubmit={submit}
     >
-      <h2 className="text-base font-semibold" id="add-category-heading">Add a group or category</h2>
+      <h2 className="text-base font-semibold" id="add-category-heading">Add a Group or Category</h2>
       <div className="flex flex-wrap items-start gap-3">
         <div className="w-full sm:w-72">
           <FloatingField

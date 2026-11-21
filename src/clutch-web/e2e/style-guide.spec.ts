@@ -200,34 +200,34 @@ async function expectTheme(page: Page, theme: Theme) {
 
 async function openAccountDetails(page: Page) {
   await page.getByRole('button', { name: new RegExp(longName) }).click()
-  await expect(page.getByRole('heading', { name: 'Account details' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Account Details' })).toBeVisible()
   await expect(page.getByRole('table')).toBeVisible()
 }
 
 async function openImportMapping(page: Page) {
   await openAccountDetails(page)
-  await page.getByRole('button', { name: 'Import transactions' }).click()
-  await expect(page.getByRole('heading', { name: 'Import transactions' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Choose CSV file' })).toBeEnabled()
+  await page.getByRole('button', { name: 'Import Transactions' }).click()
+  await expect(page.getByRole('heading', { name: 'Import Transactions' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Choose CSV File' })).toBeEnabled()
   await page.locator('#csv-file').setInputFiles(csv)
-  await expect(page.getByRole('heading', { name: 'Map CSV columns' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Map CSV Columns' })).toBeVisible()
 }
 
 async function fillMapping(page: Page) {
-  await page.getByLabel('Transaction date column').selectOption('0')
-  await page.getByLabel('Description column').selectOption('1')
-  await page.getByLabel('Date format').selectOption('yyyy-MM-dd')
-  await page.getByLabel('Signed amount column').selectOption('2')
-  await page.getByLabel('Incoming transactions use').selectOption('Positive')
-  await page.getByLabel('Number format used in this file').selectOption('dot-decimal-comma-grouping')
+  await page.getByLabel('Transaction Date Column').selectOption('0')
+  await page.getByLabel('Description Column').selectOption('1')
+  await page.getByLabel('Date Format').selectOption('yyyy-MM-dd')
+  await page.getByLabel('Signed Amount Column').selectOption('2')
+  await page.getByLabel('Incoming Transactions Use').selectOption('Positive')
+  await page.getByLabel('Number Format Used in This File').selectOption('dot-decimal-comma-grouping')
 }
 
 async function openImportReview(page: Page) {
   await openImportMapping(page)
   await fillMapping(page)
-  await page.getByRole('button', { name: 'Review import' }).click()
-  await expect(page.getByRole('heading', { name: 'Review transactions' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Cancel review' })).toBeEnabled()
+  await page.getByRole('button', { name: 'Review Import' }).click()
+  await expect(page.getByRole('heading', { name: 'Review Transactions' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Cancel Review' })).toBeEnabled()
 }
 
 async function openMortgages(page: Page) {
@@ -271,7 +271,7 @@ const signedIn = { session: 'ok' } as const
 const states: StateDef[] = [
   {
     name: 'sign-in', manualDark: true, mock: { session: 'unauthorized' },
-    reach: async (page) => { await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible() },
+    reach: async (page) => { await expect(page.getByRole('heading', { name: 'Sign In' })).toBeVisible() },
   },
   {
     name: 'sign-in-errors', manualDark: true, mock: { session: 'unauthorized' },
@@ -279,7 +279,7 @@ const states: StateDef[] = [
       await page.getByLabel('Email').fill('person@example.com')
       await page.getByLabel('Password').fill('not-a-real-password')
       mock.failWrites = true
-      await page.getByRole('button', { name: 'Sign in' }).click()
+      await page.getByRole('button', { name: 'Sign In' }).click()
       await expect(page.getByRole('alert')).toBeVisible()
     },
   },
@@ -294,31 +294,31 @@ const states: StateDef[] = [
     name: 'sign-in-field-filled', manualDark: true, mock: { session: 'unauthorized' },
     reach: async (page) => {
       await page.getByLabel('Email').fill('person@example.com')
-      await page.getByRole('heading', { name: 'Sign in' }).click()
+      await page.getByRole('heading', { name: 'Sign In' }).click()
     },
   },
   {
     name: 'startup-loading', manualDark: true, mock: { session: 'hang' },
-    reach: async (page) => { await expect(page.getByRole('status')).toContainText('Checking your session') },
+    reach: async (page) => { await expect(page.getByRole('status')).toContainText('Checking Your Session') },
   },
   {
     name: 'accounts', mock: signedIn,
-    reach: async (page) => { await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeVisible() },
+    reach: async (page) => { await expect(page.getByRole('heading', { name: 'Your Accounts' })).toBeVisible() },
   },
   {
     name: 'accounts-create-errors', mock: signedIn,
     reach: async (page, mock) => {
-      await page.getByLabel('Account description').fill('Savings')
+      await page.getByLabel('Account Description').fill('Savings')
       await page.getByLabel('Currency').selectOption('AUD')
       mock.failWrites = true
-      await page.getByRole('button', { name: 'Add account' }).click()
+      await page.getByRole('button', { name: 'Add Account' }).click()
       await expect(page.getByRole('alert')).toBeVisible()
     },
   },
   {
     name: 'nav-expanded', mock: signedIn,
     reach: async (page) => {
-      await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
       await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: 'Accounts' }).focus()
       await expect(page.getByRole('navigation', { name: 'Primary' }).getByText('Categories')).toBeVisible()
     },
@@ -331,9 +331,9 @@ const states: StateDef[] = [
     name: 'account-details-errors', mock: signedIn,
     reach: async (page, mock) => {
       await openAccountDetails(page)
-      await page.getByLabel('Account description').fill('Renamed account')
+      await page.getByLabel('Account Description').fill('Renamed account')
       mock.failWrites = true
-      await page.getByRole('button', { name: 'Save description' }).click()
+      await page.getByRole('button', { name: 'Save Description' }).click()
       await expect(page.getByRole('alert')).toBeVisible()
     },
   },
@@ -355,7 +355,7 @@ const states: StateDef[] = [
       await openImportMapping(page)
       await fillMapping(page)
       mock.failWrites = true
-      await page.getByRole('button', { name: 'Review import' }).click()
+      await page.getByRole('button', { name: 'Review Import' }).click()
       await expect(page.getByRole('alert')).toBeVisible()
     },
   },
@@ -363,7 +363,7 @@ const states: StateDef[] = [
     name: 'import-review', mock: signedIn,
     reach: async (page) => {
       await openImportReview(page)
-      await expect(page.getByText('Possible duplicate', { exact: true })).toBeVisible()
+      await expect(page.getByText('Possible Duplicate', { exact: true })).toBeVisible()
       await expect(page.getByRole('checkbox')).toBeVisible()
     },
   },
@@ -373,7 +373,7 @@ const states: StateDef[] = [
       await openImportReview(page)
       mock.ended = true
       await page.evaluate(() => window.dispatchEvent(new Event('focus')))
-      await expect(page.getByRole('dialog', { name: 'Import ended' })).toBeVisible({ timeout: 10_000 })
+      await expect(page.getByRole('dialog', { name: 'Import Ended' })).toBeVisible({ timeout: 10_000 })
     },
   },
   {
@@ -487,14 +487,14 @@ const states: StateDef[] = [
       await openMortgages(page)
       await page.getByLabel('Name', { exact: true }).fill('Edited name')
       await page.getByRole('button', { name: 'Mortgage 2', exact: true }).click()
-      await expect(page.getByRole('dialog', { name: 'Discard unsaved changes?' })).toBeVisible()
+      await expect(page.getByRole('dialog', { name: 'Discard Unsaved Changes?' })).toBeVisible()
     },
   },
   {
     name: 'mortgages-saved-toast', mock: signedIn,
     reach: async (page) => {
       await openMortgages(page)
-      await page.getByRole('button', { name: 'Add mortgage' }).click()
+      await page.getByRole('button', { name: 'Add Mortgage' }).click()
       await fillNewMortgage(page)
       await page.getByRole('button', { name: 'Save' }).click()
       await expect(page.getByRole('status').filter({ hasText: 'Mortgage saved' })).toBeVisible()
@@ -503,17 +503,17 @@ const states: StateDef[] = [
   {
     name: 'import-limits', mock: signedIn,
     reach: async (page) => {
-      await page.getByRole('button', { name: 'Import limits' }).click()
-      await expect(page.getByRole('heading', { name: 'Import limits', level: 1 })).toBeVisible()
+      await page.getByRole('button', { name: 'Import Limits' }).click()
+      await expect(page.getByRole('heading', { name: 'Import Limits', level: 1 })).toBeVisible()
     },
   },
   {
     name: 'import-limits-errors', mock: signedIn,
     reach: async (page, mock) => {
-      await page.getByRole('button', { name: 'Import limits' }).click()
-      await page.getByLabel('Maximum rows per import').fill('2000')
+      await page.getByRole('button', { name: 'Import Limits' }).click()
+      await page.getByLabel('Maximum Rows per Import').fill('2000')
       mock.failWrites = true
-      await page.getByRole('button', { name: 'Save limits' }).click()
+      await page.getByRole('button', { name: 'Save Limits' }).click()
       await expect(page.getByRole('alert')).toBeVisible()
     },
   },
@@ -526,7 +526,7 @@ const states: StateDef[] = [
   {
     name: 'sign-up', manualDark: true, mock: { session: 'unauthorized' },
     reach: async (page) => {
-      await page.getByRole('button', { name: 'New here? Create an account' }).click()
+      await page.getByRole('button', { name: 'New Here? Create an Account' }).click()
       await expect(page.getByLabel('Password')).toHaveAccessibleDescription(/at least 12 characters/)
     },
   },
@@ -534,7 +534,7 @@ const states: StateDef[] = [
     name: 'session-error', manualDark: true, mock: { session: 'error' },
     reach: async (page) => {
       await expect(page.getByRole('alert')).toContainText('Unable to load your session')
-      await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Try Again' })).toBeVisible()
     },
   },
 ]
@@ -703,7 +703,7 @@ for (const theme of ['Light', 'Dark'] as const) {
     await mockApi(page, { theme })
     await page.goto('/')
     await expectTheme(page, theme)
-    await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
     await settle(page)
     const lightness = await page.evaluate(() => {
       const luminance = (value: string) => {
@@ -789,7 +789,7 @@ test.describe('Mortgages layout and motion', () => {
       await page.setViewportSize({ width, height: 800 })
       await page.goto('/')
       await openMortgages(page)
-      await page.getByRole('button', { name: 'Add mortgage' }).click()
+      await page.getByRole('button', { name: 'Add Mortgage' }).click()
       await fillNewMortgage(page)
       await page.getByRole('button', { name: 'Save' }).click()
       const toast = page.getByRole('status').filter({ hasText: 'Mortgage saved' })
@@ -822,12 +822,12 @@ test.describe('Mortgages layout and motion', () => {
       await page.goto('/')
       await openMortgages(page)
       const strip = page.getByRole('navigation', { name: 'Mortgages' }).getByRole('list')
-      await expect(page.getByRole('button', { name: 'Add mortgage' })).toBeAttached()
+      await expect(page.getByRole('button', { name: 'Add Mortgage' })).toBeAttached()
       if (width < 768) {
         expect(await strip.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true)
       }
       await strip.evaluate((element) => { element.scrollLeft = element.scrollWidth })
-      await expect(page.getByRole('button', { name: 'Add mortgage' })).toBeInViewport()
+      await expect(page.getByRole('button', { name: 'Add Mortgage' })).toBeInViewport()
       await expectNoHorizontalScroll(page)
     })
   }

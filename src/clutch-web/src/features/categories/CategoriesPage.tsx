@@ -83,7 +83,7 @@ export function CategoriesPage() {
     <section aria-labelledby="categories-heading" className="space-y-4">
       <div>
         <PageHeading id="categories-heading">
-          Categories and groups
+          Categories and Groups
         </PageHeading>
         <p className="mt-2 text-fg-secondary">
           Groups organise your categories. Categories can also sit inside other categories.

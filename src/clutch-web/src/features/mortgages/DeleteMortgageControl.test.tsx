@@ -143,7 +143,7 @@ describe('DeleteMortgageControl', () => {
     await user.click(screen.getByRole('button', { name: 'Delete Home' }))
 
     expect(await screen.findByRole('dialog', { name: 'Delete Home?' })).toBeInTheDocument()
-    expect(screen.queryByText('Discard unsaved changes?')).not.toBeInTheDocument()
+    expect(screen.queryByText('Discard Unsaved Changes?')).not.toBeInTheDocument()
   })
 
   it('Reload with unsaved changes asks first; Stay closes the dialog and runs nothing', async () => {
@@ -155,7 +155,7 @@ describe('DeleteMortgageControl', () => {
     await user.click(await screen.findByRole('button', { name: 'Delete' }))
     await user.click(await screen.findByRole('button', { name: 'Reload' }))
 
-    await user.click(await screen.findByRole('button', { name: 'Stay on this page' }))
+    await user.click(await screen.findByRole('button', { name: 'Stay on This Page' }))
 
     expect(onReload).not.toHaveBeenCalled()
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())

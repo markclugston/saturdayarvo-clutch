@@ -20,13 +20,13 @@ export function ImportEndedDialog({ userName, busy = false, error, onAcknowledge
       <DialogPortal>
         <DialogBackdrop />
         <DialogPopup className="space-y-4 p-6" initialFocus={acknowledge}>
-          <DialogTitle>Import ended</DialogTitle>
+          <DialogTitle>Import Ended</DialogTitle>
           <DialogDescription>
             Your import was ended by {userName} in another session. Return to this account&apos;s transactions to continue.
           </DialogDescription>
           {error && <ErrorMessage>{error}</ErrorMessage>}
           <Button ref={acknowledge} type="button" disabled={busy} onClick={onAcknowledge}>
-            {busy ? 'Returning to transactions…' : 'Return to transactions'}
+            {busy ? 'Returning to Transactions…' : 'Return to Transactions'}
           </Button>
         </DialogPopup>
       </DialogPortal>

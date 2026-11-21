@@ -60,7 +60,7 @@ function ScheduleTable({ rowCount }: { rowCount: number }) {
         >
           <div className="flex items-center px-3" role="columnheader">Period</div>
           <div className="flex items-center px-3" role="columnheader">Date</div>
-          <div className="flex items-center px-3" role="columnheader">Bank schedule</div>
+          <div className="flex items-center px-3" role="columnheader">Bank Schedule</div>
         </div>
         <div role="rowgroup">
           <div aria-hidden="true" role="presentation" style={{ height: first * ROW_HEIGHT }} />

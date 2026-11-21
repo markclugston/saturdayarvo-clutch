@@ -9,7 +9,7 @@ describe('AmortizationSchedule', () => {
     const table = screen.getByRole('table')
     expect(table).toHaveAttribute('aria-rowcount', '362')
     expect(within(table).getAllByRole('columnheader').map((header) => header.textContent))
-      .toEqual(['Period', 'Date', 'Bank schedule'])
+      .toEqual(['Period', 'Date', 'Bank Schedule'])
     const firstRow = within(table).getAllByRole('row')[1] as HTMLElement
     expect(within(firstRow).getAllByRole('cell').map((cell) => cell.textContent))
       .toEqual(['1', 'Not yet calculated', 'Not yet calculated'])

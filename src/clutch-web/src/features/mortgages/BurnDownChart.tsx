@@ -47,12 +47,12 @@ export function BurnDownChart({ saved }: BurnDownChartProps) {
               Balance ($)
             </text>
             <text fill="currentColor" fontSize="12" textAnchor="middle" x="325" y="290">
-              Repayment date
+              Repayment Date
             </text>
             <g className="text-primary">
               <line stroke="currentColor" strokeWidth="3" x1="400" x2="424" y1="15" y2="15" />
               <text className="text-fg-secondary" fill="currentColor" fontSize="12" x="430" y="19">
-                Bank schedule
+                Bank Schedule
               </text>
             </g>
           </svg>

@@ -57,7 +57,7 @@ describe('MortgageTabs', () => {
     const nav = screen.getByRole('navigation', { name: 'Mortgages' })
     expect(within(nav).getAllByRole('list')).toHaveLength(1)
     expect(within(nav).getAllByRole('button').map((button) => button.textContent || button.getAttribute('aria-label')))
-      .toEqual(['Home', 'Car', 'Add mortgage'])
+      .toEqual(['Home', 'Car', 'Add Mortgage'])
     expect(screen.getByRole('button', { name: 'Home' })).toHaveAttribute('aria-current', 'true')
     expect(screen.getByRole('button', { name: 'Car' })).not.toHaveAttribute('aria-current')
     expect(screen.queryByRole('button', { name: /^Delete / })).not.toBeInTheDocument()

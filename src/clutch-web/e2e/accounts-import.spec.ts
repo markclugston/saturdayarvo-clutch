@@ -38,7 +38,7 @@ test('waits for the API to become available before showing sign-in', async ({ pa
   })
 
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Sign In' })).toBeVisible()
   await expect(page.getByRole('alert')).toHaveCount(0)
   expect(requests).toBe(2)
 })
@@ -52,7 +52,7 @@ test('sign-in journey supports keyboard navigation and keeps the Light default',
       body: JSON.stringify({ status: 401, title: 'Authentication required' }),
     }))
   await page.goto(baseUrl)
-  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Sign In' })).toBeVisible()
   await expect(page.locator('a[href]')).toHaveCount(0)
 
   await page.keyboard.press('Tab')
@@ -82,12 +82,12 @@ test('switches to account creation using a button without hyperlink controls', a
     }))
   await page.goto('/')
 
-  const createAccountButton = page.getByRole('button', { name: 'New here? Create an account' })
+  const createAccountButton = page.getByRole('button', { name: 'New Here? Create an Account' })
   await expect(createAccountButton).toBeVisible()
   await expect(createAccountButton).toHaveJSProperty('tagName', 'BUTTON')
   await expect(page.locator('a[href]')).toHaveCount(0)
   await createAccountButton.click()
-  await expect(page.getByRole('heading', { name: 'Create your account' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Create Your Account' })).toBeVisible()
 })
 
 test('provisions two real API sessions and denies cross-user account access', async ({ browser }) => {
@@ -96,13 +96,13 @@ test('provisions two real API sessions and denies cross-user account access', as
     await registerAndSignIn(ownerContext, `owner-${randomUUID()}@example.test`)
     const ownerPage = await ownerContext.newPage()
     await ownerPage.goto(baseUrl)
-    await expect(ownerPage.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
+    await expect(ownerPage.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
 
     const description = 'Private browser test account'
-    await ownerPage.getByLabel('Account description').fill(description)
+    await ownerPage.getByLabel('Account Description').fill(description)
     await ownerPage.getByLabel('Currency').selectOption('AUD')
-    await ownerPage.getByRole('button', { name: 'Add account' }).click()
-    await expect(ownerPage.getByRole('heading', { name: 'Account details' })).toBeVisible()
+    await ownerPage.getByRole('button', { name: 'Add Account' }).click()
+    await expect(ownerPage.getByRole('heading', { name: 'Account Details' })).toBeVisible()
 
     const ownerAccountsResponse = await ownerContext.request.get('/api/accounts')
     expect(ownerAccountsResponse.ok()).toBeTruthy()
@@ -116,7 +116,7 @@ test('provisions two real API sessions and denies cross-user account access', as
     await registerAndSignIn(otherContext, `other-${randomUUID()}@example.test`)
     const otherPage = await otherContext.newPage()
     await otherPage.goto(baseUrl)
-    await expect(otherPage.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
+    await expect(otherPage.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
 
     const otherUserResponse = await otherContext.request.get(`/api/accounts/${account.id}`)
     expect(otherUserResponse.status()).toBe(404)
@@ -139,21 +139,21 @@ test.describe('authenticated personal accounts and transaction import', () => {
     const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:5173'
     await page.goto(baseUrl)
     await expect(page.locator('a[href]')).toHaveCount(0)
-    await expect(page.getByRole('button', { name: 'Import limits' })).toHaveCount(0)
-    await expect(page.getByRole('heading', { name: 'Your accounts' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Your accounts' })).not.toBeFocused()
+    await expect(page.getByRole('button', { name: 'Import Limits' })).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Your Accounts' })).not.toBeFocused()
     const description = `Playwright ${Date.now()}`
-    await page.getByLabel('Account description').fill(description)
+    await page.getByLabel('Account Description').fill(description)
     await page.getByLabel('Currency').selectOption('AUD')
     const accountCreation = page.waitForResponse((response) =>
       response.url().endsWith('/api/accounts')
       && response.request().method() === 'POST')
-    await page.getByRole('button', { name: 'Add account' }).click()
+    await page.getByRole('button', { name: 'Add Account' }).click()
     const accountResponse = await accountCreation
     expect(accountResponse.ok()).toBeTruthy()
     const account = await accountResponse.json() as { id: string }
-    await expect(page.getByRole('heading', { name: 'Account details' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Back to accounts' })).toBeFocused()
+    await expect(page.getByRole('heading', { name: 'Account Details' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Back to Accounts' })).toBeFocused()
 
     const otherContext = await browser.newContext({
       storageState: process.env.PLAYWRIGHT_OTHER_STORAGE_STATE,
@@ -167,8 +167,8 @@ test.describe('authenticated personal accounts and transaction import', () => {
       await otherContext.close()
     }
 
-    await page.getByRole('button', { name: 'Import transactions' }).click()
-    await expect(page.getByRole('button', { name: 'Back to account' })).toBeFocused()
+    await page.getByRole('button', { name: 'Import Transactions' }).click()
+    await expect(page.getByRole('button', { name: 'Back to Account' })).toBeFocused()
     await page.locator('#csv-file').setInputFiles({
       name: 'duplicate-transactions.csv',
       mimeType: 'text/csv',
@@ -176,14 +176,14 @@ test.describe('authenticated personal accounts and transaction import', () => {
         `Date,Description,Amount\n2025-01-15,Duplicate ${description},12.50\n2025-01-15,Duplicate ${description},12.50`,
       ),
     })
-    await page.getByLabel('Transaction date column').selectOption('0')
-    await page.getByLabel('Description column').selectOption('1')
-    await page.getByLabel('Date format').selectOption('yyyy-MM-dd')
-    await page.getByLabel('Signed amount column').selectOption('2')
-    await page.getByLabel('Incoming transactions use').selectOption('Positive')
-    await page.getByLabel('Number format used in this file')
+    await page.getByLabel('Transaction Date Column').selectOption('0')
+    await page.getByLabel('Description Column').selectOption('1')
+    await page.getByLabel('Date Format').selectOption('yyyy-MM-dd')
+    await page.getByLabel('Signed Amount Column').selectOption('2')
+    await page.getByLabel('Incoming Transactions Use').selectOption('Positive')
+    await page.getByLabel('Number Format Used in This File')
       .selectOption('dot-decimal-comma-grouping')
-    await page.getByRole('button', { name: 'Review import' }).click()
+    await page.getByRole('button', { name: 'Review Import' }).click()
 
     await expect(page.getByRole('status')).toContainText('Possible duplicates are highlighted')
     const accessibility = await new AxeBuilder({ page })
@@ -191,14 +191,14 @@ test.describe('authenticated personal accounts and transaction import', () => {
       .analyze()
     expect(accessibility.violations).toEqual([])
 
-    const confirmButton = page.getByRole('button', { name: 'Confirm import' })
+    const confirmButton = page.getByRole('button', { name: 'Confirm Import' })
     await expect(confirmButton).toBeDisabled()
     await page.getByLabel(/I reviewed the possible duplicates/).check()
     await expect(confirmButton).toBeEnabled()
     await confirmButton.click()
     await expect(page.getByRole('status')).toContainText('2 transactions imported successfully')
-    await page.getByRole('button', { name: 'Return to account' }).click()
-    await expect(page.getByRole('button', { name: 'Back to accounts' })).toBeFocused()
+    await page.getByRole('button', { name: 'Return to Account' }).click()
+    await expect(page.getByRole('button', { name: 'Back to Accounts' })).toBeFocused()
 
     await page.emulateMedia({ colorScheme: 'dark' })
     await expect.poll(() => page.locator('html').evaluate((element) =>
