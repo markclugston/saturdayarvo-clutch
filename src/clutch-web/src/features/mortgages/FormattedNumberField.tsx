@@ -29,9 +29,20 @@ export function formatPercent(raw: string): string {
   return `${Number(whole)}.${fraction.padEnd(2, '0')}%`
 }
 
-/** Strips the symbols a user may paste ($ , % and spaces) so the draft always holds a plain number. */
-function clean(value: string): string {
-  return value.replace(/[$,%\s]/g, '')
+/**
+ * Restricted entry (WEB-001): drops every character that cannot form a valid value, including pasted
+ * symbols ($ , % and spaces), keeps one decimal point and at most two decimal places, so the draft
+ * always holds a plain non-negative number and invalid characters never render.
+ */
+export function clean(value: string): string {
+  const stripped = value.replace(/[^\d.]/g, '')
+  const dot = stripped.indexOf('.')
+  if (dot === -1) {
+    return stripped
+  }
+  const whole = stripped.slice(0, dot)
+  const fraction = stripped.slice(dot + 1).replace(/\./g, '').slice(0, 2)
+  return `${whole}.${fraction}`
 }
 
 type FormattedNumberFieldProps = Omit<InputProps, 'value' | 'onChange'> & {

@@ -106,7 +106,6 @@ describe('InterestRateChangesDialog', () => {
   it.each([
     ['duplicate date', '6', '2000-01-01', 'Effective Date', 'This effective date is already used'],
     ['rate above 100', '100.5', '2001-01-01', 'New Interest Rate', 'Enter an interest rate from 0 to 100'],
-    ['3 decimal places', '5.005', '2001-01-01', 'New Interest Rate', 'Enter an interest rate with up to 2 decimal places'],
     ['date out of range', '6', '2010-01-01', 'Effective Date', 'Choose a date from 1 Jan 2000 to 1 Dec 2009'],
   ])('refuses an invalid add (%s) with the field flagged and nothing added', async (_label, rate, date, field, message) => {
     const user = userEvent.setup()
