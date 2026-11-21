@@ -1,5 +1,6 @@
 using Clutch.API.Application.Accounts;
 using Clutch.API.Application.Categories;
+using Clutch.API.Application.Mortgages;
 using Clutch.API.Application.Imports;
 using Clutch.API.Application.Preferences;
 using Clutch.API.Application.Transactions;
@@ -78,6 +79,7 @@ public static class DependencyInjection
         services.AddScoped<AdminBootstrapper>();
         services.AddScoped<AccountService>();
         services.AddScoped<CategoryNodeService>();
+        services.AddScoped<MortgageService>();
         services.AddScoped<CsvImportParser>();
         services.AddScoped<AccountImportLease>();
         services.AddScoped<ImportAuditWriter>();

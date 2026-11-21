@@ -67,18 +67,35 @@ const csv = {
 }
 
 type Session = 'ok' | 'unauthorized' | 'error' | 'hang'
+type MortgagesMode = 'ok' | 'empty' | 'many' | 'error' | 'hang'
+
+const longMortgageName = 'Family home loan with the offset account and the fixed rate period'
+const mortgageFixture = (index: number) => ({
+  id: `550e8400-e29b-41d4-a716-4466554402${String(index).padStart(2, '0')}`,
+  name: index === 0 ? longMortgageName : `Mortgage ${index + 1}`,
+  startingBalance: 500000.5,
+  numberOfPeriods: 360,
+  firstRepaymentDate: '2000-01-01',
+  repaymentFrequency: 'Monthly',
+  interestRateChanges: [
+    { newInterestRate: 5.25, effectiveDate: '2000-01-01' },
+    { newInterestRate: 6, effectiveDate: '2005-06-01' },
+  ],
+  version: 1,
+})
 
 type Mock = {
-  theme: Theme
+  theme: Theme | 'System'
   session: Session
   themeLoadFails: boolean
   failWrites: boolean
   ended: boolean
+  mortgages: MortgagesMode
 }
 
 async function mockApi(page: Page, options: Partial<Mock> = {}): Promise<Mock> {
   const mock: Mock = {
-    theme: 'Light', session: 'ok', themeLoadFails: false, failWrites: false, ended: false, ...options,
+    theme: 'Light', session: 'ok', themeLoadFails: false, failWrites: false, ended: false, mortgages: 'ok', ...options,
   }
   await page.route((url) => url.pathname.startsWith('/api/'), async (route) => {
     const request = route.request()
@@ -96,6 +113,16 @@ async function mockApi(page: Page, options: Partial<Mock> = {}): Promise<Mock> {
     if (path === '/api/preferences/theme') {
       if (mock.themeLoadFails) return route.fulfill({ status: 500, json: { title: 'Preference failure' } })
       return route.fulfill({ json: { mode: mock.theme } })
+    }
+    if (path === '/api/mortgages' && method === 'GET') {
+      if (mock.mortgages === 'hang') return new Promise<void>(() => {})
+      if (mock.mortgages === 'error') return route.fulfill({ status: 500, json: { title: 'Server error' } })
+      const count = mock.mortgages === 'empty' ? 0 : mock.mortgages === 'many' ? 10 : 3
+      return route.fulfill({ json: Array.from({ length: count }, (_, index) => mortgageFixture(index)) })
+    }
+    if (path === '/api/mortgages' && method === 'POST' && !mock.failWrites) {
+      const body = request.postDataJSON() as Record<string, unknown>
+      return route.fulfill({ status: 201, json: { ...mortgageFixture(5), ...body, id: '550e8400-e29b-41d4-a716-446655440299', version: 1 } })
     }
     if (method !== 'GET') {
       if (mock.failWrites) {
@@ -188,6 +215,22 @@ async function openImportReview(page: Page) {
   await page.getByRole('button', { name: 'Review import' }).click()
   await expect(page.getByRole('heading', { name: 'Review transactions' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Cancel review' })).toBeEnabled()
+}
+
+async function openMortgages(page: Page) {
+  await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: 'Mortgages' }).click()
+  await page.mouse.move(600, 400)
+}
+
+async function fillNewMortgage(page: Page) {
+  await page.getByLabel('Name', { exact: true }).fill('Holiday house')
+  await page.getByLabel('Starting Balance').fill('250000')
+  await page.getByLabel('Number of Periods').fill('120')
+  await page.getByLabel('First Repayment Date').fill('2020-01-01')
+  await page.getByLabel('Repayment Frequency').selectOption('Monthly')
+  await page.getByRole('button', { name: 'Add interest rate change' }).click()
+  await page.getByLabel('New Interest Rate').fill('4.5')
+  await page.getByLabel('Effective Date').fill('2020-01-01')
 }
 
 type StateDef = {
@@ -339,6 +382,73 @@ const states: StateDef[] = [
     },
   },
   {
+    name: 'mortgages-loading', mock: { ...signedIn, mortgages: 'hang' },
+    reach: async (page) => {
+      await openMortgages(page)
+      await expect(page.getByRole('status')).toContainText('Loading...')
+    },
+  },
+  {
+    name: 'mortgages-failed', mock: { ...signedIn, mortgages: 'error' },
+    reach: async (page) => {
+      await openMortgages(page)
+      await expect(page.getByRole('alert')).toContainText('load your mortgages')
+      await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible()
+    },
+  },
+  {
+    name: 'mortgages-empty', mock: { ...signedIn, mortgages: 'empty' },
+    reach: async (page) => {
+      await openMortgages(page)
+      await expect(page.getByText('Please enter your mortgage details')).toHaveCount(2)
+    },
+  },
+  {
+    name: 'mortgages-loaded', mock: signedIn,
+    reach: async (page) => {
+      await openMortgages(page)
+      await expect(page.getByRole('table')).toBeVisible()
+    },
+  },
+  {
+    name: 'mortgages-field-errors', mock: signedIn,
+    reach: async (page) => {
+      await openMortgages(page)
+      await page.getByLabel('Name', { exact: true }).fill('')
+      await page.getByRole('button', { name: 'Save' }).click()
+      await expect(page.getByRole('alert')).toBeVisible()
+      await page.mouse.move(600, 400)
+    },
+  },
+  {
+    name: 'mortgages-delete-dialog', mock: signedIn,
+    reach: async (page) => {
+      await openMortgages(page)
+      await page.getByRole('button', { name: 'Mortgage 2', exact: true }).click()
+      await page.getByRole('button', { name: 'Delete Mortgage 2' }).click()
+      await expect(page.getByRole('dialog', { name: 'Delete Mortgage 2?' })).toBeVisible()
+    },
+  },
+  {
+    name: 'mortgages-discard-dialog', mock: signedIn,
+    reach: async (page) => {
+      await openMortgages(page)
+      await page.getByLabel('Name', { exact: true }).fill('Edited name')
+      await page.getByRole('button', { name: 'Mortgage 2', exact: true }).click()
+      await expect(page.getByRole('dialog', { name: 'Discard unsaved changes?' })).toBeVisible()
+    },
+  },
+  {
+    name: 'mortgages-saved-toast', mock: signedIn,
+    reach: async (page) => {
+      await openMortgages(page)
+      await page.getByRole('button', { name: 'Add mortgage' }).click()
+      await fillNewMortgage(page)
+      await page.getByRole('button', { name: 'Save' }).click()
+      await expect(page.getByRole('status').filter({ hasText: 'Mortgage saved' })).toBeVisible()
+    },
+  },
+  {
     name: 'import-limits', mock: signedIn,
     reach: async (page) => {
       await page.getByRole('button', { name: 'Import limits' }).click()
@@ -418,7 +528,9 @@ async function expectSurfaces(page: Page) {
     const card = resolve('surface-card')
 
     const nav = document.querySelector('nav[aria-label="Primary"]')
-    if (nav && getComputedStyle(nav).backgroundColor !== canvas) problems.push('nav is not canvas')
+    // The navigation sits on a canvas backing layer (its previous sibling); the nav element itself is transparent.
+    const backing = nav?.previousElementSibling
+    if (backing && getComputedStyle(backing).backgroundColor !== canvas) problems.push('nav is not canvas')
     const main = document.querySelector('main')
     if (!main) {
       problems.push('no main')
@@ -438,8 +550,13 @@ async function expectSurfaces(page: Page) {
     }
     const current = nav?.querySelector('[aria-current="page"]')
     if (current) {
-      const a = luminance(getComputedStyle(current).backgroundColor)
-      const b = luminance(canvas)
+      // The selected item is a tint over the canvas, so judge its label against the blended tint.
+      const style = getComputedStyle(current)
+      const [tr = 0, tg = 0, tb = 0, ta = 1] = (style.backgroundColor.match(/[\d.]+/g) ?? []).map(Number)
+      const [cr = 0, cg = 0, cb = 0] = rgb(canvas)
+      const blended = `rgb(${tr * ta + cr * (1 - ta)}, ${tg * ta + cg * (1 - ta)}, ${tb * ta + cb * (1 - ta)})`
+      const a = luminance(style.color)
+      const b = luminance(blended)
       const ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
       if (ratio < 3) problems.push(`current nav item contrast ${ratio.toFixed(2)}`)
     }
@@ -610,5 +727,87 @@ test('navigation and dialog transitions last 150 to 250ms without reduced motion
     }
   } finally {
     await context.close()
+  }
+})
+
+test.describe('Mortgages layout and motion', () => {
+  test('the toast is bottom-right on desktop and bottom-centre at 320 px, with no animation under reduced motion', async ({ page }) => {
+    await mockApi(page, { theme: 'Light' })
+    for (const width of [1280, 320]) {
+      await page.setViewportSize({ width, height: 800 })
+      await page.goto('/')
+      await openMortgages(page)
+      await page.getByRole('button', { name: 'Add mortgage' }).click()
+      await fillNewMortgage(page)
+      await page.getByRole('button', { name: 'Save' }).click()
+      const toast = page.getByRole('status').filter({ hasText: 'Mortgage saved' })
+      await expect(toast).toBeVisible()
+      const box = await toast.boundingBox()
+      expect(box).not.toBeNull()
+      const viewport = page.viewportSize()!
+      const centre = (box!.x + box!.width / 2) / viewport.width
+      if (width >= 768) {
+        expect(box!.x + box!.width).toBeGreaterThan(viewport.width * 0.8)
+        expect(centre).toBeGreaterThan(0.7)
+      } else {
+        expect(Math.abs(centre - 0.5)).toBeLessThan(0.05)
+      }
+      expect(box!.y + box!.height).toBeGreaterThan(viewport.height * 0.8)
+      const styles = await toast.evaluate((element) => {
+        const style = getComputedStyle(element)
+        return { transition: style.transitionDuration, animation: style.animationName }
+      })
+      expect(firstDurationMs(styles.transition)).toBeLessThan(50)
+      expect(styles.animation).toBe('none')
+      expect(await page.evaluate(() => document.querySelectorAll('.animate-spin').length)).toBe(0)
+    }
+  })
+
+  for (const width of [320, 1280]) {
+    test(`with 10 mortgages the tab strip scrolls within itself at ${width} px and the page does not scroll sideways`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 })
+      await mockApi(page, { theme: 'Light', mortgages: 'many' })
+      await page.goto('/')
+      await openMortgages(page)
+      const strip = page.getByRole('navigation', { name: 'Mortgages' }).getByRole('list')
+      await expect(page.getByRole('button', { name: 'Add mortgage' })).toBeAttached()
+      if (width < 768) {
+        expect(await strip.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true)
+      }
+      await strip.evaluate((element) => { element.scrollLeft = element.scrollWidth })
+      await expect(page.getByRole('button', { name: 'Add mortgage' })).toBeInViewport()
+      await expectNoHorizontalScroll(page)
+    })
+  }
+
+  test('Burndown sits above the schedule at 320 px and to its left on desktop (FR-011)', async ({ page }) => {
+    await mockApi(page, { theme: 'Light' })
+    for (const width of [320, 1280]) {
+      await page.setViewportSize({ width, height: 800 })
+      await page.goto('/')
+      await openMortgages(page)
+      const chart = await page.getByRole('heading', { name: 'Mortgage Burndown' }).locator('xpath=ancestor::section').boundingBox()
+      const schedule = await page.getByRole('heading', { name: 'Amortization Schedule' }).locator('xpath=ancestor::section').boundingBox()
+      expect(chart).not.toBeNull()
+      expect(schedule).not.toBeNull()
+      if (width < 768) {
+        expect(chart!.y + chart!.height).toBeLessThanOrEqual(schedule!.y + 1)
+      } else {
+        expect(chart!.x + chart!.width).toBeLessThanOrEqual(schedule!.x + 1)
+        expect(Math.abs(chart!.y - schedule!.y)).toBeLessThan(2)
+      }
+    }
+  })
+
+  for (const scheme of ['light', 'dark'] as const) {
+    test(`System theme follows an emulated ${scheme} colour scheme on the Mortgages screen`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme: scheme })
+      await mockApi(page, { theme: 'System' })
+      await page.goto('/')
+      await openMortgages(page)
+      await expect(page.getByRole('heading', { name: 'Loan Details' })).toBeVisible()
+      await expectTheme(page, scheme === 'dark' ? 'Dark' : 'Light')
+      await runChecks(page, `mortgages-system-${scheme}`, scheme === 'dark' ? 'Dark' : 'Light')
+    })
   }
 })

@@ -10,7 +10,7 @@
 | StartingBalance | `decimal(19,2)` | > 0, ≤ 999,999,999,999.99, ≤ 2 dp |
 | NumberOfPeriods | `int` | ≥ 1; final repayment date ≤ 31 Dec 9999 |
 | FirstRepaymentDate | `date` | Valid; ≤ today (R5) |
-| RepaymentFrequency | `nvarchar(20)` (enum as string) | `Weekly` \| `Fortnightly` \| `Monthly` |
+| RepaymentFrequency | `varchar(20)` (enum as string; ASCII values, like the other enum columns) | `Weekly` \| `Fortnightly` \| `Monthly` |
 | CreatedAtUtc | `datetimeoffset` | Creation order for tabs (tie-break: Id) |
 | Version | `int`, concurrency token | Starts at 1; +1 on every update (R4) |
 

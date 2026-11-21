@@ -2,6 +2,7 @@ using Clutch.API.Domain.Accounts;
 using Clutch.API.Domain.Audit;
 using Clutch.API.Domain.Categories;
 using Clutch.API.Domain.Imports;
+using Clutch.API.Domain.Mortgages;
 using Clutch.API.Domain.Preferences;
 using Clutch.API.Domain.Transactions;
 using Clutch.API.Infrastructure.Identity;
@@ -33,9 +34,69 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<UserThemePreference> UserThemePreferences => Set<UserThemePreference>();
 
+    public DbSet<Mortgage> Mortgages => Set<Mortgage>();
+
+    public DbSet<InterestRateChange> MortgageInterestRateChanges => Set<InterestRateChange>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
+
+        builder.Entity<Mortgage>(entity =>
+        {
+            entity.ToTable("Mortgages", table =>
+                table.HasCheckConstraint(
+                    "CK_Mortgages_NonBlankName",
+                    "LEN(LTRIM(RTRIM([Name]))) > 0"));
+            entity.HasKey(mortgage => mortgage.Id);
+            entity.Property(mortgage => mortgage.Id).ValueGeneratedNever();
+            entity.Property(mortgage => mortgage.OwnerUserId)
+                .HasMaxLength(450)
+                .IsRequired();
+            entity.Property(mortgage => mortgage.Name)
+                .HasMaxLength(Mortgage.MaximumNameLength)
+                .UseCollation("Latin1_General_100_CI_AS")
+                .IsRequired();
+            entity.Property(mortgage => mortgage.StartingBalance)
+                .HasColumnType("decimal(19,2)");
+            entity.Property(mortgage => mortgage.FirstRepaymentDate)
+                .HasColumnType("date");
+            entity.Property(mortgage => mortgage.RepaymentFrequency)
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .IsUnicode(false)
+                .IsRequired();
+            entity.Property(mortgage => mortgage.CreatedAtUtc)
+                .HasColumnType("datetimeoffset");
+            entity.Property(mortgage => mortgage.Version)
+                .IsConcurrencyToken();
+            entity.HasOne<ApplicationUser>()
+                .WithMany()
+                .HasForeignKey(mortgage => mortgage.OwnerUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(mortgage => new { mortgage.OwnerUserId, mortgage.Name })
+                .IsUnique();
+            entity.HasIndex(mortgage => new { mortgage.OwnerUserId, mortgage.CreatedAtUtc });
+            entity.HasMany(mortgage => mortgage.InterestRateChanges)
+                .WithOne()
+                .HasForeignKey(change => change.MortgageId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.Navigation(mortgage => mortgage.InterestRateChanges)
+                .UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        builder.Entity<InterestRateChange>(entity =>
+        {
+            entity.ToTable("MortgageInterestRateChanges");
+            entity.HasKey(change => change.Id);
+            entity.Property(change => change.Id).ValueGeneratedNever();
+            entity.Property(change => change.NewInterestRate)
+                .HasColumnType("decimal(5,2)");
+            entity.Property(change => change.EffectiveDate)
+                .HasColumnType("date");
+            entity.HasIndex(change => new { change.MortgageId, change.EffectiveDate })
+                .IsUnique();
+        });
 
         builder.Entity<Account>(entity =>
         {

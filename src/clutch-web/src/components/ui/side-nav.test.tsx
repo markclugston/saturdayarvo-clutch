@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { Wallet } from 'lucide-react'
-import { expect, it } from 'vitest'
+import { FolderTree, Landmark, Wallet } from 'lucide-react'
+import { expect, it, vi } from 'vitest'
 import { SideNav, SideNavItem } from './side-nav'
 
 function renderNav(expanded: boolean) {
@@ -55,4 +55,23 @@ it('shows no tooltip when collapsed and hovered or focused', async () => {
   expect(screen.getByRole('button', { name: 'Accounts' })).toHaveFocus()
   await user.hover(screen.getByRole('button', { name: 'Accounts' }))
   expect(document.querySelector('[data-slot="tooltip-popup"]')).toBeNull()
+})
+
+it('lists a Mortgages destination directly above Categories and marks only the current one', async () => {
+  const user = userEvent.setup()
+  const onMortgages = vi.fn()
+  render(
+    <SideNav expanded>
+      <SideNavItem current={false} expanded icon={Wallet} label="Accounts" onClick={() => {}} />
+      <SideNavItem current expanded icon={Landmark} label="Mortgages" onClick={onMortgages} />
+      <SideNavItem current={false} expanded icon={FolderTree} label="Categories" onClick={() => {}} />
+    </SideNav>,
+  )
+
+  const names = screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))
+  expect(names).toEqual(['Accounts', 'Mortgages', 'Categories'])
+  expect(screen.getByRole('button', { name: 'Mortgages' })).toHaveAttribute('aria-current', 'page')
+  expect(screen.getByRole('button', { name: 'Categories' })).not.toHaveAttribute('aria-current')
+  await user.click(screen.getByRole('button', { name: 'Mortgages' }))
+  expect(onMortgages).toHaveBeenCalledTimes(1)
 })

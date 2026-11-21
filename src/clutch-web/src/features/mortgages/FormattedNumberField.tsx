@@ -1,0 +1,68 @@
+import { useState, type ComponentProps } from 'react'
+import { FloatingField } from '@/components/ui/floating-field'
+
+type InputProps = Extract<ComponentProps<typeof FloatingField>, { as?: 'input' }>
+
+const plainNumber = /^\d+(\.\d{0,2})?$|^\.\d{1,2}$/
+
+function group(value: string): string {
+  const [whole = '0', fraction = ''] = value.split('.')
+  return `${Number(whole).toLocaleString('en-US')}.${fraction.padEnd(2, '0')}`
+}
+
+/** `500000.5` -> `$500,000.50`; empty -> `$0`. Anything that is not a plain 2dp number is shown as typed. */
+export function formatCurrency(raw: string): string {
+  const text = raw.trim()
+  if (text === '') {
+    return '$0'
+  }
+  return plainNumber.test(text) ? `$${group(text)}` : raw
+}
+
+/** `5.5` -> `5.50%`; empty stays empty. Anything that is not a plain 2dp number is shown as typed. */
+export function formatPercent(raw: string): string {
+  const text = raw.trim()
+  if (text === '' || !plainNumber.test(text)) {
+    return raw
+  }
+  const [whole = '0', fraction = ''] = text.split('.')
+  return `${Number(whole)}.${fraction.padEnd(2, '0')}%`
+}
+
+/** Strips the symbols a user may paste ($ , % and spaces) so the draft always holds a plain number. */
+function clean(value: string): string {
+  return value.replace(/[$,%\s]/g, '')
+}
+
+type FormattedNumberFieldProps = Omit<InputProps, 'value' | 'onChange'> & {
+  value: string
+  format: (raw: string) => string
+  onValueChange: (raw: string) => void
+}
+
+/** Shows the formatted value while idle and the plain number while editing. */
+export function FormattedNumberField({
+  value,
+  format,
+  onValueChange,
+  onFocus,
+  onBlur,
+  ...rest
+}: FormattedNumberFieldProps) {
+  const [focused, setFocused] = useState(false)
+  return (
+    <FloatingField
+      {...rest}
+      onBlur={(event) => {
+        setFocused(false)
+        onBlur?.(event)
+      }}
+      onChange={(event) => onValueChange(clean(event.currentTarget.value))}
+      onFocus={(event) => {
+        setFocused(true)
+        onFocus?.(event)
+      }}
+      value={focused ? value : format(value)}
+    />
+  )
+}

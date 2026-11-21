@@ -256,6 +256,79 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Clutch.API.Domain.Mortgages.InterestRateChange", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("EffectiveDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("MortgageId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("NewInterestRate")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MortgageId", "EffectiveDate")
+                        .IsUnique();
+
+                    b.ToTable("MortgageInterestRateChanges", (string)null);
+                });
+
+            modelBuilder.Entity("Clutch.API.Domain.Mortgages.Mortgage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateOnly>("FirstRepaymentDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .UseCollation("Latin1_General_100_CI_AS");
+
+                    b.Property<int>("NumberOfPeriods")
+                        .HasColumnType("int");
+
+                    b.Property<string>("OwnerUserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("RepaymentFrequency")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<decimal>("StartingBalance")
+                        .HasColumnType("decimal(19,2)");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerUserId", "CreatedAtUtc");
+
+                    b.HasIndex("OwnerUserId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("Mortgages", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Mortgages_NonBlankName", "LEN(LTRIM(RTRIM([Name]))) > 0");
+                        });
+                });
+
             modelBuilder.Entity("Clutch.API.Domain.Transactions.Transaction", b =>
                 {
                     b.Property<Guid>("Id")
@@ -642,6 +715,24 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Clutch.API.Domain.Mortgages.InterestRateChange", b =>
+                {
+                    b.HasOne("Clutch.API.Domain.Mortgages.Mortgage", null)
+                        .WithMany("InterestRateChanges")
+                        .HasForeignKey("MortgageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Clutch.API.Domain.Mortgages.Mortgage", b =>
+                {
+                    b.HasOne("Clutch.API.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Clutch.API.Domain.Transactions.Transaction", b =>
                 {
                     b.HasOne("Clutch.API.Domain.Accounts.Account", null)
@@ -732,6 +823,11 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Clutch.API.Domain.Imports.ImportReview", b =>
                 {
                     b.Navigation("Rows");
+                });
+
+            modelBuilder.Entity("Clutch.API.Domain.Mortgages.Mortgage", b =>
+                {
+                    b.Navigation("InterestRateChanges");
                 });
 #pragma warning restore 612, 618
         }

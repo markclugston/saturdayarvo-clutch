@@ -23,6 +23,7 @@ public sealed class ApiExceptionHandler(
                 Title = apiException.Title,
                 Detail = apiException.Detail,
                 Instance = httpContext.Request.Path,
+                Type = apiException.Type,
             };
 
             if (apiException.Errors is not null)

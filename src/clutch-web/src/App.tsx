@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { FolderTree, Menu, Wallet } from 'lucide-react'
+import { FolderTree, Landmark, Menu, Wallet } from 'lucide-react'
 import { useRef, useState, type PointerEvent } from 'react'
 import { AccountDetails } from '@/features/accounts/AccountDetails'
 import { AccountsPage } from '@/features/accounts/AccountsPage'
@@ -10,6 +10,7 @@ import { AddCategoryForm } from '@/features/categories/AddCategoryForm'
 import { CategoriesPage } from '@/features/categories/CategoriesPage'
 import { signOut, getSession } from '@/features/auth/api'
 import { ImportPage } from '@/features/imports/ImportPage'
+import { MortgagesPage } from '@/features/mortgages/MortgagesPage'
 import { ApiError } from '@/lib/api/client'
 import { ThemeSelector } from '@/components/theme/ThemeSelector'
 import { useTheme } from '@/components/theme/ThemeProvider'
@@ -17,12 +18,25 @@ import { AppShell } from '@/components/ui/app-shell'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ContentPanel } from '@/components/ui/content-panel'
+import { ToastProvider } from '@/components/ui/toast'
+import { UnsavedChangesProvider, useUnsavedChanges } from '@/components/unsaved-changes/UnsavedChangesProvider'
 import { ErrorMessage } from '@/components/ui/error-message'
 import { SideNav, SideNavItem } from '@/components/ui/side-nav'
 import { cn } from '@/lib/utils'
 
 export default function App() {
+  return (
+    <UnsavedChangesProvider>
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
+    </UnsavedChangesProvider>
+  )
+}
+
+function AppContent() {
   const queryClient = useQueryClient()
+  const { isDirty, run } = useUnsavedChanges()
   const { setMode } = useTheme()
   const sessionAttemptActive = useRef(false)
   const sessionAttemptStartedAt = useRef(performance.now())
@@ -30,6 +44,7 @@ export default function App() {
   const [isImporting, setIsImporting] = useState(false)
   const [showAdminSettings, setShowAdminSettings] = useState(false)
   const [showCategories, setShowCategories] = useState(false)
+  const [showMortgages, setShowMortgages] = useState(false)
   const navigation = useNavigationExpansion()
   const sessionQuery = useQuery({
     queryKey: ['session'],
@@ -60,6 +75,10 @@ export default function App() {
       return shouldRetry
     },
     retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 2000),
+    // While there are unsaved edits an expired sign-in must be found by a mortgage request (and its
+    // session-expired dialog), not by this query replacing the page with the sign-in screen.
+    refetchOnWindowFocus: !isDirty,
+    refetchOnReconnect: !isDirty,
   })
   const signOutMutation = useMutation({
     mutationFn: signOut,
@@ -68,6 +87,7 @@ export default function App() {
       setIsImporting(false)
       setShowAdminSettings(false)
       setShowCategories(false)
+      setShowMortgages(false)
       navigation.reset()
       setMode('Light')
       queryClient.removeQueries({
@@ -120,18 +140,26 @@ export default function App() {
       nav={(
         <PrimaryNavigation
           navigation={navigation}
-          accountsCurrent={!showCategories && !showAdminSettings}
-          categoriesCurrent={showCategories && !showAdminSettings}
-          onAccounts={() => {
+          accountsCurrent={!showCategories && !showMortgages && !showAdminSettings}
+          categoriesCurrent={showCategories && !showMortgages && !showAdminSettings}
+          mortgagesCurrent={showMortgages && !showAdminSettings}
+          onAccounts={() => run(() => {
             setShowCategories(false)
+            setShowMortgages(false)
             setShowAdminSettings(false)
             setSelectedAccountId(null)
             setIsImporting(false)
-          }}
-          onCategories={() => {
+          })}
+          onCategories={() => run(() => {
             setShowCategories(true)
+            setShowMortgages(false)
             setShowAdminSettings(false)
-          }}
+          })}
+          onMortgages={() => run(() => {
+            setShowMortgages(true)
+            setShowCategories(false)
+            setShowAdminSettings(false)
+          })}
         />
       )}
       header={(
@@ -140,7 +168,7 @@ export default function App() {
             {sessionQuery.data.id && <ThemeSelector userId={sessionQuery.data.id} />}
             {sessionQuery.data.roles?.includes('Administrator') && (
               <Button
-                onClick={() => setShowAdminSettings(true)}
+                onClick={() => run(() => setShowAdminSettings(true))}
                 type="button"
                 variant="secondary"
               >
@@ -149,7 +177,7 @@ export default function App() {
             )}
             <Button
               disabled={signOutMutation.isPending}
-              onClick={() => signOutMutation.mutate()}
+              onClick={() => run(() => signOutMutation.mutate())}
               type="button"
               variant="secondary"
             >
@@ -160,7 +188,7 @@ export default function App() {
       )}
     >
       {/* Keep keyboard focus visible while the pointer holds the overlay open below md. */}
-      <ContentPanel wide={showCategories && !showAdminSettings} className={cn(
+      <ContentPanel wide={(showCategories || showMortgages) && !showAdminSettings} className={cn(
         'ml-0 lg:ml-0',
         '[&_:is(button,input,select,textarea):not(.sr-only):focus-visible]:relative [&_:is(button,input,select,textarea):not(.sr-only):focus-visible]:z-20',
         '[&_:focus-visible:not(.sr-only)]:focus-ring',
@@ -182,6 +210,8 @@ export default function App() {
         )}
         {showAdminSettings ? (
           <ImportLimitsPage onBack={() => setShowAdminSettings(false)} />
+        ) : showMortgages ? (
+          <MortgagesPage />
         ) : showCategories ? (
           <CategoriesPage />
         ) : selectedAccountId ? (
@@ -201,7 +231,7 @@ export default function App() {
           <AccountsPage onSelectAccount={setSelectedAccountId} />
         )}
       </ContentPanel>
-      {showCategories && !showAdminSettings && <AddCategoryForm />}
+      {showCategories && !showMortgages && !showAdminSettings && <AddCategoryForm />}
     </AppShell>
   )
 }
@@ -252,16 +282,20 @@ type PrimaryNavigationProps = {
   navigation: NavigationExpansion
   accountsCurrent: boolean
   categoriesCurrent: boolean
+  mortgagesCurrent: boolean
   onAccounts: () => void
   onCategories: () => void
+  onMortgages: () => void
 }
 
 function PrimaryNavigation({
   navigation: { expanded, toggle, handlers },
   accountsCurrent,
   categoriesCurrent,
+  mortgagesCurrent,
   onAccounts,
   onCategories,
+  onMortgages,
 }: PrimaryNavigationProps) {
   return (
     <SideNav expanded={expanded} {...handlers}>
@@ -282,6 +316,13 @@ function PrimaryNavigation({
         icon={Wallet}
         label="Accounts"
         onClick={onAccounts}
+      />
+      <SideNavItem
+        current={mortgagesCurrent}
+        expanded={expanded}
+        icon={Landmark}
+        label="Mortgages"
+        onClick={onMortgages}
       />
       <SideNavItem
         current={categoriesCurrent}

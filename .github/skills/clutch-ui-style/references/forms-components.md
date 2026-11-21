@@ -44,3 +44,5 @@ All text inputs, selects and textareas use an **in-field floating label**. Exter
 - **Charts:** `primary` is the dominant series, a light `primary-tint` (optionally diagonal-hatched) for overlay series, `accent-navy` for contrast. No boxed gridlines; faint horizontal guides only.
 - **Selected column/row/day:** `selected` tint, not an outline.
 - Touch targets are at least 40x40px.
+- **Tab strip (mortgage selector):** a `nav` list of buttons, not ARIA tabs. The selected item is shown by a `selected` tint and `aria-current="true"` (never an outline or border). No borders or dividers. The strip scrolls horizontally inside itself so the page never scrolls sideways. A trash icon button ("Delete {name}") sits beside each item's select button, and the trailing "Add mortgage" button has none. Long names truncate, with the full name in `title`.
+- **Toast:** a `raised` surface with `shadow-float` (the only permitted shadow), bottom-right on desktop and bottom-centre below 768px. `role="status"`, a text "Dismiss" button, auto-dismisses after 5 s and pauses while hovered or focused. Under `prefers-reduced-motion: reduce` it appears and disappears without animation.

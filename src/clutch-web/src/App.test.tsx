@@ -6,6 +6,7 @@ import { getAccount, getCurrencies } from '@/features/accounts/api'
 import { getSession, signIn, signOut } from '@/features/auth/api'
 import { confirmImportReview, createImportReview, getAccountImportSettings, getImportStatus } from '@/features/imports/api'
 import { ApiError } from '@/lib/api/client'
+import { useUnsavedChanges } from '@/components/unsaved-changes/UnsavedChangesProvider'
 import { renderWithQueryClient } from '@/test/renderWithQueryClient'
 import App from './App'
 
@@ -72,6 +73,19 @@ vi.mock('@/features/imports/api', () => ({
 
 vi.mock('@/features/categories/CategoriesPage', () => ({
   CategoriesPage: () => <h1>Categories and groups</h1>,
+}))
+
+vi.mock('@/features/mortgages/MortgagesPage', () => ({
+  MortgagesPage: () => {
+    const { setDirty } = useUnsavedChanges()
+    return (
+      <>
+        <h1>Mortgages page</h1>
+        <button onClick={() => setDirty(true)} type="button">Make dirty</button>
+        <button onClick={() => setDirty(false)} type="button">Make clean</button>
+      </>
+    )
+  },
 }))
 
 async function startImportReview(user: ReturnType<typeof userEvent.setup>) {
@@ -380,6 +394,66 @@ describe('session loading', () => {
     expect(screen.getByRole('heading', { name: 'Your accounts' })).toBeInTheDocument()
   })
 
+  it('lists Mortgages directly above Categories and marks it current when shown', async () => {
+    const user = userEvent.setup()
+    vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
+
+    renderWithQueryClient(<App />)
+
+    const mortgages = await screen.findByRole('button', { name: 'Mortgages' })
+    const categories = screen.getByRole('button', { name: 'Categories' })
+    expect(mortgages.compareDocumentPosition(categories) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(mortgages.nextElementSibling).toBe(categories)
+    await user.click(mortgages)
+    expect(screen.getByRole('heading', { name: 'Mortgages page' })).toBeInTheDocument()
+    expect(mortgages).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'Accounts' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('asks before leaving the Mortgages screen with unsaved changes (navigation and Sign out)', async () => {
+    const user = userEvent.setup()
+    vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
+    vi.mocked(signOut).mockResolvedValue()
+    renderWithQueryClient(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Mortgages' }))
+    await user.click(screen.getByRole('button', { name: 'Make dirty' }))
+
+    await user.click(screen.getByRole('button', { name: 'Accounts' }))
+    expect(await screen.findByText('Discard unsaved changes?')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Stay on this page' }))
+    expect(screen.getByRole('heading', { name: 'Mortgages page' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Sign out' }))
+    expect(await screen.findByText('Discard unsaved changes?')).toBeInTheDocument()
+    expect(signOut).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Discard changes' }))
+    await waitFor(() => expect(signOut).toHaveBeenCalled())
+  })
+
+  it('does not refetch the session on focus or reconnect while the form is dirty, but does once clean', async () => {
+    const user = userEvent.setup()
+    vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
+    renderWithQueryClient(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Mortgages' }))
+    await user.click(screen.getByRole('button', { name: 'Make dirty' }))
+    expect(getSession).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      focusManager.setFocused(false)
+      focusManager.setFocused(true)
+      window.dispatchEvent(new Event('online'))
+    })
+    expect(getSession).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('heading', { name: 'Mortgages page' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Make clean' }))
+    await act(async () => {
+      focusManager.setFocused(false)
+      focusManager.setFocused(true)
+    })
+    await waitFor(() => expect(getSession).toHaveBeenCalledTimes(2))
+  })
+
   it('keeps primary navigation outside the header across signed-in screens', async () => {
     const user = userEvent.setup()
     vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
@@ -507,7 +581,10 @@ describe('session loading', () => {
 
     const accounts = await screen.findByRole('button', { name: 'Accounts' })
     const categories = screen.getByRole('button', { name: 'Categories' })
+    const mortgages = screen.getByRole('button', { name: 'Mortgages' })
     accounts.focus()
+    await user.tab()
+    expect(mortgages).toHaveFocus()
     await user.tab()
     expect(categories).toHaveFocus()
     await user.keyboard('{Enter}')

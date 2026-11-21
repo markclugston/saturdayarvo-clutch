@@ -166,6 +166,33 @@ export const DeletionImpactSchema = z.object({
   itemCount: z.number().int().min(1),
 })
 
+export const RepaymentFrequencySchema = z.enum(['Weekly', 'Fortnightly', 'Monthly'])
+
+export const InterestRateChangeSchema = z.object({
+  newInterestRate: z.number().min(0).max(100),
+  effectiveDate: z.iso.date(),
+})
+
+export const MortgageInputSchema = z.object({
+  name: z.string().min(1).max(100),
+  startingBalance: z.number().positive().max(999999999999.99),
+  numberOfPeriods: z.number().int().min(1),
+  firstRepaymentDate: z.iso.date(),
+  repaymentFrequency: RepaymentFrequencySchema,
+  interestRateChanges: z.array(InterestRateChangeSchema).max(60),
+})
+
+export const MortgageResponseSchema = MortgageInputSchema.extend({
+  id: z.uuid(),
+  version: z.number().int().min(1),
+})
+
+export const MortgageListSchema = z.array(MortgageResponseSchema)
+
+export type InterestRateChange = z.infer<typeof InterestRateChangeSchema>
+export type MortgageInput = z.infer<typeof MortgageInputSchema>
+export type Mortgage = z.infer<typeof MortgageResponseSchema>
+
 export type CategoryNode = z.infer<typeof CategoryNodeSchema>
 export type DeletionImpact = z.infer<typeof DeletionImpactSchema>
 export type ProblemDetails = z.infer<typeof ProblemDetailsSchema>
