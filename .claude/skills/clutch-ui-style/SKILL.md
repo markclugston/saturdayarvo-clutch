@@ -49,6 +49,7 @@ MUST / MUST NOT / SHOULD are used in the RFC 2119 sense.
 - `ring-*` other than the focus ring, and `shadow-*` other than `shadow-float`.
 - `dark:` variants used for colour.
 - External field labels without documented justification.
+- Labels, headings or button text not in Title Case (for example "Add category" instead of "Add Category").
 
 ## Changing the style guide
 

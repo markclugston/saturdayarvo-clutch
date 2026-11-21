@@ -4,7 +4,10 @@
 
 - Inter, with a `system-ui` fallback. One family for the whole product.
 - Page title 24-28px/600. Section or card title 16-18px/600. Body 14px/400. Meta 12-13px/400-500. Micro labels 11px/500.
-- Sentence case for labels and buttons. All-caps only for small nav section headings.
+- Title Case for all visible labels, headings and button text (field labels, page, section and card titles, nav items, tab names, column headers, button and link-button text). Capitalise every word except articles (a, an, the), coordinating conjunctions (and, but, or, nor, for, so, yet) and prepositions of three letters or fewer (as, at, by, in, of, on, to, up, via), which stay lower case unless first or last. Examples: "Add Category", "Save and Close", "Monthly Repayment", "Sign In".
+- Helper, error, empty-state, toast and body text stay in sentence case; they are sentences, not labels.
+- Acronyms keep their own casing (API, ID, URL). Proper nouns and user-entered data are shown as written.
+- Write the source string in Title Case. Small nav section headings may be rendered all caps with the `uppercase` class; the underlying string is still Title Case.
 
 ## 8. Motion
 

@@ -1,6 +1,14 @@
+<!--
+Sync Impact Report
+- Version: 1.2.0 → 1.3.0 (MINOR: new binding UI text rule)
+- Modified: WEB-001 Frontend — added Title Case rule for labels, headings and button text
+- Added/removed sections: none
+- Follow-up: add Title Case detail and checklist item to `clutch-ui-style`, then run
+  .\scripts\sync-agent-config.ps1 -From claude
+-->
 # SaturdayArvo Clutch Constitution
 
-**Version**: 1.2.0 | **Last Amended**: 2026-11-20
+**Version**: 1.3.0 | **Last Amended**: 2026-11-21
 
 ## Governance
 Precedence: 1. Constitution 2. `clutch-*` skills and path-scoped instructions 3. Reference documentation.
@@ -57,6 +65,7 @@ Implementation detail for each requirement lives in the skill named in its headi
 - Accessibility required: WCAG 2.2 AA.
 - Frontend tests and quality gates required.
 - Third-party UI code requires independent security review.
+- Visible labels, headings and button text must use Title Case.
 - UI work must apply the style guide. Plans must identify the applicable style guide sections, and its compliance checklist must appear in the Constitution Check and completion review.
 - Style-guide rule changes require synchronized updates.
 

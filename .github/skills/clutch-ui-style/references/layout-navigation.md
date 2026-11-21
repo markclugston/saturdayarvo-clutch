@@ -35,4 +35,4 @@ AppShell (bg-canvas)
 - Active item: `rounded-control` fill using the `selected` tint with `primary` text/icon and heavier text. Selection is not an action, so it never uses the solid `primary` fill reserved for primary buttons; the `selected` tint is under 3:1 against `canvas`, so the `primary` text and heavier weight carry the indicator too. Hover: a subtler fill (`hover`); a selected item keeps its `selected` fill on hover.
 - Icons 18-20px, consistent outline style, stroke about 1.5px.
 - Navigation items have no tooltips. Hovering the collapsed rail with a mouse expands it; the hamburger button at the top of the rail pins it open until clicked again (not persisted).
-- Group headings (e.g. "Division") are small, muted, uppercase labels. No divider lines.
+- Group headings (e.g. "Division") are small, muted labels written in Title Case and rendered with the `uppercase` class. No divider lines.

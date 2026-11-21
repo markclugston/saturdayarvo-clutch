@@ -6,6 +6,7 @@ Copy into the plan's Constitution Check and the task-completion gate for any UI 
 - [ ] Surface hierarchy follows canvas, content, card, raised
 - [ ] Only tokens used: no raw hex, no default palette, no non-token radius
 - [ ] Form fields use floating labels
+- [ ] Labels, headings and button text use Title Case; helper, error and body text use sentence case
 - [ ] Navigation expand/collapse behaviour unchanged; only restyled, unless an approved spec amends it (015: content resizes at 768px and above)
 - [ ] Dark theme has no pure black surface or pure white text
 - [ ] Both themes visually verified
