@@ -4,7 +4,7 @@ import { AmortizationSchedule } from './AmortizationSchedule'
 
 describe('AmortizationSchedule', () => {
   it('is a read-only table with Period, Date and Bank schedule headers and N + 1 rows', () => {
-    render(<AmortizationSchedule numberOfPeriods={360} />)
+    render(<AmortizationSchedule duration={360} />)
 
     const table = screen.getByRole('table')
     expect(table).toHaveAttribute('aria-rowcount', '362')
@@ -18,7 +18,7 @@ describe('AmortizationSchedule', () => {
   })
 
   it('renders only a small window of a very large schedule', () => {
-    render(<AmortizationSchedule numberOfPeriods={522_000} />)
+    render(<AmortizationSchedule duration={522_000} />)
 
     const table = screen.getByRole('table')
     expect(table).toHaveAttribute('aria-rowcount', '522002')
@@ -26,7 +26,7 @@ describe('AmortizationSchedule', () => {
   })
 
   it('renders later rows after scrolling and keeps the header', () => {
-    render(<AmortizationSchedule numberOfPeriods={1000} />)
+    render(<AmortizationSchedule duration={1000} />)
     const scroller = screen.getByRole('table').parentElement as HTMLElement
 
     fireEvent.scroll(scroller, { target: { scrollTop: 40 * 500 } })
@@ -38,11 +38,11 @@ describe('AmortizationSchedule', () => {
     expect(screen.queryByText('2', { selector: '[role="cell"]' })).not.toBeInTheDocument()
   })
 
-  it('redraws with the new row count when the saved number of periods changes', () => {
-    const { rerender } = render(<AmortizationSchedule numberOfPeriods={5} />)
+  it('redraws with the new row count when the saved duration changes', () => {
+    const { rerender } = render(<AmortizationSchedule duration={5} />)
     expect(screen.getByRole('table')).toHaveAttribute('aria-rowcount', '7')
 
-    rerender(<AmortizationSchedule numberOfPeriods={12} />)
+    rerender(<AmortizationSchedule duration={12} />)
 
     expect(screen.getByRole('table')).toHaveAttribute('aria-rowcount', '14')
     expect(screen.getByText('13')).toBeInTheDocument()

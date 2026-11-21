@@ -49,10 +49,10 @@ describe('validateNewRateChange', () => {
     return {
       ...emptyDraft(),
       name: 'Home',
-      startingBalance: '500000',
-      numberOfPeriods: '120',
-      firstRepaymentDate: '2000-01-01',
-      repaymentFrequency: 'Monthly',
+      openingBalance: '500000',
+      duration: '120',
+      drawdownDate: '2000-01-01',
+      paymentFrequency: 'Monthly',
       rows,
     }
   }
@@ -64,7 +64,7 @@ describe('validateNewRateChange', () => {
     ['missing rate', '', '2001-01-01', { newInterestRate: 'Enter an interest rate' }],
     ['invalid date', '5', '', { effectiveDate: 'Enter a valid date' }],
     ['both empty', '', '', { newInterestRate: 'Enter an interest rate', effectiveDate: 'Enter a valid date' }],
-    ['date before first repayment', '5', '1999-12-01', { effectiveDate: 'Choose a date from 1 Jan 2000 to 1 Dec 2009' }],
+    ['date before drawdown', '5', '1999-12-01', { effectiveDate: 'Choose a date from 1 Jan 2000 to 1 Dec 2009' }],
     ['date after final repayment', '5', '2010-01-01', { effectiveDate: 'Choose a date from 1 Jan 2000 to 1 Dec 2009' }],
     ['duplicate date', '6', '2000-01-01', { effectiveDate: 'This effective date is already used' }],
   ])('%s is refused with the 016 message', (_label, rate, date, expected) => {

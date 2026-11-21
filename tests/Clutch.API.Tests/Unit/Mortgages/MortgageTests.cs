@@ -24,14 +24,14 @@ public sealed class MortgageTests
     {
         var mortgage = Create("Home loan");
 
-        mortgage.Update(" Renamed ", 200m, 24, First, RepaymentFrequency.Weekly, Changes((5m, First)));
-        mortgage.Update("Renamed", 200m, 24, First, RepaymentFrequency.Weekly, Changes((5m, First)));
+        mortgage.Update(" Renamed ", 200m, 24, First, PaymentFrequency.Weekly, Changes((5m, First)));
+        mortgage.Update("Renamed", 200m, 24, First, PaymentFrequency.Weekly, Changes((5m, First)));
 
         Assert.Equal(3, mortgage.Version);
         Assert.Equal("Renamed", mortgage.Name);
-        Assert.Equal(200m, mortgage.StartingBalance);
-        Assert.Equal(24, mortgage.NumberOfPeriods);
-        Assert.Equal(RepaymentFrequency.Weekly, mortgage.RepaymentFrequency);
+        Assert.Equal(200m, mortgage.OpeningBalance);
+        Assert.Equal(24, mortgage.Duration);
+        Assert.Equal(PaymentFrequency.Weekly, mortgage.PaymentFrequency);
     }
 
     [Fact]
@@ -41,7 +41,7 @@ public sealed class MortgageTests
         var original = mortgage.InterestRateChanges.Select(change => change.Id).ToList();
 
         mortgage.Update(
-            "Home loan", 100m, 12, First, RepaymentFrequency.Monthly,
+            "Home loan", 100m, 12, First, PaymentFrequency.Monthly,
             Changes((6m, First), (7m, First.AddMonths(3))));
 
         Assert.Equal(2, mortgage.InterestRateChanges.Count);
@@ -66,7 +66,7 @@ public sealed class MortgageTests
 
     private static Mortgage Create(string name, IReadOnlyList<RateChangeValue>? changes = null) =>
         Mortgage.Create(
-            "owner", name, 100m, 12, First, RepaymentFrequency.Monthly,
+            "owner", name, 100m, 12, First, PaymentFrequency.Monthly,
             changes ?? Changes((5m, First)), Now);
 
     private static List<RateChangeValue> Changes(params (decimal Rate, DateOnly Date)[] values) =>

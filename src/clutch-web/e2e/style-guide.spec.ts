@@ -73,17 +73,17 @@ const longMortgageName = 'Family home loan with the offset account and the fixed
 const mortgageFixture = (index: number) => ({
   id: `550e8400-e29b-41d4-a716-4466554402${String(index).padStart(2, '0')}`,
   name: index === 0 ? longMortgageName : `Mortgage ${index + 1}`,
-  startingBalance: 500000.5,
-  numberOfPeriods: 360,
-  firstRepaymentDate: '2000-01-01',
-  repaymentFrequency: 'Monthly',
+  openingBalance: 500000.5,
+  duration: 360,
+  drawdownDate: '2000-01-01',
+  paymentFrequency: 'Monthly',
   interestRateChanges: [
     { newInterestRate: 5.25, effectiveDate: '2000-01-01' },
     { newInterestRate: 6, effectiveDate: '2005-06-01' },
   ],
   version: 1,
 })
-// Mortgage 1 has one change, Mortgage 2 has 60 (monthly from the first repayment date).
+// Mortgage 1 has one change, Mortgage 2 has 60 (monthly from the drawdown date).
 const rateFixtures = () => [
   { ...mortgageFixture(1), name: 'One rate', interestRateChanges: [{ newInterestRate: 5.25, effectiveDate: '2000-01-01' }] },
   {
@@ -238,10 +238,10 @@ async function openMortgages(page: Page) {
 
 async function fillNewMortgage(page: Page) {
   await page.getByLabel('Name', { exact: true }).fill('Holiday house')
-  await page.getByLabel('Starting Balance').fill('250000')
-  await page.getByLabel('Number of Periods').fill('120')
-  await page.getByLabel('First Repayment Date').fill('2020-01-01')
-  await page.getByLabel('Repayment Frequency').selectOption('Monthly')
+  await page.getByLabel('Opening Balance').fill('250000')
+  await page.getByLabel('Duration').fill('120')
+  await page.getByLabel('Drawdown Date').fill('2020-01-01')
+  await page.getByLabel('Payment Frequency').selectOption('Monthly')
   await page.getByRole('button', { name: 'Change Interest Rate' }).click()
   const dialog = page.getByRole('dialog', { name: 'Change Interest Rate' })
   await dialog.getByLabel('New Interest Rate').fill('4.5')
@@ -859,9 +859,9 @@ test.describe('Mortgages layout and motion', () => {
       await mockApi(page, { theme: 'Light', mortgages: 'rates' })
       await page.goto('/')
       await openMortgages(page)
-      const form = page.getByRole('form', { name: 'Loan Details' })
+      const form = page.getByRole('form', { name: 'Details' })
 
-      // SC-001: the Loan Details group is the same height with 1 and 60 changes.
+      // SC-001: the Details group is the same height with 1 and 60 changes.
       await page.getByRole('button', { name: 'One rate', exact: true }).click()
       await expect(page.getByLabel('Name', { exact: true })).toHaveValue('One rate')
       const oneHeight = (await form.boundingBox())!.height
@@ -937,7 +937,7 @@ test.describe('Mortgages layout and motion', () => {
       await mockApi(page, { theme: 'System' })
       await page.goto('/')
       await openMortgages(page)
-      await expect(page.getByRole('heading', { name: 'Loan Details' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Details' })).toBeVisible()
       await expectTheme(page, scheme === 'dark' ? 'Dark' : 'Light')
       await runChecks(page, `mortgages-system-${scheme}`, scheme === 'dark' ? 'Dark' : 'Light')
     })

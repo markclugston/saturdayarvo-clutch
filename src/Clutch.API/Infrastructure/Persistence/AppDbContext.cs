@@ -59,11 +59,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .HasMaxLength(Mortgage.MaximumNameLength)
                 .UseCollation("Latin1_General_100_CI_AS")
                 .IsRequired();
-            entity.Property(mortgage => mortgage.StartingBalance)
+            entity.Property(mortgage => mortgage.OpeningBalance)
                 .HasColumnType("decimal(19,2)");
-            entity.Property(mortgage => mortgage.FirstRepaymentDate)
+            entity.Property(mortgage => mortgage.DrawdownDate)
                 .HasColumnType("date");
-            entity.Property(mortgage => mortgage.RepaymentFrequency)
+            entity.Property(mortgage => mortgage.PaymentFrequency)
                 .HasConversion<string>()
                 .HasMaxLength(20)
                 .IsUnicode(false)

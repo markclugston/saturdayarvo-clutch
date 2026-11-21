@@ -40,16 +40,16 @@ hover/focus never saves (FR-003); no localStorage (per-user, not per-browser).
 | ID | Applies | How the plan complies | Gate / evidence | Status |
 |----|---------|-----------------------|-----------------|--------|
 | ARC-001 | Yes | `NavigationState` in Domain; service in Application; entity/mapping in Infrastructure; endpoint only maps HTTP. UI in clutch-web. No extra features (no live cross-device push, no generic settings). | Review | PASS |
-| DOT-001 | Yes | .NET 10 API project, DI, async + cancellation, warnings-as-errors as existing. | Build, tests | PENDING |
-| DOT-002 | Yes | EF Core only; `AsNoTracking` PK lookup; serializable upsert via execution strategy (sibling pattern). | Independent query review; SQL Server Testcontainers integration tests (default, round-trip, isolation, last-save-wins, invalid value) | PENDING |
+| DOT-001 | Yes | .NET 10 API project, DI, async + cancellation, warnings-as-errors as existing. | Build, tests | PASS (build 0 warnings; 281/281 API tests) |
+| DOT-002 | Yes | EF Core only; `AsNoTracking` PK lookup; serializable upsert via execution strategy (sibling pattern). | Independent query review; SQL Server Testcontainers integration tests (default, round-trip, isolation, last-save-wins, invalid value) | PASS (query review in [reviews.md](./reviews.md); 19/19 navigation preference tests including concurrent saves) |
 | AUD-001 | No | Preference changes are not audit events (spec assumption, same as theme). | — | N/A |
-| ENG-001 | Yes | API integration tests, Vitest component/hook tests, Playwright journeys; all automated. | Test tasks, quality gates | PENDING |
-| OPS-001 | Yes | Additive migration (new table only), `Down` drops it, no backfill needed; structured log on save failure; existing health checks unchanged. | Migration review, logging | PENDING |
-| SEC-001 | Yes | `RequireAuthorization`; user ID from principal only; allow-listed `state` (400 otherwise) plus DB check constraint; PUT protected by existing antiforgery; Zod-validated response. No new dependencies. | Independent OWASP Top 10 + dependency review | PENDING |
+| ENG-001 | Yes | API integration tests, Vitest component/hook tests, Playwright journeys; all automated. | Test tasks, quality gates | PASS for 018 and navigation tests; specs needing a running API not yet run (see quickstart.md results) |
+| OPS-001 | Yes | Additive migration (new table only), `Down` drops it, no backfill needed; structured log on save failure; existing health checks unchanged. | Migration review, logging | PASS (migration review in [reviews.md](./reviews.md); failure logged without body) |
+| SEC-001 | Yes | `RequireAuthorization`; user ID from principal only; allow-listed `state` (400 otherwise) plus DB check constraint; PUT protected by existing antiforgery; Zod-validated response. No new dependencies. | Independent OWASP Top 10 + dependency review | PASS (one medium finding F1, remediated and verified; no vulnerable .NET or npm packages; see [reviews.md](./reviews.md)) |
 | SEC-002 | No | No configuration, credentials or integrations touched. | — | N/A |
 | SEC-003 | No | Pinned/unpinned is not personal, payment or financial data; logs omit request bodies; ProblemDetails reveal nothing sensitive. | — | N/A |
-| WEB-001 | Yes | TypeScript; React Query + Zod boundary; toast uses existing component and sentence-case text; no new visible labels; hamburger `aria-expanded` and focus unchanged; axe in e2e. | Frontend gates (typecheck, lint, test, build, e2e), UI compliance checklist | PENDING |
-| Perf & Observability | Yes | Toggle applies synchronously before the save; startup wait capped at 2 s; `PreferenceMetrics` counter + histogram registered in `Program.cs`. | 500 ms feedback test, metrics registered | PENDING |
+| WEB-001 | Yes | TypeScript; React Query + Zod boundary; toast uses existing component and sentence-case text; no new visible labels; hamburger `aria-expanded` and focus unchanged; axe in e2e. | Frontend gates (typecheck, lint, test, build, e2e), UI compliance checklist | PASS: typecheck, lint, 477/477 Vitest, build and 35/35 navigation e2e pass; UI checklist complete. Specs needing a running API were not run (see quickstart.md) |
+| Perf & Observability | Yes | Toggle applies synchronously before the save; startup wait capped at 2 s; `PreferenceMetrics` counter + histogram registered in `Program.cs`. | 500 ms feedback test, metrics registered | PASS (Vitest toggle test, 2.5 s e2e test, `PreferenceMetricsTests`, meter registered) |
 
 **Applicable style guide sections**: §2 Layout model and §3 Navigation
 (`clutch-ui-style/references/layout-navigation.md`) — starting state only; behaviour from 011/015
@@ -57,19 +57,19 @@ is unchanged. Toast text follows the sentence-case rule in §11.
 
 **UI compliance checklist** (style guide §11):
 
-- [ ] No borders or divider lines on layout containers (documented hairline exception only)
-- [ ] Surface hierarchy follows canvas, content, card, raised
-- [ ] Only tokens used: no raw hex, no default palette, no non-token radius
-- [ ] Form fields use floating labels — N/A, no form fields added
-- [ ] Labels, headings and button text use Title Case; helper, error and body text use sentence case
-- [ ] Percentage and currency fields reject invalid characters at entry and reformat on blur — N/A, none added
-- [ ] Navigation expand/collapse behaviour unchanged; only restyled, unless an approved spec amends it (018 amends the starting state only)
-- [ ] Dark theme has no pure black surface or pure white text
-- [ ] Both themes visually verified
-- [ ] WCAG 2.2 AA contrast checked in both themes
-- [ ] Visible focus ring on every interactive element
-- [ ] Status not conveyed by colour alone
-- [ ] `prefers-reduced-motion` respected (pinned start applies with no transition)
+- [x] No borders or divider lines on layout containers (documented hairline exception only) — no containers or classes added
+- [x] Surface hierarchy follows canvas, content, card, raised — no surfaces added
+- [x] Only tokens used: no raw hex, no default palette, no non-token radius — no styles added
+- [x] Form fields use floating labels — N/A, no form fields added
+- [x] Labels, headings and button text use Title Case; helper, error and body text use sentence case — only new text is the sentence-case save-failure toast
+- [x] Percentage and currency fields reject invalid characters at entry and reformat on blur — N/A, none added
+- [x] Navigation expand/collapse behaviour unchanged; only restyled, unless an approved spec amends it (018 amends the starting state only) — all 35 `navigation.spec.ts` journeys pass after `07ae269`. Since `cbc27b3` (before 018) keyboard focus no longer expands the navigation; specs 011/015/018 were amended on 2026-11-22 to match
+- [x] Dark theme has no pure black surface or pure white text — no surfaces added
+- [x] Both themes visually verified — pinned-start screenshots in light and dark (`navigation.spec.ts` pinned-start axe test)
+- [x] WCAG 2.2 AA contrast checked in both themes — axe passes with pinned start in light and dark
+- [x] Visible focus ring on every interactive element — e2e focus-indicator journeys pass in both themes after `07ae269`
+- [x] Status not conveyed by colour alone — save failure is a text toast
+- [x] `prefers-reduced-motion` respected (pinned start applies with no transition) — reduced-motion pinned-start e2e test passes
 
 **Pre-research gate**: PASS — no violations; PENDING rows are implementation-time gates that need tasks.
 
@@ -110,6 +110,8 @@ src/clutch-web/
 ├── src/features/preferences/api.ts                               # get/save + hooks (timeout, scope)
 ├── src/features/preferences/api.test.ts                          # extend
 ├── src/App.tsx                                                   # startup gating, seeded pinned, save on toggle
+│                                                                 # (also: hover only at >= 768px, from 011 FR-014, not 018)
+├── src/lib/useMediaQuery.ts                                      # new, serves 011 FR-014 only, not a 018 requirement
 ├── src/App.test.tsx                                              # extend
 ├── e2e/navigation.spec.ts                                        # persisted-state journeys + mock
 └── e2e/style-guide.spec.ts, e2e/import-settings.spec.ts         # add navigation preference mock to /api/* routes
@@ -125,10 +127,10 @@ src/clutch-web/
 ### Post-Design Constitution Check
 
 - ARC-001 PASS: layering mirrors theme preference; nothing beyond the spec.
-- DOT-002 / OPS-001 PENDING (by design): PK lookup needs no extra index; migration is additive with drop-table rollback. Query and migration reviews required in the final phase.
-- SEC-001 PENDING: contract accepts no user ID; two-layer allow-list; OWASP review required.
-- WEB-001 PENDING: no new controls; checklist above to be validated.
-- Perf & Observability PENDING: metrics and 2 s cap covered by tests.
+- DOT-002 / OPS-001 PASS: PK lookup needs no extra index; migration is additive with drop-table rollback. Query and migration reviews completed ([reviews.md](./reviews.md)).
+- SEC-001 PASS: contract accepts no user ID; two-layer allow-list; OWASP review completed, finding F1 remediated.
+- WEB-001 PASS: no new controls; UI compliance checklist validated above.
+- Perf & Observability PASS: metrics and 2 s cap covered by tests.
 
 **Post-design gate result**: PASS. No unresolved clarifications; no unjustified deviations.
 

@@ -392,7 +392,7 @@ test('keeps deeply nested category actions usable beside navigation', async ({ p
 })
 
 for (const mode of ['Light', 'Dark'] as const) {
-  test(`keeps keyboard focus visible over hovered navigation in ${mode} mode`, async ({ page }) => {
+  test(`keeps keyboard focus visible over the pinned navigation in ${mode} mode`, async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 812 })
     await mockApi(page)
     let groupName = 'Food'
@@ -412,9 +412,8 @@ for (const mode of ['Light', 'Dark'] as const) {
     await page.keyboard.press('Enter')
     await expect(page.getByRole('button', { name: 'Rename Food' })).toBeVisible()
 
-    const pane = await nav.boundingBox()
-    if (!pane) throw new Error('Navigation has no bounds')
-    await page.mouse.move(pane.x + 25, pane.y + 20)
+    // Below 768px only the hamburger opens the navigation over the page; hover does not.
+    await setPaneState(page, true)
     await categories.focus()
     await page.keyboard.press('Tab')
     // The group card's focusable horizontal scroll area.
@@ -744,6 +743,31 @@ test('overlays at 767px and shrinks the content at 768px', async ({ page }) => {
     expect(expandedMain.x).toBeCloseTo(compactMain.x + (shrinks ? navGrowth : 0), 1)
     expect(expandedMain.width).toBeCloseTo(compactMain.width - (shrinks ? navGrowth : 0), 1)
   }
+})
+
+test('does not expand on hover at 767px, where it would cover content, but does at 768px', async ({ page }) => {
+  await mockApi(page)
+  await page.goto('/')
+  const nav = page.getByRole('navigation', { name: 'Primary' })
+  const toggle = page.getByRole('button', { name: 'Toggle navigation' })
+  const label = nav.getByText('Accounts', { exact: true })
+
+  await page.setViewportSize({ width: 767, height: 900 })
+  await setPaneState(page, false)
+  await nav.getByRole('button', { name: 'Accounts' }).hover()
+  await page.waitForTimeout(400)
+  await expect(label).toBeHidden()
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  // The hamburger still opens it, and leaving the pointer over it keeps it open.
+  await toggle.click()
+  await expect(label).toBeVisible()
+  await setPaneState(page, false)
+
+  await page.setViewportSize({ width: 768, height: 900 })
+  await nav.getByRole('button', { name: 'Accounts' }).hover()
+  await expect(label).toBeVisible()
+  await page.mouse.move(600, 400)
+  await expect(label).toBeHidden()
 })
 
 test('navigates directly from a compact touch pane', async ({ browser }) => {

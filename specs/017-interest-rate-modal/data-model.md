@@ -24,7 +24,7 @@ No stored data, API or schema changes. Interest rate changes keep 016's model
 ## Listed rows (in the modal)
 
 - Sorted by `date` ascending for display only; `draft.rows` order is not rewritten.
-- Row with `date === draft.firstRepaymentDate` is marked "Opening Rate".
+- Row with `date === draft.drawdownDate` is marked "Opening Rate".
 - Dates display as `formatDisplayDate(date)` → `1 Jan 2025` (`en-AU`, `day: 'numeric', month: 'short', year: 'numeric'`, parsed as a local date, not UTC). New pure helper in `loanDraft.ts`.
 - Remove → `draft.rows` without that row's `key`; errors keyed to that row are no longer shown.
 - Errors: `errors["{row.key}.newInterestRate" | "{row.key}.effectiveDate"]` per row and `errors.interestRateChanges` above the list, from `validateDraft` or `mapServerErrors` as in 016.

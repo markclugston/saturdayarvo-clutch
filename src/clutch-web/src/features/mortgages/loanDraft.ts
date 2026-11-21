@@ -3,7 +3,7 @@ import {
   finalRepaymentDate,
   formatMessageDate,
   parseDate,
-  type RepaymentFrequency,
+  type PaymentFrequency,
 } from './repaymentDates'
 
 export const MAX_RATE_CHANGES = 60
@@ -15,14 +15,14 @@ export type RateRowDraft = { key: string; rate: string; date: string }
 
 export type LoanDraft = {
   name: string
-  startingBalance: string
-  numberOfPeriods: string
-  firstRepaymentDate: string
-  repaymentFrequency: RepaymentFrequency | ''
+  openingBalance: string
+  duration: string
+  drawdownDate: string
+  paymentFrequency: PaymentFrequency | ''
   rows: RateRowDraft[]
 }
 
-/** Messages keyed like the API: `name`, `startingBalance`, ..., `interestRateChanges`, `{rowKey}.newInterestRate`. */
+/** Messages keyed like the API: `name`, `openingBalance`, ..., `interestRateChanges`, `{rowKey}.newInterestRate`. */
 export type DraftErrors = Record<string, string>
 
 let rowCounter = 0
@@ -35,10 +35,10 @@ export function newRow(rate = '', date = ''): RateRowDraft {
 export function emptyDraft(): LoanDraft {
   return {
     name: '',
-    startingBalance: '',
-    numberOfPeriods: '',
-    firstRepaymentDate: '',
-    repaymentFrequency: '',
+    openingBalance: '',
+    duration: '',
+    drawdownDate: '',
+    paymentFrequency: '',
     rows: [],
   }
 }
@@ -46,10 +46,10 @@ export function emptyDraft(): LoanDraft {
 export function mortgageToDraft(mortgage: Mortgage): LoanDraft {
   return {
     name: mortgage.name,
-    startingBalance: String(mortgage.startingBalance),
-    numberOfPeriods: String(mortgage.numberOfPeriods),
-    firstRepaymentDate: mortgage.firstRepaymentDate,
-    repaymentFrequency: mortgage.repaymentFrequency,
+    openingBalance: String(mortgage.openingBalance),
+    duration: String(mortgage.duration),
+    drawdownDate: mortgage.drawdownDate,
+    paymentFrequency: mortgage.paymentFrequency,
     rows: mortgage.interestRateChanges.map((change) =>
       newRow(String(change.newInterestRate), change.effectiveDate)),
   }
@@ -57,10 +57,10 @@ export function mortgageToDraft(mortgage: Mortgage): LoanDraft {
 
 export function draftsEqual(left: LoanDraft, right: LoanDraft): boolean {
   return left.name === right.name
-    && left.startingBalance === right.startingBalance
-    && left.numberOfPeriods === right.numberOfPeriods
-    && left.firstRepaymentDate === right.firstRepaymentDate
-    && left.repaymentFrequency === right.repaymentFrequency
+    && left.openingBalance === right.openingBalance
+    && left.duration === right.duration
+    && left.drawdownDate === right.drawdownDate
+    && left.paymentFrequency === right.paymentFrequency
     && left.rows.length === right.rows.length
     && left.rows.every((row, index) =>
       row.rate === right.rows[index]?.rate && row.date === right.rows[index]?.date)
@@ -100,39 +100,39 @@ export function validateDraft(draft: LoanDraft, today: string): DraftErrors {
     errors.name = 'Enter a name of up to 100 characters'
   }
 
-  const balance = parseNumber(draft.startingBalance)
+  const balance = parseNumber(draft.openingBalance)
   if (balance === null || balance <= 0) {
-    errors.startingBalance = 'Enter a starting balance greater than 0'
+    errors.openingBalance = 'Enter a opening balance greater than 0'
   } else if (balance > MAX_BALANCE) {
-    errors.startingBalance = 'Enter a starting balance up to 999,999,999,999.99'
-  } else if (decimalPlaces(draft.startingBalance) > 2) {
-    errors.startingBalance = 'Enter a starting balance with up to 2 decimal places'
+    errors.openingBalance = 'Enter a opening balance up to 999,999,999,999.99'
+  } else if (decimalPlaces(draft.openingBalance) > 2) {
+    errors.openingBalance = 'Enter a opening balance with up to 2 decimal places'
   }
 
-  if (parseDate(draft.firstRepaymentDate) === null) {
-    errors.firstRepaymentDate = 'Enter a valid date'
-  } else if (draft.firstRepaymentDate > today) {
-    errors.firstRepaymentDate = 'Enter a date that is not in the future'
+  if (parseDate(draft.drawdownDate) === null) {
+    errors.drawdownDate = 'Enter a valid date'
+  } else if (draft.drawdownDate > today) {
+    errors.drawdownDate = 'Enter a date that is not in the future'
   }
 
-  if (draft.repaymentFrequency === '') {
-    errors.repaymentFrequency = 'Choose Weekly, Fortnightly or Monthly'
+  if (draft.paymentFrequency === '') {
+    errors.paymentFrequency = 'Choose Weekly, Fortnightly or Monthly'
   }
 
-  const periods = parseNumber(draft.numberOfPeriods)
+  const periods = parseNumber(draft.duration)
   const tooLate = 'The final repayment date would be later than 31 Dec 9999'
   if (periods === null || !Number.isInteger(periods) || periods < 1) {
-    errors.numberOfPeriods = 'Enter a whole number of 1 or more'
+    errors.duration = 'Enter a whole number of 1 or more'
   } else if (periods > MAX_PERIODS) {
-    errors.numberOfPeriods = tooLate
-  } else if (!errors.firstRepaymentDate && draft.repaymentFrequency !== ''
-    && finalRepaymentDate(draft.firstRepaymentDate, periods, draft.repaymentFrequency) === null) {
-    errors.numberOfPeriods = tooLate
+    errors.duration = tooLate
+  } else if (!errors.drawdownDate && draft.paymentFrequency !== ''
+    && finalRepaymentDate(draft.drawdownDate, periods, draft.paymentFrequency) === null) {
+    errors.duration = tooLate
   }
 
-  const headerValid = !errors.firstRepaymentDate && !errors.numberOfPeriods && !errors.repaymentFrequency
-  const final = headerValid && periods !== null && draft.repaymentFrequency !== ''
-    ? finalRepaymentDate(draft.firstRepaymentDate, periods, draft.repaymentFrequency)
+  const headerValid = !errors.drawdownDate && !errors.duration && !errors.paymentFrequency
+  const final = headerValid && periods !== null && draft.paymentFrequency !== ''
+    ? finalRepaymentDate(draft.drawdownDate, periods, draft.paymentFrequency)
     : null
 
   const rows = draft.rows.filter((row) => !isEmptyRow(row))
@@ -165,28 +165,28 @@ export function validateDraft(draft: LoanDraft, today: string): DraftErrors {
       errors[dateKey] = 'Enter a valid date'
     } else if ((usedDates.get(row.date) ?? 0) > 1) {
       errors[dateKey] = 'This effective date is already used'
-    } else if (final !== null && (row.date < draft.firstRepaymentDate || row.date > final)) {
+    } else if (final !== null && (row.date < draft.drawdownDate || row.date > final)) {
       errors[dateKey] =
-        `Choose a date from ${formatMessageDate(draft.firstRepaymentDate)} to ${formatMessageDate(final)}`
+        `Choose a date from ${formatMessageDate(draft.drawdownDate)} to ${formatMessageDate(final)}`
     }
 
-    if (dateValid && rate !== null && row.date === draft.firstRepaymentDate) {
+    if (dateValid && rate !== null && row.date === draft.drawdownDate) {
       openingRateFound = true
     }
   }
 
   if (headerValid && !errors.interestRateChanges && !openingRateFound) {
     errors.interestRateChanges =
-      'Add the opening interest rate, effective on the first repayment date'
+      'Add the opening interest rate, effective on the drawdown date'
   }
 
   return errors
 }
 
-/** True when First Repayment Date, Number of Periods and Repayment Frequency are all valid. */
+/** True when Drawdown Date, Duration and Payment Frequency are all valid. */
 export function headerIsValid(draft: LoanDraft, today: string): boolean {
   const errors = validateDraft({ ...draft, rows: [] }, today)
-  return !errors.firstRepaymentDate && !errors.numberOfPeriods && !errors.repaymentFrequency
+  return !errors.drawdownDate && !errors.duration && !errors.paymentFrequency
 }
 
 /** Empty rows are dropped. `rowKeys[i]` is the screen row that became `interestRateChanges[i]`. */
@@ -195,10 +195,10 @@ export function draftToInput(draft: LoanDraft): { input: MortgageInput; rowKeys:
   return {
     input: {
       name: draft.name.trim(),
-      startingBalance: Number(draft.startingBalance.trim()),
-      numberOfPeriods: Number(draft.numberOfPeriods.trim()),
-      firstRepaymentDate: draft.firstRepaymentDate,
-      repaymentFrequency: draft.repaymentFrequency as RepaymentFrequency,
+      openingBalance: Number(draft.openingBalance.trim()),
+      duration: Number(draft.duration.trim()),
+      drawdownDate: draft.drawdownDate,
+      paymentFrequency: draft.paymentFrequency as PaymentFrequency,
       interestRateChanges: rows.map((row) => ({
         newInterestRate: Number(row.rate.trim()),
         effectiveDate: row.date,

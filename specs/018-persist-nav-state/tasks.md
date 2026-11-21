@@ -1,4 +1,4 @@
-﻿---
+---
 
 description: "Task list for 018 Remember Navigation Expanded State"
 ---
@@ -75,12 +75,12 @@ None. No new packages or config.
 ## Phase 5: Completion Gates
 
 - [X] T024 Run axe (WCAG 2.2 AA) in both themes with pinned start and confirm existing 011/015 journeys pass in `src/clutch-web/e2e/navigation.spec.ts` (WEB-001, FR-009)
-- [ ] T025 Independent query review of `NavigationPreferenceService` read/upsert (DOT-002, `clutch-data-access`)
-- [ ] T026 Migration review of `AddNavigationPreferences` with drop-table rollback, no backfill (OPS-001, `clutch-data-access`)
-- [ ] T027 Independent OWASP Top 10 + dependency vulnerability review of the full diff (SEC-001, `clutch-security-review`)
+- [X] T025 Independent query review of `NavigationPreferenceService` read/upsert (DOT-002, `clutch-data-access`)
+- [X] T026 Migration review of `AddNavigationPreferences` with drop-table rollback, no backfill (OPS-001, `clutch-data-access`)
+- [X] T027 Independent OWASP Top 10 + dependency vulnerability review of the full diff (SEC-001, `clutch-security-review`)
 - [X] T028 Validate plan.md UI compliance checklist with agent-executable checks: Playwright screenshots of the pinned start in both themes, and a `prefers-reduced-motion: reduce` run confirming the pinned start applies with no transition, both in `src/clutch-web/e2e/navigation.spec.ts` (WEB-001, ENG-001, `clutch-ui-style`)
 - [X] T029 Run quickstart.md commands (API tests, typecheck, lint, test, build, e2e) and record results (ENG-001, DOT-001)
-- [ ] T030 Run `/speckit-converge` and resolve any appended tasks (Workflow gate)
+- [X] T030 Run `/speckit-converge` and resolve any appended tasks (Workflow gate)
 
 ---
 
@@ -99,3 +99,16 @@ None. No new packages or config.
 ## Implementation Strategy
 
 MVP = User Story 1. Deliver stories incrementally; each must pass its own tests before the next starts.
+
+## Phase 6: Convergence
+
+- [X] T031 Make `PUT /api/preferences/navigation` return the contract 400 (title `The navigation state is invalid.`, detail `Choose Pinned or Unpinned.`) and record save outcome `invalid` for every non-string or unbindable `state`, such as `{"state":5}`, `{"state":true}`, `{"state":{}}`, an empty body and malformed JSON. Today these fail at the framework's request-body binding before the endpoint runs, so the response is a generic 400 with no metric. Add these cases to the invalid-state theory in `tests/Clutch.API.Tests/Integration/Preferences/NavigationPreferenceTests.cs`. Fix in `src/Clutch.API/Api/Endpoints/NavigationPreferenceEndpoints.cs` per contracts/navigation-preferences.md and FR-008 (partial)
+- [X] T032 Record the evidence for T028 and T029: tick the validated items in the plan.md UI compliance checklist (marking the N/A rows), move the Constitution Check rows from PENDING to their outcomes, and write the quickstart.md command results (pass/fail counts per command) into `specs/018-persist-nav-state/quickstart.md`, per plan: UI compliance checklist and T029 (partial)
+
+## Phase 7: Convergence
+
+- [X] T033 CRITICAL: Get `npx playwright test --config playwright.style-guide.config.ts` (10 failures: `nav-expanded`, `categories` and `surface lightness` at 1024 and 1440 px) and `--config playwright.ownership.config.ts` (the `categories journey`) passing. These are stale tests; commit `c7db67b` on branch `claude/hopeful-poincare-f513a2` already updates `src/clutch-web/e2e/style-guide.spec.ts` and `src/clutch-web/e2e/categories-groups.spec.ts`. Merging it needs the uncommitted 016/017 edits to `style-guide.spec.ts` in the working tree committed or reconciled first (ask the user). Rerun both configs per Constitution ENG-001 (partial)
+- [X] T034 Investigate and fix or justify the failing `trash icons and focus indicators meet 3:1 non-text contrast in light mode` test (focus indicator ratio 1, needs 3) in `src/clutch-web/e2e/accounts-transaction-delete.spec.ts`; a baseline run at `3ee7739` could not start, so it is unknown whether 018 or earlier styling caused it. Rerun `npx playwright test --config playwright.transaction-delete.config.ts` per Constitution ENG-001 and WEB-001 (partial)
+- [X] T035 Add a Vitest test in `src/clutch-web/src/App.test.tsx` where the navigation `PUT` never resolves: the hamburger flips `aria-expanded` at once, a second click flips it back, and no toast appears, proving feedback does not depend on how long saving takes per FR-010 and SC-005 (partial)
+- [X] T036 Reconcile the hover-below-768px change (`src/clutch-web/src/lib/useMediaQuery.ts`, `src/clutch-web/src/App.tsx`, its Vitest and Playwright tests) with 018: it is traced to 011 FR-014 (2026-11-22), not to a 018 requirement, and 018 FR-009 says existing behaviour is unchanged. Add that trace to 018 `spec.md` FR-009 and `plan.md`, or move the change out of this feature, per plan: scope (ARC-001 do not add unrequested features) (unrequested)
+- [X] T037 Stabilise three e2e tests that each failed once in a combined run and passed on rerun, in `src/clutch-web/e2e/startup.spec.ts` (`recovers automatically from a temporary session failure`), `src/clutch-web/e2e/accounts-transaction-delete.spec.ts` (`keyboard Tab, Enter, Space, and Shift+Tab…`) and `src/clutch-web/e2e/active-import.spec.ts` (`ended preview requires actor acknowledgement after reconnect…`), and make `src/clutch-web/e2e/import-settings.spec.ts` use the configured `baseURL` instead of a hardcoded `http://127.0.0.1:5173`, per Constitution ENG-001 (partial)

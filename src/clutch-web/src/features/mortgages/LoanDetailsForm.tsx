@@ -177,7 +177,7 @@ export function LoanDetailsForm({
       onSubmit={(event) => void submit(event)}
     >
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold" id={`${idPrefix}-heading`}>Loan Details</h2>
+        <h2 className="text-base font-semibold" id={`${idPrefix}-heading`}>Details</h2>
         {baseline && (
           <DeleteMortgageControl
             mortgage={baseline}
@@ -204,46 +204,46 @@ export function LoanDetailsForm({
           autoComplete="off"
           className="w-full sm:w-56"
           disabled={saving}
-          error={errors.startingBalance}
+          error={errors.openingBalance}
           format={formatCurrency}
           id={`${idPrefix}-balance`}
           inputMode="decimal"
-          label="Starting Balance"
-          onValueChange={(startingBalance) => change({ startingBalance })}
-          value={draft.startingBalance}
+          label="Opening Balance"
+          onValueChange={(openingBalance) => change({ openingBalance })}
+          value={draft.openingBalance}
+        />
+        <FloatingField
+          className="w-full sm:w-52"
+          disabled={saving}
+          error={errors.drawdownDate}
+          id={`${idPrefix}-drawdown-date`}
+          label="Drawdown Date"
+          onChange={(event) => change({ drawdownDate: event.currentTarget.value })}
+          type="date"
+          value={draft.drawdownDate}
         />
         <FloatingField
           autoComplete="off"
           className="w-full sm:w-44"
           disabled={saving}
-          error={errors.numberOfPeriods}
-          id={`${idPrefix}-periods`}
+          error={errors.duration}
+          id={`${idPrefix}-duration`}
           inputMode="numeric"
-          label="Number of Periods"
-          onChange={(event) => change({ numberOfPeriods: event.currentTarget.value })}
-          value={draft.numberOfPeriods}
-        />
-        <FloatingField
-          className="w-full sm:w-52"
-          disabled={saving}
-          error={errors.firstRepaymentDate}
-          id={`${idPrefix}-first-date`}
-          label="First Repayment Date"
-          onChange={(event) => change({ firstRepaymentDate: event.currentTarget.value })}
-          type="date"
-          value={draft.firstRepaymentDate}
+          label="Duration"
+          onChange={(event) => change({ duration: event.currentTarget.value })}
+          value={draft.duration}
         />
         <FloatingField
           as="select"
           className="w-full sm:w-52"
           disabled={saving}
-          error={errors.repaymentFrequency}
+          error={errors.paymentFrequency}
           id={`${idPrefix}-frequency`}
-          label="Repayment Frequency"
+          label="Payment Frequency"
           onChange={(event) => change({
-            repaymentFrequency: event.currentTarget.value as LoanDraft['repaymentFrequency'],
+            paymentFrequency: event.currentTarget.value as LoanDraft['paymentFrequency'],
           })}
-          value={draft.repaymentFrequency}
+          value={draft.paymentFrequency}
         >
           <option value="">Choose…</option>
           <option value="Weekly">Weekly</option>

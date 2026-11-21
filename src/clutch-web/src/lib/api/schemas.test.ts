@@ -85,10 +85,10 @@ describe('API schemas', () => {
   describe('mortgage schemas', () => {
     const input = {
       name: 'Home loan',
-      startingBalance: 500000.5,
-      numberOfPeriods: 360,
-      firstRepaymentDate: '2000-01-01',
-      repaymentFrequency: 'Monthly',
+      openingBalance: 500000.5,
+      duration: 360,
+      drawdownDate: '2000-01-01',
+      paymentFrequency: 'Monthly',
       interestRateChanges: [{ newInterestRate: 5.25, effectiveDate: '2000-01-01' }],
     }
 
@@ -102,8 +102,8 @@ describe('API schemas', () => {
     })
 
     it('rejects an unknown frequency, bad date, and more than 60 changes', () => {
-      expect(MortgageInputSchema.safeParse({ ...input, repaymentFrequency: 'Daily' }).success).toBe(false)
-      expect(MortgageInputSchema.safeParse({ ...input, firstRepaymentDate: '01/01/2000' }).success).toBe(false)
+      expect(MortgageInputSchema.safeParse({ ...input, paymentFrequency: 'Daily' }).success).toBe(false)
+      expect(MortgageInputSchema.safeParse({ ...input, drawdownDate: '01/01/2000' }).success).toBe(false)
       expect(InterestRateChangeSchema.safeParse({ newInterestRate: 101, effectiveDate: '2000-01-01' }).success)
         .toBe(false)
       const many = Array.from({ length: 61 }, () => ({ newInterestRate: 1, effectiveDate: '2000-01-01' }))
@@ -112,11 +112,11 @@ describe('API schemas', () => {
 
     it('round-trips 999,999,999,999.99 exactly and rejects one cent more', () => {
       const parsed = MortgageInputSchema.parse(
-        JSON.parse(JSON.stringify({ ...input, startingBalance: 999999999999.99 })),
+        JSON.parse(JSON.stringify({ ...input, openingBalance: 999999999999.99 })),
       )
-      expect(parsed.startingBalance).toBe(999999999999.99)
-      expect(String(parsed.startingBalance)).toBe('999999999999.99')
-      expect(MortgageInputSchema.safeParse({ ...input, startingBalance: 1000000000000 }).success).toBe(false)
+      expect(parsed.openingBalance).toBe(999999999999.99)
+      expect(String(parsed.openingBalance)).toBe('999999999999.99')
+      expect(MortgageInputSchema.safeParse({ ...input, openingBalance: 1000000000000 }).success).toBe(false)
     })
   })
 })

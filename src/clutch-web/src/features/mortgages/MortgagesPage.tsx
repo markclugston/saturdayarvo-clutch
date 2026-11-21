@@ -159,7 +159,7 @@ export function MortgagesPage() {
       />
       <div className="grid gap-4 md:grid-cols-2">
         <BurnDownChart saved={selectedMortgage !== undefined} />
-        <AmortizationSchedule numberOfPeriods={selectedMortgage?.numberOfPeriods} />
+        <AmortizationSchedule duration={selectedMortgage?.duration} />
       </div>
       {sessionExpired && (
         <SessionExpiredDialog

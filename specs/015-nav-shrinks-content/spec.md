@@ -12,6 +12,8 @@
   Amends 011-expand-navigation. Where this spec conflicts with 011 (FR-010, the "overlay" clarifications,
   User Story 3 scenario 3, the narrow-screen edge case), this spec wins; 011's hover/focus expansion,
   destinations and accessibility behaviour are unchanged.
+  Amended 2026-11-22: 011 triggers are now hover (768px and wider only) and the hamburger pin;
+  keyboard focus no longer expands the navigation (see 011 Amendment 2026-11-22).
 -->
 
 ## Clarifications
@@ -34,8 +36,8 @@ As a signed-in user, when the left navigation expands I want the main page secti
 **Acceptance Scenarios**:
 
 1. **Given** the compact navigation, **When** the user hovers over it, **Then** the navigation widens and the main page section's left edge moves right and its width shrinks by the same amount, with no content covered by the navigation.
-2. **Given** the expanded navigation, **When** the pointer and keyboard focus leave it, **Then** it collapses and the main section returns to its original position and width.
-3. **Given** the compact navigation, **When** a keyboard user focuses a destination, **Then** the navigation expands and the main section shrinks exactly as with hover.
+2. **Given** the hover-expanded navigation that is not pinned, **When** the pointer leaves it, **Then** it collapses and the main section returns to its original position and width (amended 2026-11-22).
+3. **Given** the compact navigation, **When** a keyboard user activates the hamburger, **Then** the navigation expands and the main section shrinks exactly as with hover (amended 2026-11-22).
 4. **Given** the main section contains page content (forms, tables, account lists), **When** the section shrinks or grows, **Then** the content reflows to the available width with nothing clipped or unreachable.
 
 ---
@@ -66,7 +68,7 @@ As a signed-in user on a narrow screen, I can still reach all page content when 
 
 **Acceptance Scenarios**:
 
-1. **Given** a viewport narrower than the narrow-screen breakpoint (including 320 CSS pixels), **When** the navigation expands, **Then** it overlays the main section as defined in 011, the main section keeps its full width and position, and the page as a whole has no horizontal scroll.
+1. **Given** a viewport narrower than the narrow-screen breakpoint (including 320 CSS pixels), **When** the user pins the navigation with the hamburger (hover does not expand it there, per 011 FR-014, amended 2026-11-22), **Then** it overlays the main section as defined in 011, the main section keeps its full width and position, and the page as a whole has no horizontal scroll.
 2. **Given** a viewport narrower than the breakpoint, **When** the navigation collapses, **Then** the overlay is removed and page content is fully visible.
 3. **Given** a viewport at or above the breakpoint, **When** the navigation expands, **Then** the main section shrinks as in User Story 1.
 
@@ -84,7 +86,7 @@ As a signed-in user on a narrow screen, I can still reach all page content when 
 - **FR-001**: At viewport widths at or above the narrow-screen breakpoint, when the navigation expands, the main page section MUST shrink in width and shift right by the amount the navigation grows; the navigation MUST NOT overlay or cover any page content.
 - **FR-002**: When the navigation collapses, the main section MUST return to its compact-state position and width.
 - **FR-003**: The main section's content MUST reflow to its available width in both states, with no clipped or unreachable content and no horizontal scroll of the whole page, including at a 320 CSS pixel viewport (where the overlay behaviour of FR-009 applies).
-- **FR-004**: Expansion and collapse triggers (hover, keyboard focus), destinations, labels, current-destination indication and accessibility behaviour MUST remain as defined in 011.
+- **FR-004**: Expansion and collapse triggers (hover and the hamburger pin, amended 2026-11-22), destinations, labels, current-destination indication and accessibility behaviour MUST remain as defined in 011.
 - **FR-005**: The resize MUST NOT remove focus from, or clear values entered in, any page control.
 - **FR-006**: The navigation MUST NOT flicker between states when the pointer rests on its edge during a resize.
 - **FR-007**: The resize MUST be visible within 500 milliseconds and MUST be applied without animation when the user prefers reduced motion.
@@ -110,6 +112,6 @@ As a signed-in user on a narrow screen, I can still reach all page content when 
 
 ## Assumptions
 
-- The pane's width, hover/focus triggers, no persisted state, destinations and accessibility behaviour already implemented stay as they are; only the relationship to the main section changes.
+- The pane's width, hover and hamburger-pin triggers (amended 2026-11-22), no persisted state (later superseded by 018), destinations and accessibility behaviour already implemented stay as they are; only the relationship to the main section changes.
 - The shrink applies at viewport widths at or above the narrow-screen breakpoint; below it the navigation overlays content as in 011. Content within the main section adapts by wrapping or scrolling inside the section.
 - Resize timing and easing follow existing UI motion conventions.

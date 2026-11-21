@@ -17,9 +17,9 @@ public sealed class MortgageUpdateTests(SqlServerFixture fixture)
 
         using var response = await SendAsync(client, HttpMethod.Put, $"/api/mortgages/{created.Id}", Body(
             "Renamed",
-            startingBalance: 100m,
-            numberOfPeriods: 24,
-            repaymentFrequency: "Weekly",
+            openingBalance: 100m,
+            duration: 24,
+            paymentFrequency: "Weekly",
             rates: new[]
             {
                 new { newInterestRate = 4m, effectiveDate = "2000-01-01" },
@@ -31,11 +31,11 @@ public sealed class MortgageUpdateTests(SqlServerFixture fixture)
         var updated = (await response.Content.ReadFromJsonAsync<MortgageDto>())!;
         Assert.Equal(2, updated.Version);
         Assert.Equal("Renamed", updated.Name);
-        Assert.Equal("Weekly", updated.RepaymentFrequency);
+        Assert.Equal("Weekly", updated.PaymentFrequency);
         Assert.Equal([4m, 6m], updated.InterestRateChanges.Select(change => change.NewInterestRate));
         var listed = Assert.Single(await ListAsync(client));
         Assert.Equal(updated.Version, listed.Version);
-        Assert.Equal(100m, listed.StartingBalance);
+        Assert.Equal(100m, listed.OpeningBalance);
         Assert.Equal(
             [("2000-01-01", 4m), ("2000-03-04", 6m)],
             listed.InterestRateChanges.Select(change => (change.EffectiveDate, change.NewInterestRate)));
@@ -84,7 +84,7 @@ public sealed class MortgageUpdateTests(SqlServerFixture fixture)
                 client,
                 HttpMethod.Put,
                 $"/api/mortgages/{created.Id}",
-                Body(name, startingBalance: 100 + index, version: 1));
+                Body(name, openingBalance: 100 + index, version: 1));
             return response.StatusCode;
         }));
 
@@ -123,7 +123,7 @@ public sealed class MortgageUpdateTests(SqlServerFixture fixture)
         await CreateAsync(client, Body("Home loan"));
         var second = await CreateAsync(client, Body("Car loan"));
 
-        using var invalid = await SendAsync(client, HttpMethod.Put, $"/api/mortgages/{second.Id}", Body("Car loan", numberOfPeriods: 0, version: 1));
+        using var invalid = await SendAsync(client, HttpMethod.Put, $"/api/mortgages/{second.Id}", Body("Car loan", duration: 0, version: 1));
         Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
 
         using var clash = await SendAsync(client, HttpMethod.Put, $"/api/mortgages/{second.Id}", Body(" home LOAN ", version: 1));

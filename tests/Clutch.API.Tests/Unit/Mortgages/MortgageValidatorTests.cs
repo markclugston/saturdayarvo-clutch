@@ -33,7 +33,7 @@ public sealed class MortgageValidatorTests
 
         Assert.Empty(result.Errors);
         Assert.Equal("Home loan", result.Value!.Name);
-        Assert.Equal(360, result.Value.NumberOfPeriods);
+        Assert.Equal(360, result.Value.Duration);
     }
 
     [Theory]
@@ -53,20 +53,20 @@ public sealed class MortgageValidatorTests
     }
 
     [Theory]
-    [InlineData(null, "Enter a starting balance greater than 0")]
-    [InlineData(0.0, "Enter a starting balance greater than 0")]
-    [InlineData(-1.0, "Enter a starting balance greater than 0")]
-    [InlineData(1000000000000.00, "Enter a starting balance up to 999,999,999,999.99")]
-    public void Starting_balance_bounds(double? value, string message) =>
-        Assert.Equal(message, Errors(Valid(balance: (decimal?)value))["startingBalance"]);
+    [InlineData(null, "Enter a opening balance greater than 0")]
+    [InlineData(0.0, "Enter a opening balance greater than 0")]
+    [InlineData(-1.0, "Enter a opening balance greater than 0")]
+    [InlineData(1000000000000.00, "Enter a opening balance up to 999,999,999,999.99")]
+    public void Opening_balance_bounds(double? value, string message) =>
+        Assert.Equal(message, Errors(Valid(balance: (decimal?)value))["openingBalance"]);
 
     [Fact]
-    public void Starting_balance_accepts_the_maximum_and_rejects_three_decimal_places()
+    public void Opening_balance_accepts_the_maximum_and_rejects_three_decimal_places()
     {
-        Assert.DoesNotContain("startingBalance", Errors(Valid(balance: 999_999_999_999.99m)).Keys);
+        Assert.DoesNotContain("openingBalance", Errors(Valid(balance: 999_999_999_999.99m)).Keys);
         Assert.Equal(
-            "Enter a starting balance with up to 2 decimal places",
-            Errors(Valid(balance: 10.005m))["startingBalance"]);
+            "Enter a opening balance with up to 2 decimal places",
+            Errors(Valid(balance: 10.005m))["openingBalance"]);
     }
 
     [Fact]
@@ -76,10 +76,10 @@ public sealed class MortgageValidatorTests
             balance: decimal.MaxValue,
             periods: decimal.MaxValue,
             rows: new RateChangeCandidate(decimal.MaxValue, "2000-01-01")));
-        Assert.Equal("Enter a starting balance up to 999,999,999,999.99", errors["startingBalance"]);
+        Assert.Equal("Enter a opening balance up to 999,999,999,999.99", errors["openingBalance"]);
         Assert.Equal(
             "The final repayment date would be later than 31 Dec 9999",
-            errors["numberOfPeriods"]);
+            errors["duration"]);
         Assert.Equal(
             "Enter an interest rate from 0 to 100",
             errors["interestRateChanges[0].newInterestRate"]);
@@ -88,8 +88,8 @@ public sealed class MortgageValidatorTests
             balance: decimal.MinValue,
             periods: decimal.MinValue,
             rows: new RateChangeCandidate(decimal.MinValue, "2000-01-01")));
-        Assert.Equal("Enter a starting balance greater than 0", low["startingBalance"]);
-        Assert.Equal("Enter a whole number of 1 or more", low["numberOfPeriods"]);
+        Assert.Equal("Enter a opening balance greater than 0", low["openingBalance"]);
+        Assert.Equal("Enter a whole number of 1 or more", low["duration"]);
         Assert.Equal("Enter an interest rate from 0 to 100", low["interestRateChanges[0].newInterestRate"]);
     }
 
@@ -97,17 +97,17 @@ public sealed class MortgageValidatorTests
     [InlineData(1.5)]
     [InlineData(0)]
     [InlineData(-1)]
-    public void Number_of_periods_must_be_a_whole_number_of_one_or_more(double value) =>
+    public void Duration_must_be_a_whole_number_of_one_or_more(double value) =>
         Assert.Equal(
             "Enter a whole number of 1 or more",
-            Errors(Valid(periods: (decimal)value))["numberOfPeriods"]);
+            Errors(Valid(periods: (decimal)value))["duration"]);
 
     [Fact]
-    public void Number_of_periods_past_31_Dec_9999_is_rejected()
+    public void Duration_past_31_Dec_9999_is_rejected()
     {
         const string message = "The final repayment date would be later than 31 Dec 9999";
-        Assert.Equal(message, Errors(Valid(periods: 3_000_000_000m))["numberOfPeriods"]);
-        Assert.Equal(message, Errors(Valid(periods: 200_000m))["numberOfPeriods"]);
+        Assert.Equal(message, Errors(Valid(periods: 3_000_000_000m))["duration"]);
+        Assert.Equal(message, Errors(Valid(periods: 200_000m))["duration"]);
     }
 
     [Theory]
@@ -115,8 +115,8 @@ public sealed class MortgageValidatorTests
     [InlineData("01/01/2000")]
     [InlineData("")]
     [InlineData(null)]
-    public void Unreadable_first_repayment_date_is_rejected(string? value) =>
-        Assert.Equal("Enter a valid date", Errors(Valid(first: value))["firstRepaymentDate"]);
+    public void Unreadable_drawdown_date_is_rejected(string? value) =>
+        Assert.Equal("Enter a valid date", Errors(Valid(first: value))["drawdownDate"]);
 
     [Fact]
     public void Future_date_bound_is_the_latest_date_anywhere_in_the_world()
@@ -128,7 +128,7 @@ public sealed class MortgageValidatorTests
 
         Assert.Equal(
             "Enter a date that is not in the future",
-            MortgageValidator.Validate(candidate, early).Errors["firstRepaymentDate"]);
+            MortgageValidator.Validate(candidate, early).Errors["drawdownDate"]);
         Assert.Empty(MortgageValidator.Validate(candidate, late).Errors);
     }
 
@@ -139,12 +139,12 @@ public sealed class MortgageValidatorTests
     public void Frequency_must_match_exactly(string? value) =>
         Assert.Equal(
             "Choose Weekly, Fortnightly or Monthly",
-            Errors(Valid(frequency: value))["repaymentFrequency"]);
+            Errors(Valid(frequency: value))["paymentFrequency"]);
 
     [Fact]
     public void Opening_rate_is_required_including_when_there_are_no_rows()
     {
-        const string message = "Add the opening interest rate, effective on the first repayment date";
+        const string message = "Add the opening interest rate, effective on the drawdown date";
         Assert.Equal(
             message,
             Errors(Valid(rows: new RateChangeCandidate(5m, "2000-02-01")))["interestRateChanges"]);
@@ -276,7 +276,7 @@ public sealed class MortgageValidatorTests
             "Monthly",
             [new RateChangeCandidate(5m, "1999-01-01")]));
 
-        Assert.Equal(["numberOfPeriods"], errors.Keys);
+        Assert.Equal(["duration"], errors.Keys);
     }
 
     [Fact]
@@ -285,7 +285,7 @@ public sealed class MortgageValidatorTests
         var errors = Errors(Valid(name: " ", balance: -5m));
 
         Assert.Equal("Enter a name", errors["name"]);
-        Assert.Equal("Enter a starting balance greater than 0", errors["startingBalance"]);
+        Assert.Equal("Enter a opening balance greater than 0", errors["openingBalance"]);
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider

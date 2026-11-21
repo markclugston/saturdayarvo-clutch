@@ -4,6 +4,7 @@ import { test, expect } from './fixtures.js'
 
 test.describe('account import settings', () => {
   test('saves, reuses, edits, and exposes defaults in another browser context', async ({
+    baseURL,
     browser,
   }) => {
     const storageState = process.env.PLAYWRIGHT_STORAGE_STATE
@@ -12,7 +13,7 @@ test.describe('account import settings', () => {
       'Provide an authenticated owner storage state for the import-settings journey.',
     )
 
-    const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:5173'
+    const baseUrl = baseURL!
     const context = await browser.newContext({ storageState: storageState! })
     const page = await context.newPage()
     await page.goto(baseUrl)
@@ -147,6 +148,7 @@ test.describe('account import settings', () => {
   })
 
   test('imports a balance column, shows it right-most, and preselects it next time', async ({
+    baseURL,
     browser,
   }) => {
     const storageState = process.env.PLAYWRIGHT_STORAGE_STATE
@@ -155,7 +157,7 @@ test.describe('account import settings', () => {
       'Provide an authenticated owner storage state for the import-settings journey.',
     )
 
-    const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:5173'
+    const baseUrl = baseURL!
     const context = await browser.newContext({ storageState: storageState! })
     const page = await context.newPage()
     try {
@@ -219,10 +221,11 @@ test.describe('account import settings', () => {
   })
 
   test('audits authenticated journeys across views, themes, and responsive sizes with mocked APIs', async ({
+    baseURL,
     page,
   }) => {
     test.setTimeout(120_000)
-    const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:5173'
+    const baseUrl = baseURL!
     const accountId = '550e8400-e29b-41d4-a716-446655440011'
     const account = {
       id: accountId,

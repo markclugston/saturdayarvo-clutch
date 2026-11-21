@@ -172,7 +172,7 @@ export const DeletionImpactSchema = z.object({
   itemCount: z.number().int().min(1),
 })
 
-export const RepaymentFrequencySchema = z.enum(['Weekly', 'Fortnightly', 'Monthly'])
+export const PaymentFrequencySchema = z.enum(['Weekly', 'Fortnightly', 'Monthly'])
 
 export const InterestRateChangeSchema = z.object({
   newInterestRate: z.number().min(0).max(100),
@@ -181,10 +181,10 @@ export const InterestRateChangeSchema = z.object({
 
 export const MortgageInputSchema = z.object({
   name: z.string().min(1).max(100),
-  startingBalance: z.number().positive().max(999999999999.99),
-  numberOfPeriods: z.number().int().min(1),
-  firstRepaymentDate: z.iso.date(),
-  repaymentFrequency: RepaymentFrequencySchema,
+  openingBalance: z.number().positive().max(999999999999.99),
+  duration: z.number().int().min(1),
+  drawdownDate: z.iso.date(),
+  paymentFrequency: PaymentFrequencySchema,
   interestRateChanges: z.array(InterestRateChangeSchema).max(60),
 })
 

@@ -1,4 +1,4 @@
-export type RepaymentFrequency = 'Weekly' | 'Fortnightly' | 'Monthly'
+export type PaymentFrequency = 'Weekly' | 'Fortnightly' | 'Monthly'
 
 const MONTH_NAMES = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
@@ -73,11 +73,11 @@ export function formatMessageDate(value: string): string {
 
 // Last repayment date as yyyy-MM-dd, or null when later than 31 Dec 9999 or the inputs are invalid.
 export function finalRepaymentDate(
-  firstRepaymentDate: string,
+  drawdownDate: string,
   periods: number,
-  frequency: RepaymentFrequency,
+  frequency: PaymentFrequency,
 ): string | null {
-  const first = parseDate(firstRepaymentDate)
+  const first = parseDate(drawdownDate)
   if (!first || !Number.isInteger(periods) || periods < 1) {
     return null
   }

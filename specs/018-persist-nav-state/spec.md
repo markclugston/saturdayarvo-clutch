@@ -11,7 +11,9 @@
 <!--
   Builds on 011-expand-navigation and 015-nav-shrinks-content. The hamburger already pins the
   navigation open or unpins it; this feature only makes that pinned/unpinned choice persist per user.
-  Hover/focus expansion, layout and accessibility behaviour are unchanged.
+  Hover expansion, layout and accessibility behaviour are unchanged.
+  Amended 2026-11-22: keyboard focus no longer expands the navigation (see 011 Amendment
+  2026-11-22); keyboard users expand it with the hamburger, which pins it.
 -->
 
 ## Clarifications
@@ -33,7 +35,7 @@ As a signed-in user, when I pin the navigation open (or unpin it) with the hambu
 **Acceptance Scenarios**:
 
 1. **Given** a signed-in user pins the navigation open, **When** they reload, sign out and back in, or return later, **Then** the navigation starts pinned open with the main section laid out as for an expanded navigation.
-2. **Given** a signed-in user unpins the navigation, **When** they return, **Then** the navigation starts compact and still expands on hover and keyboard focus.
+2. **Given** a signed-in user unpins the navigation, **When** they return, **Then** the navigation starts compact and still expands on hover (amended 2026-11-22).
 3. **Given** a user who has never changed the navigation state, **When** they sign in, **Then** the navigation starts compact (unpinned).
 4. **Given** the saved state is pinned, **When** the application first displays a signed-in screen, **Then** the navigation appears pinned without first showing compact and then jumping open.
 5. **Given** a user signs in, **When** sign-in completes, **Then** the session-loading screen stays up until their saved state has loaded (at most 2 seconds), and the first signed-in screen shows the navigation in that saved state.
@@ -60,7 +62,7 @@ As a signed-in user on more than one device, I get my saved navigation state on 
 - Saving fails (network or server error): the on-screen pin/unpin still takes effect for the current session, no blocking error interrupts the user, and the failure is reported through existing non-blocking feedback; the previously saved state applies next visit.
 - Loading the saved state fails or takes longer than 2 seconds: the session-loading screen gives way to the signed-in screen with the navigation compact and fully usable; a saved state that arrives later is not applied in that session.
 - Rapid repeated toggling: the last state the user chose is the one saved.
-- Hover expansion and keyboard-focus expansion are temporary and MUST NOT change the saved state.
+- Hover expansion is temporary, and keyboard focus does not expand the navigation; neither MUST change the saved state (amended 2026-11-22).
 - Narrow viewports (below 768 CSS pixels): a saved pinned state still applies, with the navigation overlaying content as defined in 015.
 - Sign-in and session-loading screens show no navigation, so the saved state is not applied there.
 - Sign-out followed by a different user signing in: the previous user's state is not shown.
@@ -73,20 +75,20 @@ As a signed-in user on more than one device, I get my saved navigation state on 
 - **FR-001**: When a signed-in user pins or unpins the navigation with the hamburger control, the system MUST save that pinned/unpinned state against that user.
 - **FR-002**: On sign-in and on every application open or refresh with an active session, the system MUST load the user's saved state and the first signed-in screen MUST show the navigation in that state; with no saved state, it MUST start unpinned (compact).
 - **FR-002a**: Until the saved state has loaded, the system MUST keep showing the existing session-loading screen, for at most 2 seconds measured from when the session has loaded; after 2 seconds or on load failure it MUST show the signed-in screen with the navigation compact and MUST NOT apply a late-arriving saved state in that session.
-- **FR-003**: Only explicit pin/unpin actions MUST change the saved state; hover and keyboard-focus expansion MUST NOT.
+- **FR-003**: Only explicit pin/unpin actions MUST change the saved state; hover expansion and keyboard focus MUST NOT (amended 2026-11-22).
 - **FR-004**: The saved state MUST belong to the signed-in user, apply on any device they use the next time the application opens or refreshes there, and MUST NOT be visible to or applied for any other user.
 - **FR-005**: When states are saved from more than one device, the most recently saved state MUST win.
 - **FR-006**: A failure to save the state MUST NOT block navigation or page use, and the chosen state MUST remain in effect for the current session, and the failure MUST be reported through the existing non-blocking feedback. Load failures are covered by FR-002a.
 - **FR-007**: Applying a saved pinned state on load MUST NOT cause a visible compact-to-expanded jump of the navigation or main section.
 - **FR-008**: The saved state MUST only accept pinned or unpinned; any other value MUST be rejected.
-- **FR-009**: Existing hamburger, hover, keyboard focus, layout (011, 015), destinations and accessibility behaviour MUST remain unchanged apart from the starting state.
+- **FR-009**: Existing hamburger, hover, keyboard operation, layout (011, 015 as amended 2026-11-22), destinations and accessibility behaviour MUST remain unchanged apart from the starting state. The one other change delivered alongside this feature, hover no longer expanding the navigation below 768px, belongs to 011 FR-014 (WCAG 2.2 SC 1.4.13) and is not a 018 requirement.
 - **FR-010**: The hamburger control MUST give visible feedback within 500 milliseconds of activation regardless of how long saving takes.
 
 ### Key Entities *(include if feature involves data)*
 
 - **Navigation preference**: A signed-in user's saved navigation state (pinned or unpinned) and when it was last saved; one per user.
 
-**Terminology**: *Pinned* (stored `Pinned`) means the hamburger holds the navigation open; this is the "expanded state" in the title. *Unpinned* or *compact* (stored `Unpinned`) means the navigation is closed. Temporary hover or focus expansion is neither state and is never saved.
+**Terminology**: *Pinned* (stored `Pinned`) means the hamburger holds the navigation open; this is the "expanded state" in the title. *Unpinned* or *compact* (stored `Unpinned`) means the navigation is closed. Temporary hover expansion is neither state and is never saved (amended 2026-11-22).
 
 ### Constitution Scope
 
@@ -103,7 +105,7 @@ Tick each that applies, so plan can pick requirement IDs without rereading the s
 - **SC-001**: In 100% of return visits (reload, sign out/in, new device), the navigation starts in the user's most recently saved state.
 - **SC-002**: Users who never toggled the navigation start compact in 100% of sign-ins.
 - **SC-003**: In 100% of checks, one user's saved state is never applied to another user.
-- **SC-004**: Hover and keyboard-focus expansion change the saved state in 0% of checks.
+- **SC-004**: Hover expansion and keyboard focus change the saved state in 0% of checks (amended 2026-11-22).
 - **SC-005**: When saving or loading fails, the navigation and page remain usable in 100% of checks, and the hamburger responds visibly within 500 milliseconds.
 - **SC-006**: After sign-in, the wait for the saved state never exceeds 2 seconds from when the session has loaded in 100% of checks, including when loading the saved state is slow or fails, so the signed-in screen follows without further waiting; the navigation never visibly jumps from compact to pinned.
 

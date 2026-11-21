@@ -71,16 +71,16 @@ describe('LoanDetailsForm (new mortgage)', () => {
     server = installFakeApi([])
   })
 
-  it('uses floating labels and native date inputs, and a Repayment Frequency select', () => {
+  it('uses floating labels and native date inputs, and a Payment Frequency select', () => {
     renderForm()
 
-    for (const label of ['Name', 'Starting Balance', 'Number of Periods', 'First Repayment Date', 'Repayment Frequency']) {
+    for (const label of ['Name', 'Opening Balance', 'Drawdown Date', 'Duration', 'Payment Frequency']) {
       expect(screen.getByLabelText(label)).toBeInTheDocument()
     }
-    expect(screen.getByLabelText('First Repayment Date')).toHaveAttribute('type', 'date')
-    expect(within(screen.getByLabelText('Repayment Frequency')).getAllByRole('option').map((option) => option.textContent))
+    expect(screen.getByLabelText('Drawdown Date')).toHaveAttribute('type', 'date')
+    expect(within(screen.getByLabelText('Payment Frequency')).getAllByRole('option').map((option) => option.textContent))
       .toEqual(['Choose…', 'Weekly', 'Fortnightly', 'Monthly'])
-    expect(screen.getByRole('heading', { name: 'Loan Details' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Details' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Delete/ })).not.toBeInTheDocument()
   })
 
@@ -111,13 +111,13 @@ describe('LoanDetailsForm (new mortgage)', () => {
     const cases: Case[] = [
       ['name blank', { name: ' ' }, 'Name', 'Enter a name'],
       ['name too long', { name: 'a'.repeat(101) }, 'Name', 'Enter a name of up to 100 characters'],
-      ['balance zero', { balance: '0' }, 'Starting Balance', 'Enter a starting balance greater than 0'],
-      ['balance too large', { balance: '1000000000000' }, 'Starting Balance', 'Enter a starting balance up to 999,999,999,999.99'],
-      ['periods fractional', { periods: '1.5' }, 'Number of Periods', 'Enter a whole number of 1 or more'],
-      ['periods zero', { periods: '0' }, 'Number of Periods', 'Enter a whole number of 1 or more'],
-      ['periods negative', { periods: '-1' }, 'Number of Periods', 'Enter a whole number of 1 or more'],
-      ['periods past 9999', { periods: '3000000000' }, 'Number of Periods', 'The final repayment date would be later than 31 Dec 9999'],
-      ['frequency not chosen', { frequency: '' }, 'Repayment Frequency', 'Choose Weekly, Fortnightly or Monthly'],
+      ['balance zero', { balance: '0' }, 'Opening Balance', 'Enter a opening balance greater than 0'],
+      ['balance too large', { balance: '1000000000000' }, 'Opening Balance', 'Enter a opening balance up to 999,999,999,999.99'],
+      ['periods fractional', { periods: '1.5' }, 'Duration', 'Enter a whole number of 1 or more'],
+      ['periods zero', { periods: '0' }, 'Duration', 'Enter a whole number of 1 or more'],
+      ['periods negative', { periods: '-1' }, 'Duration', 'Enter a whole number of 1 or more'],
+      ['periods past 9999', { periods: '3000000000' }, 'Duration', 'The final repayment date would be later than 31 Dec 9999'],
+      ['frequency not chosen', { frequency: '' }, 'Payment Frequency', 'Choose Weekly, Fortnightly or Monthly'],
     ]
 
     it.each(cases)('%s', async (_label, patch, field, message) => {
@@ -132,20 +132,20 @@ describe('LoanDetailsForm (new mortgage)', () => {
       expect(server.requests.filter((request) => request.method === 'POST')).toHaveLength(0)
     })
 
-    it('flags a missing or future First Repayment Date before any request is sent', async () => {
+    it('flags a missing or future Drawdown Date before any request is sent', async () => {
       const user = userEvent.setup()
       renderForm()
       await fillForm(user, validValues)
-      setDate('First Repayment Date', '')
+      setDate('Drawdown Date', '')
       await submit(user)
-      expect(screen.getByLabelText('First Repayment Date')).toHaveAccessibleDescription('Enter a valid date')
+      expect(screen.getByLabelText('Drawdown Date')).toHaveAccessibleDescription('Enter a valid date')
 
       const future = new Date()
       future.setDate(future.getDate() + 2)
       const iso = `${future.getFullYear()}-${String(future.getMonth() + 1).padStart(2, '0')}-${String(future.getDate()).padStart(2, '0')}`
-      setDate('First Repayment Date', iso)
+      setDate('Drawdown Date', iso)
       await submit(user)
-      expect(screen.getByLabelText('First Repayment Date')).toHaveAccessibleDescription('Enter a date that is not in the future')
+      expect(screen.getByLabelText('Drawdown Date')).toHaveAccessibleDescription('Enter a date that is not in the future')
       expect(server.requests.filter((request) => request.method === 'POST')).toHaveLength(0)
     })
 
@@ -183,7 +183,7 @@ describe('LoanDetailsForm (new mortgage)', () => {
       renderForm()
       server.failNext('POST', problem(400, {
         errors: {
-          startingBalance: ['Enter a starting balance greater than 0'],
+          openingBalance: ['Enter a opening balance greater than 0'],
           mortgages: ['You can save up to 20 mortgages'],
           'interestRateChanges[0].effectiveDate': ['Enter a valid date'],
         },
@@ -191,7 +191,7 @@ describe('LoanDetailsForm (new mortgage)', () => {
       await fillForm(user, validValues)
       await submit(user)
 
-      expect(await screen.findByLabelText('Starting Balance')).toHaveAccessibleDescription('Enter a starting balance greater than 0')
+      expect(await screen.findByLabelText('Opening Balance')).toHaveAccessibleDescription('Enter a opening balance greater than 0')
       const summary = screen.getByRole('alert')
       expect(summary).toHaveTextContent('You can save up to 20 mortgages')
       expect(summary).toHaveTextContent('Correct the highlighted fields and try again.')
@@ -220,16 +220,16 @@ describe('LoanDetailsForm (new mortgage)', () => {
       const user = userEvent.setup()
       renderForm()
       server.failNext('POST', problem(400, {
-        errors: { interestRateChanges: ['Add the opening interest rate, effective on the first repayment date'] },
+        errors: { interestRateChanges: ['Add the opening interest rate, effective on the drawdown date'] },
       }))
       await fillForm(user, validValues)
       await submit(user)
 
       const summary = await screen.findByRole('alert')
-      expect(summary).toHaveTextContent('Add the opening interest rate, effective on the first repayment date')
+      expect(summary).toHaveTextContent('Add the opening interest rate, effective on the drawdown date')
       expect(summary).not.toHaveTextContent('Correct')
       const dialog = await openDialog(user)
-      expect(within(dialog).getByRole('alert')).toHaveTextContent('Add the opening interest rate, effective on the first repayment date')
+      expect(within(dialog).getByRole('alert')).toHaveTextContent('Add the opening interest rate, effective on the drawdown date')
     })
     it.each([
       ['500', problem(500)],
@@ -284,7 +284,7 @@ describe('LoanDetailsForm (editing)', () => {
     renderForm({ mortgage, onSaved })
 
     expect(screen.getByLabelText('Name')).toHaveValue('Car')
-    expect(screen.getByLabelText('Starting Balance')).toHaveValue('$500,000.00')
+    expect(screen.getByLabelText('Opening Balance')).toHaveValue('$500,000.00')
     await user.type(screen.getByLabelText('Name'), ' loan')
     await submit(user)
 
@@ -382,7 +382,7 @@ describe('LoanDetailsForm (editing)', () => {
       expect(currentRate()).toBe('6.00%')
     })
 
-    it.each([1, 60])('shows no rate rows in Loan Details with %i change(s)', (count) => {
+    it.each([1, 60])('shows no rate rows in Details with %i change(s)', (count) => {
       const changes = Array.from({ length: count }, (_, index) => ({
         newInterestRate: 5,
         effectiveDate: `${2000 + Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, '0')}-01`,
@@ -457,20 +457,20 @@ describe('LoanDetailsForm (editing)', () => {
 
       expect(server.requests.filter((request) => request.method === 'PUT')).toHaveLength(0)
       const summary = screen.getByRole('alert')
-      expect(summary).toHaveTextContent('Add the opening interest rate, effective on the first repayment date')
+      expect(summary).toHaveTextContent('Add the opening interest rate, effective on the drawdown date')
       expect(summary).not.toHaveTextContent('Correct')
       const valueGroup = screen.getByRole('button', { name: 'Change Interest Rate' }).parentElement as HTMLElement
       expect(valueGroup).not.toHaveTextContent('Add the opening')
       dialog = await openDialog(user)
-      expect(within(dialog).getByRole('alert')).toHaveTextContent('Add the opening interest rate, effective on the first repayment date')
+      expect(within(dialog).getByRole('alert')).toHaveTextContent('Add the opening interest rate, effective on the drawdown date')
     })
 
-    it('moving First Repayment Date after the rates refuses Save and flags the out-of-range row in the dialog', async () => {
+    it('moving Drawdown Date after the rates refuses Save and flags the out-of-range row in the dialog', async () => {
       const mortgage = makeMortgage({ interestRateChanges: rates.slice(0, 2) })
       const server = installFakeApi([mortgage])
       const user = userEvent.setup()
       renderForm({ mortgage })
-      setDate('First Repayment Date', '2000-06-01')
+      setDate('Drawdown Date', '2000-06-01')
 
       await submit(user)
 
@@ -487,7 +487,7 @@ describe('LoanDetailsForm (editing)', () => {
       installFakeApi([mortgage])
       const user = userEvent.setup()
       renderForm({ mortgage })
-      setDate('First Repayment Date', '2000-06-01')
+      setDate('Drawdown Date', '2000-06-01')
       await user.clear(screen.getByLabelText('Name'))
 
       await submit(user)

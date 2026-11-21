@@ -18,7 +18,7 @@ fetching) follows the code and is not repeated.
 ## R3 Schedule size and windowing
 
 - **Decision**: Fixed-row-height windowed rendering inside the group's scroll container (in-house, ~40 lines), `role="table"` with `aria-rowcount` = N + 2 (header included) and `aria-rowindex` on rendered rows; sticky header.
-- **Rationale**: Number of periods has no fixed limit; weekly from 1 Jan 0001 reaches ~522,000 rows, which is unusable as plain DOM.
+- **Rationale**: Duration has no fixed limit; weekly from 1 Jan 0001 reaches ~522,000 rows, which is unusable as plain DOM.
 - **Alternatives**: Render all rows — freezes the browser; `@tanstack/react-virtual` — new dependency for a simple fixed-height case.
 
 ## R4 Concurrency version
@@ -29,7 +29,7 @@ fetching) follows the code and is not repeated.
 
 ## R5 "Not later than today" on the server
 
-- **Decision**: Screen checks against the user's local date. Server rejects a First repayment date after `DateOnly.FromDateTime(timeProvider.GetUtcNow().AddHours(14).UtcDateTime)`, the latest date anywhere in the world (UTC+14), using an injected `TimeProvider`. (`UTC today + 1 day` is wrong: before 10:00 UTC it accepts a date that is still in the future everywhere.)
+- **Decision**: Screen checks against the user's local date. Server rejects a Drawdown date after `DateOnly.FromDateTime(timeProvider.GetUtcNow().AddHours(14).UtcDateTime)`, the latest date anywhere in the world (UTC+14), using an injected `TimeProvider`. (`UTC today + 1 day` is wrong: before 10:00 UTC it accepts a date that is still in the future everywhere.)
 - **Rationale**: The server cannot trust a client-sent "today"; the bound never rejects a valid local date.
 - **Alternatives**: Client-supplied time zone — untrusted input that still needs a bound.
 
@@ -41,13 +41,13 @@ fetching) follows the code and is not repeated.
 
 ## R7 Error shape that separates field errors from clashes
 
-- **Decision**: Validation (including duplicate name and limits) → 400 ProblemDetails with `errors` keyed by field path (`name`, `startingBalance`, `numberOfPeriods`, `firstRepaymentDate`, `repaymentFrequency`, `interestRateChanges`, `interestRateChanges[i].newInterestRate`, `interestRateChanges[i].effectiveDate`, `mortgages` for the 20-limit). 409 is reserved for version clashes.
+- **Decision**: Validation (including duplicate name and limits) → 400 ProblemDetails with `errors` keyed by field path (`name`, `openingBalance`, `duration`, `drawdownDate`, `paymentFrequency`, `interestRateChanges`, `interestRateChanges[i].newInterestRate`, `interestRateChanges[i].effectiveDate`, `mortgages` for the 20-limit). 409 is reserved for version clashes.
 - **Rationale**: The UI must tell "show next to field" (FR-008) from "changed elsewhere, Reload" (FR-021). Categories uses 409 for duplicates; here 409 already means a clash.
 - **Alternatives**: 409 for both with a discriminator — harder to type on the client.
 
 ## R8 Numeric storage
 
-- **Decision**: `StartingBalance` `decimal(19,2)`; `NewInterestRate` `decimal(5,2)`; `NumberOfPeriods` `int`. Requests carry `numberOfPeriods` as a JSON number and the validator rejects values above the date bound (always far below `int.MaxValue`). Starting balance is capped at 999,999,999,999.99 (spec FR-007), well below 2⁵³ cents, so JSON and JS numbers keep every cent and values round-trip unchanged (SC-002).
+- **Decision**: `OpeningBalance` `decimal(19,2)`; `NewInterestRate` `decimal(5,2)`; `Duration` `int`. Requests carry `duration` as a JSON number and the validator rejects values above the date bound (always far below `int.MaxValue`). Opening balance is capped at 999,999,999,999.99 (spec FR-007), well below 2⁵³ cents, so JSON and JS numbers keep every cent and values round-trip unchanged (SC-002).
 - **Rationale**: "No upper limit" is bounded only by what can be stored; 19 digits matches existing money columns' width.
 - **Alternatives**: `decimal(38,2)` — no realistic benefit.
 

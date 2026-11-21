@@ -286,8 +286,11 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<DateOnly>("FirstRepaymentDate")
+                    b.Property<DateOnly>("DrawdownDate")
                         .HasColumnType("date");
+
+                    b.Property<int>("Duration")
+                        .HasColumnType("int");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -295,22 +298,19 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(100)")
                         .UseCollation("Latin1_General_100_CI_AS");
 
-                    b.Property<int>("NumberOfPeriods")
-                        .HasColumnType("int");
+                    b.Property<decimal>("OpeningBalance")
+                        .HasColumnType("decimal(19,2)");
 
                     b.Property<string>("OwnerUserId")
                         .IsRequired()
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<string>("RepaymentFrequency")
+                    b.Property<string>("PaymentFrequency")
                         .IsRequired()
                         .HasMaxLength(20)
                         .IsUnicode(false)
                         .HasColumnType("varchar(20)");
-
-                    b.Property<decimal>("StartingBalance")
-                        .HasColumnType("decimal(19,2)");
 
                     b.Property<int>("Version")
                         .IsConcurrencyToken()

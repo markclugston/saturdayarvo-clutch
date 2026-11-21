@@ -9,10 +9,10 @@
 
 ## Expansion and presentation
 
-- Hovering with a mouse or focusing a destination by keyboard expands the pane. It collapses when neither hover nor keyboard focus remains. There is no hamburger button.
-- Escape dismisses the expanded pane without moving the pointer or focus; a new hover or keyboard focus interaction can expand it again.
+- At 768 CSS pixels and wider, hovering with a mouse expands the pane; it collapses when the pointer leaves unless pinned. Below 768px hover does not expand it, because the expanded pane covers page content there and content that appears on hover must be dismissible (WCAG 2.2 SC 1.4.13). A hamburger button (`aria-label="Toggle navigation"`, `aria-expanded`) at the top of the pane pins it open at any width until activated again, by mouse or keyboard. Keyboard focus on a destination does not expand the pane. (Amended 2026-11-22; see spec Amendment.)
+- There is no Escape dismissal: below 768px only the hamburger opens the pane over the page, and activating it again closes it, so nothing opens on hover or focus that cannot be closed.
 - Compact state shows the destination icons but no visible destination text; expanded state shows the same icons with their labels. Buttons retain their accessible names in both states; icons are decorative.
-- The pane begins compact and expands while hovered or keyboard-focused. Touch users tap the compact destination icons directly. See [data-model.md](../data-model.md).
+- The pane begins compact, or pinned when the user's saved 018 preference is pinned, and expands while hovered or pinned (amended 2026-11-22). Touch users tap the compact destination icons directly. See [data-model.md](../data-model.md).
 - Expanded navigation overlays page content only where they share space, including at a 320 CSS pixel viewport, without resizing or moving it. Do not force overlap by repositioning content or widening the pane. Both destinations and page content remain reachable and usable.
 - Keyboard-focused page controls remain visible above the overlay, including when a pointer keeps the pane expanded.
 

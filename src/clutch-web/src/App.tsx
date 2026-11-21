@@ -23,6 +23,7 @@ import { ToastProvider, useToast } from '@/components/ui/toast'
 import { UnsavedChangesProvider, useUnsavedChanges } from '@/components/unsaved-changes/UnsavedChangesProvider'
 import { ErrorMessage } from '@/components/ui/error-message'
 import { SideNav, SideNavItem } from '@/components/ui/side-nav'
+import { useMediaQuery } from '@/lib/useMediaQuery'
 import { cn } from '@/lib/utils'
 
 export default function App() {
@@ -293,10 +294,13 @@ function SignedInShell({
   )
 }
 
+// 768px is the breakpoint at which the expanded navigation starts shrinking the page (015).
+const HOVER_EXPANDS_QUERY = '(min-width: 768px)'
+
 type NavigationExpansion = ReturnType<typeof useNavigationExpansion>
 
 /**
- * The navigation expands while a mouse hovers it. Clicking the hamburger pins it open until
+ * The navigation expands while a mouse hovers it at 768px and wider. Clicking the hamburger pins it open until
  * the hamburger is clicked again; unpinning while the pointer is still over the navigation
  * collapses it until the pointer leaves and re-enters. Only the pinned choice is saved, per user;
  * `initialPinned` is the saved value, applied before the first render.
@@ -305,7 +309,11 @@ function useNavigationExpansion(initialPinned: boolean) {
   const [pinned, setPinned] = useState(initialPinned)
   const [hovered, setHovered] = useState(false)
   const [hoverSuppressed, setHoverSuppressed] = useState(false)
-  const expanded = pinned || (hovered && !hoverSuppressed)
+  // Below 768px the expanded navigation covers the page, so hover must not open it: content that
+  // appears on hover and hides other content has to be dismissible (WCAG 2.2 SC 1.4.13), and the
+  // hamburger is the deliberate, reversible way to open it there.
+  const hoverExpands = useMediaQuery(HOVER_EXPANDS_QUERY, true)
+  const expanded = pinned || (hoverExpands && hovered && !hoverSuppressed)
 
   return {
     expanded,

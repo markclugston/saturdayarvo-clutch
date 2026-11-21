@@ -99,7 +99,8 @@ for (const restored of [false, true]) {
         await owner.setOffline(false)
       }
       const modal = affected.getByRole('dialog', { name: 'Import Ended', exact: true })
-      await expect(modal).toBeVisible({ timeout: 5000 })
+      // The foreground case enforces the 5 s notice limit below; a reconnect depends on the network recovering.
+      await expect(modal).toBeVisible({ timeout: restored ? 15_000 : 5000 })
       if (!restored) expect(Date.now() - endedAt).toBeLessThanOrEqual(5000)
       await expect(modal).toContainText(email)
       await expect(modal).toContainText('another session')

@@ -15,11 +15,11 @@ public sealed class MortgageAuditTests(SqlServerFixture fixture)
         var tag = Guid.NewGuid().ToString("N")[..8];
         var original = $"Audit {tag}";
         var renamed = $"Renamed {tag}";
-        var created = await CreateAsync(client, Body(original, startingBalance: 123456.78m));
+        var created = await CreateAsync(client, Body(original, openingBalance: 123456.78m));
 
-        using var unchanged = await SendAsync(client, HttpMethod.Put, $"/api/mortgages/{created.Id}", Body(original, startingBalance: 123456.78m, version: 1));
+        using var unchanged = await SendAsync(client, HttpMethod.Put, $"/api/mortgages/{created.Id}", Body(original, openingBalance: 123456.78m, version: 1));
         Assert.Equal(HttpStatusCode.OK, unchanged.StatusCode);
-        using var rename = await SendAsync(client, HttpMethod.Put, $"/api/mortgages/{created.Id}", Body(renamed, startingBalance: 123456.78m, version: 2));
+        using var rename = await SendAsync(client, HttpMethod.Put, $"/api/mortgages/{created.Id}", Body(renamed, openingBalance: 123456.78m, version: 2));
         Assert.Equal(HttpStatusCode.OK, rename.StatusCode);
         using var delete = await SendAsync(client, HttpMethod.Delete, $"/api/mortgages/{created.Id}?version=3", null);
         Assert.Equal(HttpStatusCode.NoContent, delete.StatusCode);
@@ -49,7 +49,7 @@ public sealed class MortgageAuditTests(SqlServerFixture fixture)
         using var client = await SignedInClientAsync(fixture.Factory);
         var tag = Guid.NewGuid().ToString("N")[..8];
         var created = await CreateAsync(client, Body($"Quiet {tag}"));
-        using var invalid = await SendAsync(client, HttpMethod.Put, $"/api/mortgages/{created.Id}", Body($"Quiet {tag}", numberOfPeriods: 0, version: 1));
+        using var invalid = await SendAsync(client, HttpMethod.Put, $"/api/mortgages/{created.Id}", Body($"Quiet {tag}", duration: 0, version: 1));
         using var stale = await SendAsync(client, HttpMethod.Put, $"/api/mortgages/{created.Id}", Body($"Quiet {tag}", version: 9));
 
         Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);

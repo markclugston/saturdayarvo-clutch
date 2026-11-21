@@ -23,10 +23,10 @@ public sealed class MortgageLoggingTests(SqlServerFixture fixture)
         // Distinctive numbers so any leak is unmistakable.
         const decimal balance = 7654321.09m;
         const decimal rate = 3.14m;
-        var created = await CreateAsync(client, Body("Logged", startingBalance: balance, rates: new[] { new { newInterestRate = rate, effectiveDate = "2000-01-01" } }));
-        using var invalid = await SendAsync(client, HttpMethod.Post, "/api/mortgages", Body("Logged", startingBalance: balance));
-        using var update = await SendAsync(client, HttpMethod.Put, $"/api/mortgages/{created.Id}", Body("Logged", startingBalance: balance, version: 1, rates: new[] { new { newInterestRate = rate, effectiveDate = "2000-01-01" } }));
-        using var stale = await SendAsync(client, HttpMethod.Put, $"/api/mortgages/{created.Id}", Body("Logged", startingBalance: balance, version: 1));
+        var created = await CreateAsync(client, Body("Logged", openingBalance: balance, rates: new[] { new { newInterestRate = rate, effectiveDate = "2000-01-01" } }));
+        using var invalid = await SendAsync(client, HttpMethod.Post, "/api/mortgages", Body("Logged", openingBalance: balance));
+        using var update = await SendAsync(client, HttpMethod.Put, $"/api/mortgages/{created.Id}", Body("Logged", openingBalance: balance, version: 1, rates: new[] { new { newInterestRate = rate, effectiveDate = "2000-01-01" } }));
+        using var stale = await SendAsync(client, HttpMethod.Put, $"/api/mortgages/{created.Id}", Body("Logged", openingBalance: balance, version: 1));
         using var delete = await SendAsync(client, HttpMethod.Delete, $"/api/mortgages/{created.Id}?version=2", null);
 
         Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);

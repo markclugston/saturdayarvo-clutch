@@ -18,13 +18,13 @@ public sealed class Mortgage
 
     public string Name { get; private set; } = string.Empty;
 
-    public decimal StartingBalance { get; private set; }
+    public decimal OpeningBalance { get; private set; }
 
-    public int NumberOfPeriods { get; private set; }
+    public int Duration { get; private set; }
 
-    public DateOnly FirstRepaymentDate { get; private set; }
+    public DateOnly DrawdownDate { get; private set; }
 
-    public RepaymentFrequency RepaymentFrequency { get; private set; }
+    public PaymentFrequency PaymentFrequency { get; private set; }
 
     public DateTimeOffset CreatedAtUtc { get; private set; }
 
@@ -36,10 +36,10 @@ public sealed class Mortgage
     public static Mortgage Create(
         string ownerUserId,
         string name,
-        decimal startingBalance,
-        int numberOfPeriods,
-        DateOnly firstRepaymentDate,
-        RepaymentFrequency repaymentFrequency,
+        decimal openingBalance,
+        int duration,
+        DateOnly drawdownDate,
+        PaymentFrequency paymentFrequency,
         IReadOnlyList<RateChangeValue> rateChanges,
         DateTimeOffset createdAtUtc)
     {
@@ -51,20 +51,20 @@ public sealed class Mortgage
             Version = 1,
         };
         mortgage.Apply(
-            name, startingBalance, numberOfPeriods, firstRepaymentDate, repaymentFrequency, rateChanges);
+            name, openingBalance, duration, drawdownDate, paymentFrequency, rateChanges);
         return mortgage;
     }
 
     // Replaces every value and the whole rate-change set; always moves the version.
     public void Update(
         string name,
-        decimal startingBalance,
-        int numberOfPeriods,
-        DateOnly firstRepaymentDate,
-        RepaymentFrequency repaymentFrequency,
+        decimal openingBalance,
+        int duration,
+        DateOnly drawdownDate,
+        PaymentFrequency paymentFrequency,
         IReadOnlyList<RateChangeValue> rateChanges)
     {
-        Apply(name, startingBalance, numberOfPeriods, firstRepaymentDate, repaymentFrequency, rateChanges);
+        Apply(name, openingBalance, duration, drawdownDate, paymentFrequency, rateChanges);
         Version++;
     }
 
@@ -78,17 +78,17 @@ public sealed class Mortgage
 
     private void Apply(
         string name,
-        decimal startingBalance,
-        int numberOfPeriods,
-        DateOnly firstRepaymentDate,
-        RepaymentFrequency repaymentFrequency,
+        decimal openingBalance,
+        int duration,
+        DateOnly drawdownDate,
+        PaymentFrequency paymentFrequency,
         IReadOnlyList<RateChangeValue> rateChanges)
     {
         Name = name.Trim();
-        StartingBalance = startingBalance;
-        NumberOfPeriods = numberOfPeriods;
-        FirstRepaymentDate = firstRepaymentDate;
-        RepaymentFrequency = repaymentFrequency;
+        OpeningBalance = openingBalance;
+        Duration = duration;
+        DrawdownDate = drawdownDate;
+        PaymentFrequency = paymentFrequency;
         ReplaceRateChanges(rateChanges);
     }
 }

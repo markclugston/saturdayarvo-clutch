@@ -107,20 +107,20 @@ public static class MortgageEndpoints
     // from the validator rather than a generic JSON error.
     private sealed record MortgageRequest(
         string? Name,
-        JsonElement? StartingBalance,
-        JsonElement? NumberOfPeriods,
-        string? FirstRepaymentDate,
-        string? RepaymentFrequency,
+        JsonElement? OpeningBalance,
+        JsonElement? Duration,
+        string? DrawdownDate,
+        string? PaymentFrequency,
         List<RateChangeRequest?>? InterestRateChanges,
         int? Version)
     {
         public MortgageCandidate ToCandidate() =>
             new(
                 Name,
-                ToDecimal(StartingBalance),
-                ToDecimal(NumberOfPeriods),
-                FirstRepaymentDate,
-                RepaymentFrequency,
+                ToDecimal(OpeningBalance),
+                ToDecimal(Duration),
+                DrawdownDate,
+                PaymentFrequency,
                 (InterestRateChanges ?? [])
                     .Select(change => change is null
                         ? new RateChangeCandidate(null, null)
@@ -157,10 +157,10 @@ public static class MortgageEndpoints
     private sealed record MortgageResponse(
         Guid Id,
         string Name,
-        decimal StartingBalance,
-        int NumberOfPeriods,
-        string FirstRepaymentDate,
-        string RepaymentFrequency,
+        decimal OpeningBalance,
+        int Duration,
+        string DrawdownDate,
+        string PaymentFrequency,
         List<InterestRateChangeResponse> InterestRateChanges,
         int Version)
     {
@@ -168,10 +168,10 @@ public static class MortgageEndpoints
             new(
                 mortgage.Id,
                 mortgage.Name,
-                mortgage.StartingBalance,
-                mortgage.NumberOfPeriods,
-                FormatDate(mortgage.FirstRepaymentDate),
-                mortgage.RepaymentFrequency.ToString(),
+                mortgage.OpeningBalance,
+                mortgage.Duration,
+                FormatDate(mortgage.DrawdownDate),
+                mortgage.PaymentFrequency.ToString(),
                 mortgage.InterestRateChanges
                     .OrderBy(change => change.EffectiveDate)
                     .Select(change => new InterestRateChangeResponse(

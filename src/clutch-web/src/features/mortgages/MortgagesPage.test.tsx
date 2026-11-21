@@ -40,7 +40,7 @@ describe('MortgagesPage', () => {
       expect(status).toHaveTextContent('Loading...')
       expect(status.querySelector('svg')).not.toBeNull()
       await act(async () => release())
-      expect(await screen.findByRole('heading', { name: 'Loan Details' })).toBeInTheDocument()
+      expect(await screen.findByRole('heading', { name: 'Details' })).toBeInTheDocument()
     })
 
     it('shows a generic alert with Retry and no form when loading fails, and Retry shows Loading... at once', async () => {
@@ -52,14 +52,14 @@ describe('MortgagesPage', () => {
       const alert = await screen.findByRole('alert')
       expect(alert).toHaveTextContent('We couldn’t load your mortgages. Please try again.')
       expect(alert).not.toHaveTextContent('internal details')
-      expect(screen.queryByRole('heading', { name: 'Loan Details' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Details' })).not.toBeInTheDocument()
 
       const release = server.hold('GET')
       await user.click(screen.getByRole('button', { name: 'Retry' }))
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
       expect(screen.getByRole('status')).toHaveTextContent('Loading...')
       await act(async () => release())
-      expect(await screen.findByRole('heading', { name: 'Loan Details' })).toBeInTheDocument()
+      expect(await screen.findByRole('heading', { name: 'Details' })).toBeInTheDocument()
     })
 
     it('returns to the sign-in screen without an alert when loading returns 401', async () => {
@@ -72,12 +72,12 @@ describe('MortgagesPage', () => {
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     })
 
-    it('lays out the tab strip, Loan Details, then the Burndown and Schedule groups', async () => {
+    it('lays out the tab strip, Details, then the Burndown and Schedule groups', async () => {
       server = installFakeApi([makeMortgage({ name: 'Home' })])
       renderWithProviders(<MortgagesPage />)
 
       const strip = await screen.findByRole('navigation', { name: 'Mortgages' })
-      const details = screen.getByRole('heading', { name: 'Loan Details' })
+      const details = screen.getByRole('heading', { name: 'Details' })
       const burndown = screen.getByRole('heading', { name: 'Mortgage Burndown' })
       const schedule = screen.getByRole('heading', { name: 'Amortization Schedule' })
       const follows = (a: Node, b: Node) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
@@ -92,7 +92,7 @@ describe('MortgagesPage', () => {
       server = installFakeApi([])
       renderWithProviders(<MortgagesPage />)
 
-      await screen.findByRole('heading', { name: 'Loan Details' })
+      await screen.findByRole('heading', { name: 'Details' })
       const burndown = screen.getByRole('heading', { name: 'Mortgage Burndown' }).closest('section')
       const schedule = screen.getByRole('heading', { name: 'Amortization Schedule' }).closest('section')
       expect(within(burndown as HTMLElement).getByText(PLEASE_ENTER)).toBeInTheDocument()
@@ -118,7 +118,7 @@ describe('MortgagesPage', () => {
       server = installFakeApi([])
       const user = userEvent.setup()
       renderWithProviders(<MortgagesPage />)
-      await screen.findByRole('heading', { name: 'Loan Details' })
+      await screen.findByRole('heading', { name: 'Details' })
 
       await fillForm(user, {
         ...validValues,
@@ -132,10 +132,10 @@ describe('MortgagesPage', () => {
       const post = server.requests.find((request) => request.method === 'POST')
       expect(post?.body).toMatchObject({
         name: 'Home loan',
-        startingBalance: 500000,
-        numberOfPeriods: 360,
-        firstRepaymentDate: '2000-01-01',
-        repaymentFrequency: 'Monthly',
+        openingBalance: 500000,
+        duration: 360,
+        drawdownDate: '2000-01-01',
+        paymentFrequency: 'Monthly',
         interestRateChanges: [
           { newInterestRate: 5.25, effectiveDate: '2000-01-01' },
           { newInterestRate: 6, effectiveDate: '2000-06-01' },
@@ -188,16 +188,16 @@ describe('MortgagesPage', () => {
   describe('switching and editing', () => {
     it('shows the other mortgage when a tab is chosen and updates the label on rename', async () => {
       server = installFakeApi([
-        makeMortgage({ name: 'Home', startingBalance: 1000 }),
-        makeMortgage({ name: 'Car', startingBalance: 2000 }),
+        makeMortgage({ name: 'Home', openingBalance: 1000 }),
+        makeMortgage({ name: 'Car', openingBalance: 2000 }),
       ])
       const user = userEvent.setup()
       renderWithProviders(<MortgagesPage />)
       await screen.findByRole('button', { name: 'Home' })
-      expect(screen.getByLabelText('Starting Balance')).toHaveValue('$1,000.00')
+      expect(screen.getByLabelText('Opening Balance')).toHaveValue('$1,000.00')
 
       await user.click(screen.getByRole('button', { name: 'Car' }))
-      expect(screen.getByLabelText('Starting Balance')).toHaveValue('$2,000.00')
+      expect(screen.getByLabelText('Opening Balance')).toHaveValue('$2,000.00')
 
       await user.clear(screen.getByLabelText('Name'))
       await user.type(screen.getByLabelText('Name'), 'Car loan')
@@ -361,7 +361,7 @@ describe('MortgagesPage', () => {
 
       expect(await screen.findByText('The latest version could not be loaded. Please try again.')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Reload' })).toBeEnabled()
-      expect(screen.getByRole('heading', { name: 'Loan Details' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Details' })).toBeInTheDocument()
       expect(screen.queryByText(/couldn.t load your mortgages/)).not.toBeInTheDocument()
     })
 
@@ -473,8 +473,8 @@ describe('MortgagesPage', () => {
   it('setDate helper is exercised by the form (sanity)', async () => {
     server = installFakeApi([])
     renderWithProviders(<MortgagesPage />)
-    await screen.findByRole('heading', { name: 'Loan Details' })
-    setDate('First Repayment Date', '2000-01-01')
-    expect(screen.getByLabelText('First Repayment Date')).toHaveValue('2000-01-01')
+    await screen.findByRole('heading', { name: 'Details' })
+    setDate('Drawdown Date', '2000-01-01')
+    expect(screen.getByLabelText('Drawdown Date')).toHaveValue('2000-01-01')
   })
 })

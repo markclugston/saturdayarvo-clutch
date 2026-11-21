@@ -6,18 +6,18 @@ public sealed record RateChangeCandidate(decimal? NewInterestRate, string? Effec
 
 public sealed record MortgageCandidate(
     string? Name,
-    decimal? StartingBalance,
-    decimal? NumberOfPeriods,
-    string? FirstRepaymentDate,
-    string? RepaymentFrequency,
+    decimal? OpeningBalance,
+    decimal? Duration,
+    string? DrawdownDate,
+    string? PaymentFrequency,
     IReadOnlyList<RateChangeCandidate> InterestRateChanges);
 
 public sealed record ValidMortgage(
     string Name,
-    decimal StartingBalance,
-    int NumberOfPeriods,
-    DateOnly FirstRepaymentDate,
-    RepaymentFrequency RepaymentFrequency,
+    decimal OpeningBalance,
+    int Duration,
+    DateOnly DrawdownDate,
+    PaymentFrequency PaymentFrequency,
     IReadOnlyList<RateChangeValue> RateChanges);
 
 // One message per field key: the first applicable row of the contract's message table.
@@ -27,17 +27,17 @@ public sealed record MortgageValidationResult(
 
 public static class MortgageValidator
 {
-    public const decimal MaximumStartingBalance = 999_999_999_999.99m;
+    public const decimal MaximumOpeningBalance = 999_999_999_999.99m;
     private const string DateFormat = "yyyy-MM-dd";
 
     public static MortgageValidationResult Validate(MortgageCandidate candidate, TimeProvider timeProvider)
     {
         var errors = new Dictionary<string, string>(StringComparer.Ordinal);
         var name = ValidateName(candidate.Name, errors);
-        var balance = ValidateStartingBalance(candidate.StartingBalance, errors);
-        var firstDate = ValidateFirstRepaymentDate(candidate.FirstRepaymentDate, timeProvider, errors);
-        var frequency = ValidateFrequency(candidate.RepaymentFrequency, errors);
-        var periods = ValidatePeriods(candidate.NumberOfPeriods, firstDate, frequency, errors);
+        var balance = ValidateOpeningBalance(candidate.OpeningBalance, errors);
+        var firstDate = ValidateDrawdownDate(candidate.DrawdownDate, timeProvider, errors);
+        var frequency = ValidateFrequency(candidate.PaymentFrequency, errors);
+        var periods = ValidatePeriods(candidate.Duration, firstDate, frequency, errors);
 
         var rows = candidate.InterestRateChanges
             .Select((row, index) => (row, index))
@@ -57,9 +57,9 @@ public static class MortgageValidator
             .Select(group => group.Key)
             .ToHashSet();
 
-        var headerValid = !errors.ContainsKey("firstRepaymentDate")
-            && !errors.ContainsKey("numberOfPeriods")
-            && !errors.ContainsKey("repaymentFrequency")
+        var headerValid = !errors.ContainsKey("drawdownDate")
+            && !errors.ContainsKey("duration")
+            && !errors.ContainsKey("paymentFrequency")
             && firstDate is not null
             && periods is not null
             && frequency is not null;
@@ -100,7 +100,7 @@ public static class MortgageValidator
             && !changes.Any(change => change.EffectiveDate == firstDate!.Value))
         {
             errors["interestRateChanges"] =
-                "Add the opening interest rate, effective on the first repayment date";
+                "Add the opening interest rate, effective on the drawdown date";
         }
 
         if (errors.Count > 0)
@@ -140,30 +140,30 @@ public static class MortgageValidator
         return trimmed;
     }
 
-    private static decimal? ValidateStartingBalance(decimal? value, Dictionary<string, string> errors)
+    private static decimal? ValidateOpeningBalance(decimal? value, Dictionary<string, string> errors)
     {
         if (value is null or <= 0)
         {
-            errors["startingBalance"] = "Enter a starting balance greater than 0";
+            errors["openingBalance"] = "Enter a opening balance greater than 0";
             return null;
         }
 
-        if (value > MaximumStartingBalance)
+        if (value > MaximumOpeningBalance)
         {
-            errors["startingBalance"] = "Enter a starting balance up to 999,999,999,999.99";
+            errors["openingBalance"] = "Enter a opening balance up to 999,999,999,999.99";
             return null;
         }
 
         if (value != decimal.Round(value.Value, 2))
         {
-            errors["startingBalance"] = "Enter a starting balance with up to 2 decimal places";
+            errors["openingBalance"] = "Enter a opening balance with up to 2 decimal places";
             return null;
         }
 
         return value;
     }
 
-    private static DateOnly? ValidateFirstRepaymentDate(
+    private static DateOnly? ValidateDrawdownDate(
         string? value,
         TimeProvider timeProvider,
         Dictionary<string, string> errors)
@@ -171,7 +171,7 @@ public static class MortgageValidator
         var date = ParseDate(value);
         if (date is null)
         {
-            errors["firstRepaymentDate"] = "Enter a valid date";
+            errors["drawdownDate"] = "Enter a valid date";
             return null;
         }
 
@@ -179,25 +179,25 @@ public static class MortgageValidator
         var latest = DateOnly.FromDateTime(timeProvider.GetUtcNow().AddHours(14).UtcDateTime);
         if (date.Value > latest)
         {
-            errors["firstRepaymentDate"] = "Enter a date that is not in the future";
+            errors["drawdownDate"] = "Enter a date that is not in the future";
             return null;
         }
 
         return date;
     }
 
-    private static RepaymentFrequency? ValidateFrequency(string? value, Dictionary<string, string> errors)
+    private static PaymentFrequency? ValidateFrequency(string? value, Dictionary<string, string> errors)
     {
-        RepaymentFrequency? frequency = value switch
+        PaymentFrequency? frequency = value switch
         {
-            "Weekly" => RepaymentFrequency.Weekly,
-            "Fortnightly" => RepaymentFrequency.Fortnightly,
-            "Monthly" => RepaymentFrequency.Monthly,
+            "Weekly" => PaymentFrequency.Weekly,
+            "Fortnightly" => PaymentFrequency.Fortnightly,
+            "Monthly" => PaymentFrequency.Monthly,
             _ => null,
         };
         if (frequency is null)
         {
-            errors["repaymentFrequency"] = "Choose Weekly, Fortnightly or Monthly";
+            errors["paymentFrequency"] = "Choose Weekly, Fortnightly or Monthly";
         }
 
         return frequency;
@@ -206,19 +206,19 @@ public static class MortgageValidator
     private static int? ValidatePeriods(
         decimal? value,
         DateOnly? firstDate,
-        RepaymentFrequency? frequency,
+        PaymentFrequency? frequency,
         Dictionary<string, string> errors)
     {
         if (value is null || value < 1 || value != decimal.Truncate(value.Value))
         {
-            errors["numberOfPeriods"] = "Enter a whole number of 1 or more";
+            errors["duration"] = "Enter a whole number of 1 or more";
             return null;
         }
 
         const string tooLate = "The final repayment date would be later than 31 Dec 9999";
         if (value > int.MaxValue)
         {
-            errors["numberOfPeriods"] = tooLate;
+            errors["duration"] = tooLate;
             return null;
         }
 
@@ -227,7 +227,7 @@ public static class MortgageValidator
             && frequency is not null
             && RepaymentDates.FinalRepaymentDate(firstDate.Value, periods, frequency.Value) is null)
         {
-            errors["numberOfPeriods"] = tooLate;
+            errors["duration"] = tooLate;
             return null;
         }
 

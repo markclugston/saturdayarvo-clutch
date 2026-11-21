@@ -15,10 +15,10 @@ internal static class MortgageTestSupport
     public sealed record MortgageDto(
         Guid Id,
         string Name,
-        decimal StartingBalance,
-        int NumberOfPeriods,
-        string FirstRepaymentDate,
-        string RepaymentFrequency,
+        decimal OpeningBalance,
+        int Duration,
+        string DrawdownDate,
+        string PaymentFrequency,
         List<RateChange> InterestRateChanges,
         int Version);
 
@@ -78,19 +78,19 @@ internal static class MortgageTestSupport
 
     public static object Body(
         string name = "Home loan",
-        object? startingBalance = null,
-        object? numberOfPeriods = null,
-        string? firstRepaymentDate = "2000-01-01",
-        string? repaymentFrequency = "Monthly",
+        object? openingBalance = null,
+        object? duration = null,
+        string? drawdownDate = "2000-01-01",
+        string? paymentFrequency = "Monthly",
         object? rates = null,
         int? version = null) =>
         new Dictionary<string, object?>
         {
             ["name"] = name,
-            ["startingBalance"] = startingBalance ?? 250000.5m,
-            ["numberOfPeriods"] = numberOfPeriods ?? 360,
-            ["firstRepaymentDate"] = firstRepaymentDate,
-            ["repaymentFrequency"] = repaymentFrequency,
+            ["openingBalance"] = openingBalance ?? 250000.5m,
+            ["duration"] = duration ?? 360,
+            ["drawdownDate"] = drawdownDate,
+            ["paymentFrequency"] = paymentFrequency,
             ["interestRateChanges"] = rates ?? new[] { new { newInterestRate = 5.25m, effectiveDate = "2000-01-01" } },
             ["version"] = version,
         };

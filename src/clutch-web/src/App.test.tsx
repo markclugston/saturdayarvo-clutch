@@ -624,6 +624,77 @@ describe('session loading', () => {
     expect(label).toBeVisible()
   })
 
+  describe('hover expansion below 768px', () => {
+    // WCAG 2.2 SC 1.4.13: hover must not open content that covers the page and cannot be dismissed.
+    // Below 768px the expanded navigation overlays the page, so only the hamburger opens it there.
+    function stubViewport(initiallyWide: boolean) {
+      const listeners = new Set<() => void>()
+      const viewport = { wide: initiallyWide }
+      vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+        matches: query === '(min-width: 768px)' ? viewport.wide : false,
+        media: query,
+        addEventListener: (_type: string, listener: () => void) => listeners.add(listener),
+        removeEventListener: (_type: string, listener: () => void) => listeners.delete(listener),
+      })))
+      return {
+        resize: (wide: boolean) => act(() => {
+          viewport.wide = wide
+          listeners.forEach((listener) => listener())
+        }),
+      }
+    }
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    it('does not expand on hover, and the hamburger still pins and unpins', async () => {
+      stubViewport(false)
+      vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
+      const user = userEvent.setup()
+      renderWithQueryClient(<App />)
+
+      const nav = await screen.findByRole('navigation', { name: 'Primary' })
+      const toggle = screen.getByRole('button', { name: 'Toggle navigation' })
+      const label = within(nav).getByText('Accounts')
+      await user.hover(nav)
+      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+      await waitFor(() => expect(label).not.toBeVisible())
+
+      await user.click(toggle)
+      expect(toggle).toHaveAttribute('aria-expanded', 'true')
+      expect(label).toBeVisible()
+      await user.unhover(nav)
+      expect(label).toBeVisible()
+
+      await user.click(toggle)
+      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+      await waitFor(() => expect(label).not.toBeVisible())
+    })
+
+    it('collapses a hover expansion when the viewport narrows and hover works again once it widens', async () => {
+      const viewport = stubViewport(true)
+      vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
+      const user = userEvent.setup()
+      renderWithQueryClient(<App />)
+
+      const nav = await screen.findByRole('navigation', { name: 'Primary' })
+      const label = within(nav).getByText('Accounts')
+      await user.hover(nav)
+      expect(label).toBeVisible()
+
+      await viewport.resize(false)
+      await waitFor(() => expect(label).not.toBeVisible())
+      await user.unhover(nav)
+      await user.hover(nav)
+      await waitFor(() => expect(label).not.toBeVisible())
+
+      // The pointer is still over the navigation, which no longer covers content at this width.
+      await viewport.resize(true)
+      expect(label).toBeVisible()
+    })
+  })
+
   it('operates destinations by keyboard', async () => {
     vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
     const user = userEvent.setup()
@@ -817,6 +888,22 @@ describe('session loading', () => {
 
       expect(await screen.findByText(/could not be saved/)).toBeInTheDocument()
       expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    })
+
+    it('responds to the hamburger at once while a save never completes (FR-010)', async () => {
+      vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
+      respondToNavigation({ put: () => new Promise(() => {}) })
+      const user = userEvent.setup()
+      renderWithQueryClient(<App />)
+
+      const toggle = await screen.findByRole('button', { name: 'Toggle navigation' })
+      await user.click(toggle)
+      expect(toggle).toHaveAttribute('aria-expanded', 'true')
+      await user.click(toggle)
+      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+      await user.click(toggle)
+      expect(toggle).toHaveAttribute('aria-expanded', 'true')
+      expect(screen.queryByText(/could not be saved/)).not.toBeInTheDocument()
     })
 
     it('saves rapid toggles in order so the last request carries the final state', async () => {

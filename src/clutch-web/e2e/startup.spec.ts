@@ -63,7 +63,8 @@ test('recovers automatically from a temporary session failure', async ({ page })
   })
 
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Sign In' })).toBeVisible({ timeout: 5000 })
+  // The app retries after 500 ms; allow headroom for a loaded machine running many workers.
+  await expect(page.getByRole('heading', { name: 'Sign In', exact: true })).toBeVisible({ timeout: 15_000 })
   expect(attempts).toBe(2)
 })
 

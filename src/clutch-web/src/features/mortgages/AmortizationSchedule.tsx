@@ -8,18 +8,18 @@ const FALLBACK_VIEWPORT_HEIGHT = 384
 const OVERSCAN = 8
 
 type AmortizationScheduleProps = {
-  /** Saved Number of Periods of the selected mortgage; undefined for a new, unsaved one. */
-  numberOfPeriods?: number
+  /** Saved Duration of the selected mortgage; undefined for a new, unsaved one. */
+  duration?: number
 }
 
 /** Read-only placeholder schedule: periods 1 to N + 1, rendered through a window so any N stays usable. */
-export function AmortizationSchedule({ numberOfPeriods }: AmortizationScheduleProps) {
+export function AmortizationSchedule({ duration }: AmortizationScheduleProps) {
   return (
     <section aria-labelledby="schedule-heading" className="flex min-h-0 min-w-0 flex-col rounded-card bg-card p-4 xl:p-5">
       <h2 className="mb-3 text-base font-semibold" id="schedule-heading">Amortization Schedule</h2>
-      {numberOfPeriods === undefined
+      {duration === undefined
         ? <p className="text-sm text-fg-secondary">{ENTER_DETAILS_MESSAGE}</p>
-        : <ScheduleTable rowCount={numberOfPeriods + 1} />}
+        : <ScheduleTable rowCount={duration + 1} />}
     </section>
   )
 }

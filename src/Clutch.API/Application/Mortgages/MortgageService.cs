@@ -69,10 +69,10 @@ public sealed class MortgageService(
                 var mortgage = Mortgage.Create(
                     ownerUserId,
                     valid2.Name,
-                    valid2.StartingBalance,
-                    valid2.NumberOfPeriods,
-                    valid2.FirstRepaymentDate,
-                    valid2.RepaymentFrequency,
+                    valid2.OpeningBalance,
+                    valid2.Duration,
+                    valid2.DrawdownDate,
+                    valid2.PaymentFrequency,
                     valid2.RateChanges,
                     now);
                 dbContext.Mortgages.Add(mortgage);
@@ -157,10 +157,10 @@ public sealed class MortgageService(
             var oldName = mortgage.Name;
             mortgage.Update(
                 update.Name,
-                update.StartingBalance,
-                update.NumberOfPeriods,
-                update.FirstRepaymentDate,
-                update.RepaymentFrequency,
+                update.OpeningBalance,
+                update.Duration,
+                update.DrawdownDate,
+                update.PaymentFrequency,
                 update.RateChanges);
             var description = string.Equals(oldName, mortgage.Name, StringComparison.Ordinal)
                 ? $"Mortgage {mortgage.Name} was updated."

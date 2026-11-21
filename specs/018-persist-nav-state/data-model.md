@@ -4,7 +4,7 @@
 
 | Value | Meaning |
 |---|---|
-| `Unpinned` | Navigation starts compact; expands on hover/focus. Default when no row exists. |
+| `Unpinned` | Navigation starts compact; expands on hover (amended 2026-11-22). Default when no row exists. |
 | `Pinned` | Navigation starts pinned open. |
 
 ## UserNavigationPreference (entity, table `UserNavigationPreferences`)
@@ -37,4 +37,4 @@ row      --user deleted--------> (cascade delete)
 | State | Source | Changes on |
 |---|---|---|
 | `pinned` | Seeded once per signed-in user from the settled preference query (`Unpinned` on error/timeout) | Hamburger toggle only; dropped on sign-out (signed-in shell, keyed by user ID, unmounts) |
-| `hovered`, `hoverSuppressed` | Pointer/focus, unchanged from 011/015 | Never saved |
+| `hovered`, `hoverSuppressed` | Mouse pointer only (amended 2026-11-22), unchanged from 011/015 | Never saved |

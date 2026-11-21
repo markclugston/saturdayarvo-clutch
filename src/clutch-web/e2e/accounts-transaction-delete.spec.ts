@@ -165,6 +165,12 @@ const nonTextContrastProbe = `(() => {
   };
 })()`
 
+// Colour transitions on buttons animate the outline from currentColor, so measure after they settle.
+async function probeNonTextContrast(page: Page) {
+  await page.evaluate('Promise.all(document.getAnimations().map((animation) => animation.finished))')
+  return page.evaluate<ContrastProbe>(nonTextContrastProbe)
+}
+
 function expectNonTextContrast(probe: ContrastProbe) {
   expect(probe.focus.outlineStyle).not.toBe('none')
   expect(probe.focus.ratio).toBeGreaterThanOrEqual(3)
@@ -403,6 +409,8 @@ test.describe('delete imported transaction', () => {
       await createAccountWithTransactions(page, `Keyboard ${viewport.width} ${Date.now()}`)
 
       const trashButton = deleteButtonFor(page, 'Delete me first')
+      // Tabbing before the rows render walks past them and exhausts the press budget.
+      await expect(trashButton).toBeVisible()
       await tabToDeleteButtonFor(page, 'Delete me first')
       await expect(trashButton).toBeFocused()
 
@@ -497,20 +505,20 @@ test.describe('delete imported transaction', () => {
       const trashButtons = page.getByRole('button', { name: 'Delete transaction' })
       await trashButtons.first().focus()
       await expect(trashButtons.first()).toBeFocused()
-      expectNonTextContrast(await page.evaluate<ContrastProbe>(nonTextContrastProbe))
+      expectNonTextContrast(await probeNonTextContrast(page))
 
       await trashButtons.first().click()
       const dialog = page.getByRole('alertdialog')
       await expect(dialog).toBeVisible()
       await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused()
       await page.keyboard.press('Shift')
-      expectNonTextContrast(await page.evaluate<ContrastProbe>(nonTextContrastProbe))
+      expectNonTextContrast(await probeNonTextContrast(page))
 
       const deleteButton = dialog.getByRole('button', { name: 'Delete', exact: true })
       await page.keyboard.press('Shift')
       await deleteButton.focus()
       await expect(deleteButton).toBeFocused()
-      expectNonTextContrast(await page.evaluate<ContrastProbe>(nonTextContrastProbe))
+      expectNonTextContrast(await probeNonTextContrast(page))
 
       await context.close()
     })

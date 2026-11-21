@@ -7,9 +7,9 @@ client). Errors are RFC 9457 ProblemDetails. Another user's mortgage behaves as 
 
 ```text
 InterestRateChange   { newInterestRate: number, effectiveDate: "yyyy-MM-dd" }
-MortgageInput        { name: string, startingBalance: number, numberOfPeriods: number,
-                       firstRepaymentDate: "yyyy-MM-dd",
-                       repaymentFrequency: "Weekly" | "Fortnightly" | "Monthly",
+MortgageInput        { name: string, openingBalance: number, duration: number,
+                       drawdownDate: "yyyy-MM-dd",
+                       paymentFrequency: "Weekly" | "Fortnightly" | "Monthly",
                        interestRateChanges: InterestRateChange[] }       // ≤ 60 items
 MortgageResponse     MortgageInput & { id: uuid, version: number }       // changes sorted by effectiveDate
 ```
@@ -27,11 +27,11 @@ MortgageResponse     MortgageInput & { id: uuid, version: number }       // chan
 
 - **400 validation**: `title` "The mortgage is invalid.", `errors` keyed by field path (research R7).
   The request DTO reads values loosely so badly shaped values still return field errors, never a
-  generic JSON error: `startingBalance`, `numberOfPeriods` and `newInterestRate` as raw JSON
+  generic JSON error: `openingBalance`, `duration` and `newInterestRate` as raw JSON
   (`JsonElement?`), converted in the endpoint to `decimal?` (a JSON number that fits `decimal` keeps
   its value; a number too large for `decimal` becomes `decimal.MaxValue`, or `decimal.MinValue` if
   negative, so it fails the upper or lower bound; a string, boolean, array or object becomes null,
-  i.e. unreadable); `firstRepaymentDate`, `effectiveDate` and `repaymentFrequency` as `string?`,
+  i.e. unreadable); `drawdownDate`, `effectiveDate` and `paymentFrequency` as `string?`,
   parsed by the validator (dates exactly `yyyy-MM-dd` with the invariant culture, so "2000-13-45"
   is unreadable; frequency exactly `Weekly`, `Fortnightly` or `Monthly`). The validator receives
   only `decimal?` and `string?` values, no JSON types (ARC-001). Malformed JSON, or a body whose
@@ -44,26 +44,26 @@ MortgageResponse     MortgageInput & { id: uuid, version: number }       // chan
   | `name` | Missing, empty or only spaces | Enter a name |
   | `name` | Over 100 characters after trimming | Enter a name of up to 100 characters |
   | `name` | Same as another of the user's mortgages after trimming, ignoring case | A mortgage with this name already exists |
-  | `startingBalance` | Missing, unreadable, 0 or less | Enter a starting balance greater than 0 |
-  | `startingBalance` | Above 999,999,999,999.99 | Enter a starting balance up to 999,999,999,999.99 |
-  | `startingBalance` | More than 2 decimal places | Enter a starting balance with up to 2 decimal places |
-  | `numberOfPeriods` | Missing, unreadable, fractional, 0 or negative | Enter a whole number of 1 or more |
-  | `numberOfPeriods` | Final repayment date after 31 Dec 9999 (including any value above `int.MaxValue`) | The final repayment date would be later than 31 Dec 9999 |
-  | `firstRepaymentDate` | Missing, unreadable or not a storable date | Enter a valid date |
-  | `firstRepaymentDate` | Later than today (R5) | Enter a date that is not in the future |
-  | `repaymentFrequency` | Missing or not `Weekly`, `Fortnightly` or `Monthly` | Choose Weekly, Fortnightly or Monthly |
+  | `openingBalance` | Missing, unreadable, 0 or less | Enter a opening balance greater than 0 |
+  | `openingBalance` | Above 999,999,999,999.99 | Enter a opening balance up to 999,999,999,999.99 |
+  | `openingBalance` | More than 2 decimal places | Enter a opening balance with up to 2 decimal places |
+  | `duration` | Missing, unreadable, fractional, 0 or negative | Enter a whole number of 1 or more |
+  | `duration` | Final repayment date after 31 Dec 9999 (including any value above `int.MaxValue`) | The final repayment date would be later than 31 Dec 9999 |
+  | `drawdownDate` | Missing, unreadable or not a storable date | Enter a valid date |
+  | `drawdownDate` | Later than today (R5) | Enter a date that is not in the future |
+  | `paymentFrequency` | Missing or not `Weekly`, `Fortnightly` or `Monthly` | Choose Weekly, Fortnightly or Monthly |
   | `interestRateChanges[i].newInterestRate` | Missing or unreadable | Enter an interest rate |
   | `interestRateChanges[i].newInterestRate` | Below 0 or above 100 | Enter an interest rate from 0 to 100 |
   | `interestRateChanges[i].newInterestRate` | More than 2 decimal places | Enter an interest rate with up to 2 decimal places |
   | `interestRateChanges[i].effectiveDate` | Missing, unreadable or not a storable date | Enter a valid date |
   | `interestRateChanges[i].effectiveDate` | Same date as another row (every such row) | This effective date is already used |
-  | `interestRateChanges[i].effectiveDate` | Before the First repayment date or after the final repayment date | Choose a date from {first} to {final} (e.g. "Choose a date from 1 Jan 2000 to 1 Dec 2029") |
+  | `interestRateChanges[i].effectiveDate` | Before the Drawdown date or after the final repayment date | Choose a date from {first} to {final} (e.g. "Choose a date from 1 Jan 2000 to 1 Dec 2029") |
   | `interestRateChanges` | More than 60 rows | A mortgage can have up to 60 interest rate changes |
-  | `interestRateChanges` | No row effective on the First repayment date (including no rows) | Add the opening interest rate, effective on the first repayment date |
+  | `interestRateChanges` | No row effective on the Drawdown date (including no rows) | Add the opening interest rate, effective on the drawdown date |
   | `mortgages` | Create when the user already has 20 | You can save up to 20 mortgages |
 
   Dates in messages use `d MMM yyyy` with the invariant culture, so years below 1000 keep four
-  digits ("1 Jan 0001"). While `firstRepaymentDate`, `numberOfPeriods` or `repaymentFrequency` has
+  digits ("1 Jan 0001"). While `drawdownDate`, `duration` or `paymentFrequency` has
   an error, rows are not range-checked and the opening-rate rule is not applied; only those
   fields are flagged (FR-005). Completely empty rows are dropped by the client before sending, and
   a row with both fields null that still reaches the server is ignored the same way (not counted,

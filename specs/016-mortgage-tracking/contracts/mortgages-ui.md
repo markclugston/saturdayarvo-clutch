@@ -13,7 +13,7 @@ Accessible names and roles that tests (Vitest, Playwright, axe) rely on.
 |---|---|
 | Loading | `role="status"`: spinning `LoaderCircle` (as `StartupLoadingDialog`) + "Loading..." |
 | Load failed | `role="alert"`: "We couldn't load your mortgages. Please try again." + button "Retry" (returns to Loading at once) |
-| Loaded | Tab strip → Loan details panel → Burn Down (left) and Amortization Schedule (right); stacked, chart first, below 768 px |
+| Loaded | Tab strip → Details panel → Burn Down (left) and Amortization Schedule (right); stacked, chart first, below 768 px |
 
 ## Tab strip
 
@@ -21,10 +21,10 @@ Accessible names and roles that tests (Vitest, Playwright, axe) rely on.
 - One select button per mortgage (name, truncated with full name in `title` and accessible name), then button "Add mortgage" (no trash). At 20 mortgages "Add mortgage" is `aria-disabled="true"` (not the `disabled` attribute, so it stays focusable and hoverable): the text "You can save up to 20 mortgages" is its native `title` (shown on hover) and its accessible description (`aria-describedby` to visually hidden text). Clicking it or pressing Enter/Space does nothing.
 - Each mortgage's select button has a sibling button "Delete {name}" (Trash2 icon) → dialog "Delete {name}?" with "Delete" / "Cancel"; Cancel returns focus to the trash button. Delete shows busy text "Deleting…" and is disabled while the request runs. On 409 the dialog stays open with `role="alert"` "This mortgage was changed elsewhere; reload to see the latest" + button "Reload" (closes the dialog and refreshes, through the guard when dirty).
 
-## Loan details panel (styled like `AddCategoryForm`)
+## Details panel (styled like `AddCategoryForm`)
 
-- Region heading "Loan details". Floating-label fields: "Name", "Starting balance", "Number of periods", "First repayment date" (`type="date"`), "Repayment frequency" (select: Weekly, Fortnightly, Monthly).
-- Group "Interest rate changes": rows of "New interest rate" (%) and "Effective date" (`type="date"`), each with "Remove interest rate change {n}"; button "Add interest rate change" disabled with hint "Enter the first repayment date, number of periods and repayment frequency first" until those are valid, and disabled at 60 rows.
+- Region heading "Details". Floating-label fields: "Name", "Opening balance", "Drawdown date" (`type="date"`), "Duration", "Payment frequency" (select: Weekly, Fortnightly, Monthly).
+- Group "Interest rate changes": rows of "New interest rate" (%) and "Effective date" (`type="date"`), each with "Remove interest rate change {n}"; button "Add interest rate change" disabled with hint "Enter the drawdown date, duration and payment frequency first" until those are valid, and disabled at 60 rows.
 - Buttons: "Save" (busy text "Saving…"), "Cancel". No Delete button.
 - Field errors under each field, linked by `aria-describedby`, `aria-invalid="true"`; a summary is announced via `role="alert"`. Errors without a field input (`mortgages`, set-level `interestRateChanges`) appear in that summary; set-level `interestRateChanges` also shows under the "Interest rate changes" group.
 - Conflict: `role="alert"` "This mortgage was changed elsewhere; reload to see the latest" + button "Reload".

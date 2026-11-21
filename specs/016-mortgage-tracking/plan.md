@@ -5,7 +5,7 @@
 ## Summary
 
 Add a Mortgages destination above Categories. A signed-in user keeps up to 20 mortgages, each with
-loan details and 1–60 interest rate changes, edited one at a time in a Loan details panel under a
+loan details and 1–60 interest rate changes, edited one at a time in a Details panel under a
 tab strip. The API stores mortgages per owner with server-side validation, an integer concurrency
 version (409 on clashes) and one audit event per create, update and delete. The Amortization
 Schedule (N + 1 placeholder rows, windowed) and Burn Down chart (inline SVG skeleton) are
@@ -97,7 +97,7 @@ specs/016-mortgage-tracking/
 src/Clutch.API/
 ├── Domain/Mortgages/Mortgage.cs                      # new: aggregate, version, rate changes
 ├── Domain/Mortgages/InterestRateChange.cs            # new
-├── Domain/Mortgages/RepaymentFrequency.cs            # new: Weekly | Fortnightly | Monthly
+├── Domain/Mortgages/PaymentFrequency.cs            # new: Weekly | Fortnightly | Monthly
 ├── Domain/Mortgages/RepaymentDates.cs                # new: final repayment date (FR-019)
 ├── Domain/Mortgages/MortgageValidator.cs             # new: FR-007 rules → field errors
 ├── Application/Mortgages/MortgageService.cs          # new: list/create/update/delete + audit

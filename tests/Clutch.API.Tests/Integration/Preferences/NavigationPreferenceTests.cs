@@ -49,6 +49,12 @@ public sealed class NavigationPreferenceTests(SqlServerFixture fixture)
     [InlineData("{\"state\":null}")]
     [InlineData("{\"state\":\"pinned\"}")]
     [InlineData("{\"state\":\"Expanded\"}")]
+    [InlineData("{\"state\":5}")]
+    [InlineData("{\"state\":true}")]
+    [InlineData("{\"state\":{}}")]
+    [InlineData("[]")]
+    [InlineData("")]
+    [InlineData("{\"state\":")]
     public async Task Invalid_state_is_rejected_saves_nothing_and_records_invalid_outcome(string body)
     {
         using var client = CreateClient();
@@ -89,6 +95,88 @@ public sealed class NavigationPreferenceTests(SqlServerFixture fixture)
         {
             Assert.Contains("invalid", outcomes);
         }
+    }
+
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task Oversized_body_is_rejected_as_invalid_and_saves_nothing()
+    {
+        using var client = CreateClient();
+        await SignInNewUserAsync(client);
+        var body = "{\"state\":\"Pinned\",\"padding\":\"" + new string('x', 5000) + "\"}";
+
+        using var response = await SendRawAsync(client, body);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemBody>();
+        Assert.NotNull(problem);
+        Assert.Equal("The navigation state is invalid.", problem.Title);
+        Assert.Equal("Unpinned", await GetStateAsync(client));
+    }
+
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task Save_without_an_antiforgery_token_is_rejected_and_saves_nothing()
+    {
+        using var client = CreateClient();
+        await SignInNewUserAsync(client);
+        using var request = new HttpRequestMessage(HttpMethod.Put, Path)
+        {
+            Content = JsonContent.Create(new { state = "Pinned" }),
+        };
+
+        using var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("Unpinned", await GetStateAsync(client));
+    }
+
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task Unauthenticated_save_is_rejected()
+    {
+        using var signedIn = CreateClient();
+        await SignInNewUserAsync(signedIn);
+        using var anonymous = CreateClient();
+
+        // Take a valid antiforgery token anonymously so only authentication is missing.
+        using var response = await SendJsonAsync(anonymous, HttpMethod.Put, new { state = "Pinned" });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task Concurrent_first_saves_from_two_devices_both_succeed_and_one_state_wins()
+    {
+        using var firstClient = CreateClient();
+        var email = await SignInNewUserAsync(firstClient);
+        using var secondClient = CreateClient();
+        await SignInAsync(secondClient, email);
+
+        var saves = Enumerable.Range(0, 12)
+            .Select(index => SendJsonAsync(
+                index % 2 == 0 ? firstClient : secondClient,
+                HttpMethod.Put,
+                new { state = index % 2 == 0 ? "Pinned" : "Unpinned" }))
+            .ToArray();
+        var responses = await Task.WhenAll(saves);
+
+        try
+        {
+            Assert.All(responses, response => Assert.Equal(HttpStatusCode.OK, response.StatusCode));
+        }
+        finally
+        {
+            foreach (var response in responses)
+            {
+                response.Dispose();
+            }
+        }
+
+        var final = await GetStateAsync(firstClient);
+        Assert.Contains(final, new[] { "Pinned", "Unpinned" });
+        Assert.Equal(final, await GetStateAsync(secondClient));
     }
 
     [Fact]

@@ -17,10 +17,10 @@ export function makeMortgage(overrides: Partial<Mortgage> = {}): Mortgage {
   return {
     id: `00000000-0000-4000-8000-${String(counter).padStart(12, '0')}`,
     name: `Mortgage ${counter}`,
-    startingBalance: 500000,
-    numberOfPeriods: 360,
-    firstRepaymentDate: '2000-01-01',
-    repaymentFrequency: 'Monthly',
+    openingBalance: 500000,
+    duration: 360,
+    drawdownDate: '2000-01-01',
+    paymentFrequency: 'Monthly',
     interestRateChanges: [{ newInterestRate: 5.25, effectiveDate: '2000-01-01' }],
     version: 1,
     ...overrides,
@@ -138,25 +138,25 @@ export function setDate(label: string | RegExp, value: string, index = 0) {
   fireEvent.change(fields[index] as HTMLElement, { target: { value } })
 }
 
-/** Types into the Loan Details form. Rates are added after any existing ones. */
+/** Types into the Details form. Rates are added after any existing ones. */
 export async function fillForm(user: ReturnType<typeof userEvent.setup>, values: FormValues) {
   if (values.name !== undefined) {
     await user.clear(screen.getByLabelText('Name'))
     await user.type(screen.getByLabelText('Name'), values.name)
   }
   if (values.balance !== undefined) {
-    await user.clear(screen.getByLabelText('Starting Balance'))
-    await user.type(screen.getByLabelText('Starting Balance'), values.balance)
+    await user.clear(screen.getByLabelText('Opening Balance'))
+    await user.type(screen.getByLabelText('Opening Balance'), values.balance)
   }
   if (values.periods !== undefined) {
-    await user.clear(screen.getByLabelText('Number of Periods'))
-    await user.type(screen.getByLabelText('Number of Periods'), values.periods)
+    await user.clear(screen.getByLabelText('Duration'))
+    await user.type(screen.getByLabelText('Duration'), values.periods)
   }
   if (values.first !== undefined) {
-    setDate('First Repayment Date', values.first)
+    setDate('Drawdown Date', values.first)
   }
   if (values.frequency !== undefined) {
-    await user.selectOptions(screen.getByLabelText('Repayment Frequency'), values.frequency)
+    await user.selectOptions(screen.getByLabelText('Payment Frequency'), values.frequency)
   }
   if (values.rates && values.rates.length > 0) {
     await addRates(user, values.rates)

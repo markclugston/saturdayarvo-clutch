@@ -21,8 +21,8 @@ public sealed class MortgageCreateTests(SqlServerFixture fixture)
 
         Assert.Equal("Home loan", created.Name);
         Assert.Equal(1, created.Version);
-        Assert.Equal(250000.5m, created.StartingBalance);
-        Assert.Equal("Monthly", created.RepaymentFrequency);
+        Assert.Equal(250000.5m, created.OpeningBalance);
+        Assert.Equal("Monthly", created.PaymentFrequency);
         Assert.Equal(created.Id, Assert.Single(await ListAsync(client)).Id);
     }
 
@@ -94,17 +94,17 @@ public sealed class MortgageCreateTests(SqlServerFixture fixture)
             return problem.Errors!;
         }
 
-        Assert.Equal("Enter a whole number of 1 or more", (await ErrorsFor(Body(numberOfPeriods: 1.5m)))["numberOfPeriods"][0]);
-        Assert.Equal("Enter a valid date", (await ErrorsFor(Body(firstRepaymentDate: "2000-13-45")))["firstRepaymentDate"][0]);
+        Assert.Equal("Enter a whole number of 1 or more", (await ErrorsFor(Body(duration: 1.5m)))["duration"][0]);
+        Assert.Equal("Enter a valid date", (await ErrorsFor(Body(drawdownDate: "2000-13-45")))["drawdownDate"][0]);
         Assert.Equal(
             "Choose Weekly, Fortnightly or Monthly",
-            (await ErrorsFor(Body(repaymentFrequency: "Daily")))["repaymentFrequency"][0]);
+            (await ErrorsFor(Body(paymentFrequency: "Daily")))["paymentFrequency"][0]);
         Assert.Equal(
-            "Enter a starting balance greater than 0",
-            (await ErrorsFor(Body(startingBalance: "abc")))["startingBalance"][0]);
+            "Enter a opening balance greater than 0",
+            (await ErrorsFor(Body(openingBalance: "abc")))["openingBalance"][0]);
         Assert.Equal(
-            "Enter a starting balance up to 999,999,999,999.99",
-            (await ErrorsFor(Body(startingBalance: 1000000000000.00m)))["startingBalance"][0]);
+            "Enter a opening balance up to 999,999,999,999.99",
+            (await ErrorsFor(Body(openingBalance: 1000000000000.00m)))["openingBalance"][0]);
         Assert.Equal(
             "Enter a valid date",
             (await ErrorsFor(Body(rates: new[]
@@ -129,12 +129,12 @@ public sealed class MortgageCreateTests(SqlServerFixture fixture)
         }
 
         var hugePeriods = await RawErrors(
-            """{"name":"A","startingBalance":10,"numberOfPeriods":1e30,"firstRepaymentDate":"2000-01-01","repaymentFrequency":"Monthly","interestRateChanges":[{"newInterestRate":5,"effectiveDate":"2000-01-01"}]}""");
+            """{"name":"A","openingBalance":10,"duration":1e30,"drawdownDate":"2000-01-01","paymentFrequency":"Monthly","interestRateChanges":[{"newInterestRate":5,"effectiveDate":"2000-01-01"}]}""");
         Assert.Equal(
             "The final repayment date would be later than 31 Dec 9999",
-            hugePeriods["numberOfPeriods"][0]);
+            hugePeriods["duration"][0]);
         var hugeRate = await RawErrors(
-            """{"name":"A","startingBalance":10,"numberOfPeriods":12,"firstRepaymentDate":"2000-01-01","repaymentFrequency":"Monthly","interestRateChanges":[{"newInterestRate":1e30,"effectiveDate":"2000-01-01"}]}""");
+            """{"name":"A","openingBalance":10,"duration":12,"drawdownDate":"2000-01-01","paymentFrequency":"Monthly","interestRateChanges":[{"newInterestRate":1e30,"effectiveDate":"2000-01-01"}]}""");
         Assert.Equal(
             "Enter an interest rate from 0 to 100",
             hugeRate["interestRateChanges[0].newInterestRate"][0]);
@@ -160,13 +160,13 @@ public sealed class MortgageCreateTests(SqlServerFixture fixture)
 
     [Fact]
     [Trait("Category", "SqlServer")]
-    public async Task First_repayment_date_bound_uses_the_latest_time_zone()
+    public async Task Drawdown_date_bound_uses_the_latest_time_zone()
     {
         var beforeTenUtc = new FixedTimeProvider(new DateTimeOffset(2026, 6, 15, 9, 59, 0, TimeSpan.Zero));
         var atTenUtc = new FixedTimeProvider(new DateTimeOffset(2026, 6, 15, 10, 0, 0, TimeSpan.Zero));
         var body = Body(
-            numberOfPeriods: 12,
-            firstRepaymentDate: "2026-06-16",
+            duration: 12,
+            drawdownDate: "2026-06-16",
             rates: new[] { new { newInterestRate = 5m, effectiveDate = "2026-06-16" } });
 
         using (var early = fixture.Factory.WithWebHostBuilder(builder => UseClock(builder, beforeTenUtc)))
@@ -176,7 +176,7 @@ public sealed class MortgageCreateTests(SqlServerFixture fixture)
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
             Assert.Equal(
                 "Enter a date that is not in the future",
-                (await ProblemAsync(response)).Errors!["firstRepaymentDate"][0]);
+                (await ProblemAsync(response)).Errors!["drawdownDate"][0]);
         }
 
         using (var late = fixture.Factory.WithWebHostBuilder(builder => UseClock(builder, atTenUtc)))

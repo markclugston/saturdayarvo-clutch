@@ -1,6 +1,6 @@
 namespace Clutch.API.Domain.Mortgages;
 
-public enum RepaymentFrequency
+public enum PaymentFrequency
 {
     Weekly,
     Fortnightly,

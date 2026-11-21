@@ -24,15 +24,15 @@ async function registerAndSignIn(context: BrowserContext, email: string) {
 async function openMortgages(page: Page) {
   await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: 'Mortgages' }).click()
   await page.mouse.move(700, 500)
-  await expect(page.getByRole('heading', { name: 'Loan Details' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Details' })).toBeVisible()
 }
 
 async function fillHeader(page: Page, name: string, balance: string, periods: string) {
   await page.getByLabel('Name', { exact: true }).fill(name)
-  await page.getByLabel('Starting Balance').fill(balance)
-  await page.getByLabel('Number of Periods').fill(periods)
-  await page.getByLabel('First Repayment Date').fill('2000-01-01')
-  await page.getByLabel('Repayment Frequency').selectOption('Monthly')
+  await page.getByLabel('Opening Balance').fill(balance)
+  await page.getByLabel('Duration').fill(periods)
+  await page.getByLabel('Drawdown Date').fill('2000-01-01')
+  await page.getByLabel('Payment Frequency').selectOption('Monthly')
 }
 
 const rateDialog = (page: Page) => page.getByRole('dialog', { name: 'Change Interest Rate' })
@@ -88,7 +88,7 @@ test('mortgages journey: add, reload, sign out and in, switch, rename, guard and
     // Reload: persisted, and the rate changes come back in effective-date order.
     await page.reload()
     await openMortgages(page)
-    await expect(page.getByLabel('Starting Balance')).toHaveValue('$500,000.50')
+    await expect(page.getByLabel('Opening Balance')).toHaveValue('$500,000.50')
     expect(await listedRates(page)).toEqual(['5.25% 1 Jan 2000', '6.00% 1 Jun 2005'])
 
     // Sign out and back in: the values are unchanged (SC-002).
@@ -99,7 +99,7 @@ test('mortgages journey: add, reload, sign out and in, switch, rename, guard and
     await page.getByRole('button', { name: 'Sign In' }).click()
     await openMortgages(page)
     await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Home loan')
-    await expect(page.getByLabel('Starting Balance')).toHaveValue('$500,000.50')
+    await expect(page.getByLabel('Opening Balance')).toHaveValue('$500,000.50')
 
     // A second mortgage, then switch.
     await page.getByRole('button', { name: 'Add Mortgage' }).click()
@@ -121,10 +121,10 @@ test('mortgages journey: add, reload, sign out and in, switch, rename, guard and
         headers: { 'X-CSRF-TOKEN': freshToken.requestToken },
         data: {
           name,
-          startingBalance: 1000,
-          numberOfPeriods: 12,
-          firstRepaymentDate: '2000-01-01',
-          repaymentFrequency: 'Weekly',
+          openingBalance: 1000,
+          duration: 12,
+          drawdownDate: '2000-01-01',
+          paymentFrequency: 'Weekly',
           interestRateChanges: [{ newInterestRate: 4, effectiveDate: '2000-01-01' }],
         },
       })
@@ -188,7 +188,7 @@ test('mortgages journey: add, reload, sign out and in, switch, rename, guard and
     await page.getByRole('dialog', { name: 'Discard Unsaved Changes?' }).getByRole('button', { name: 'Discard Changes' }).click()
     await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Home loan')
 
-    // Delete (from the Loan Details header): cancel, then confirm.
+    // Delete (from the Details header): cancel, then confirm.
     await tab(page, 'Shed').click()
     await page.getByRole('button', { name: 'Delete Shed' }).click()
     const dialog = page.getByRole('dialog', { name: 'Delete Shed?' })
