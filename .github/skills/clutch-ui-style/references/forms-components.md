@@ -1,54 +1,30 @@
 # Form controls and components (style guide §4–5)
 
-## 4. Form controls (floating labels)
+Implementation: `src/clutch-web/src/components/ui/` (fields, buttons, chips, dialog, toast) and
+the feature folders that use them. Read sizes, classes and variants there; reuse the nearest
+existing usage as the pattern.
 
-All text inputs, selects and textareas use an **in-field floating label**. External labels need documented justification.
+## 4. Form controls
 
-- **All fields (text inputs and drop-down lists):** the same height as a button (`h-10`, 40px) and the same value font size (`text-sm`, 14px).
-- **Text inputs, resting and empty:** the label sits inside the field at body size in `fg-secondary` (`fg-muted` fails AA for label text), vertically centred. **Focus or filled:** it moves up and shrinks to about 75% (150-200ms ease-out, `transform` only) at the top of the field, with the value below it.
-- **Selects:** always show a value, so the label stays small (10px) at the top. Option lists use `raised` background and `fg` text so they stay readable in every theme. Selects use a custom chevron with `appearance-none`.
-- Field background is `raised`. No border at rest.
-- **Focus:** the shared `focus-ring` utility (2px `primary` outline, 2px offset). Never a heavy outline.
-- **Error:** label and ring use `danger`, with helper text below. **Disabled:** reduced opacity, no pointer events.
-- **Multi-select and tag fields:** selections render as removable chips (with an x) inside the field, plus a ghost "+ Add" chip.
-- Every field MUST have `id`/`htmlFor`, and `aria-invalid` and `aria-describedby` when in error.
-- **Percentage (%) and currency ($) fields (WEB-001):**
-  - **Restricted entry:** only characters that can form a valid value are accepted (digits, one decimal separator, and a leading minus only where negative values are valid). Any other typed or pasted character is rejected before it renders, so it never appears in the field. Use `inputMode="decimal"` and filter in the change handler, not with a post-hoc error message.
-  - **Format on blur:** when focus leaves the field, reformat the text to the canonical percentage or currency format (currency symbol, thousands separators and decimal places for `$`; `%` suffix for percentages). Use one shared formatter (`Intl.NumberFormat`) so every field formats identically; the decimal places for each field come from its spec.
-  - **Focus:** show the raw editable value without symbols or separators, so the user can edit it. Parse and format only through the shared helpers.
-  - An empty field stays empty on blur. A value outside the field's allowed range still shows the standard error state.
-
-```tsx
-// FloatingField (sketch). The label floats with transform, so only colour and transform transition.
-<div className="relative rounded-control bg-raised">
-  <input
-    id={id}
-    placeholder=" "
-    className="peer h-10 w-full rounded-control bg-transparent px-3 pt-[18px] pb-1.5 text-sm
-               leading-4 text-fg placeholder:text-transparent focus-visible:focus-ring"
-  />
-  <label
-    htmlFor={id}
-    className="pointer-events-none absolute left-3 top-2.5 origin-left text-sm text-fg-secondary
-               transition-[color,transform] duration-150 ease-out
-               peer-focus:[transform:translateY(-0.5rem)_scale(0.75)]
-               peer-not-placeholder-shown:[transform:translateY(-0.5rem)_scale(0.75)]"
-  >
-    {label}
-  </label>
-</div>
-```
+- Text inputs, selects and textareas use `FloatingField` (in-field floating label). An external label needs documented justification in the plan.
+- Every field has `id`/`htmlFor`, plus `aria-invalid` and `aria-describedby` when in error. Errors use `ErrorMessage`.
+- **Percentage (%) and currency ($) fields (WEB-001):** build them on `FormattedNumberField` and its `formatCurrency` / `formatPercent` helpers (`src/features/mortgages/FormattedNumberField.tsx`). Do not hand-roll filtering or formatting. Each field's decimal places and range come from its spec. A value outside the allowed range shows the standard error state. Display-only amounts use `src/lib/formatCurrencyAmount.ts`.
 
 ## 5. Components
 
-- **Primary button:** solid `primary`, `primary-contrast` text, `rounded-control`. A subtle top-to-bottom gradient is allowed on primary buttons only.
-- **Secondary button:** the `secondary-solid` / `secondary-solid-contrast` pair, which is `neutral-strong` in the light theme and `raised` in the dark theme, with no `dark:` variant.
-- **Neutral button:** `Button variant="neutral"`: `raised` fill, `fg` text, `hover` on hover, `rounded-control`, the shared focus ring and disabled rules, no border and no `dark:` variant. Use it for a standard grey action that is not the page's main (primary) or companion (secondary) action, such as "Change Interest Rate" beside a read-only value. Contrast of `fg` on `raised` is about 16:1 in Light and 8:1 in Dark. In Dark, `secondary-solid` already resolves to `raised`, so neutral and secondary look alike there; that is intended.
-- **Tertiary button:** text only. **Icon button:** square, rounded, tone-filled, no border.
-- **Status chips:** pale tinted background with saturated text of the same hue (see tokens). Status MUST NOT rely on colour alone; include text or an icon.
-- **Stat cards:** large number (28-32px/600) with a small coloured delta indicator.
-- **Charts:** `primary` is the dominant series, a light `primary-tint` (optionally diagonal-hatched) for overlay series, `accent-navy` for contrast. No boxed gridlines; faint horizontal guides only.
-- **Selected column/row/day:** `selected` tint, not an outline.
+- **Buttons:** use a `Button` variant. The primary variant is for a page's main action. Use the neutral variant for a standard grey action that is neither primary nor its companion secondary action.
+- **Status:** use `StatusChip`. Status MUST NOT rely on colour alone; include text or an icon.
+- **Charts:** `primary` is the dominant series, `primary-tint` the overlay series, `accent-navy` the contrast series (the `chart-*` tokens in `index.css`). No boxed gridlines; faint horizontal guides only.
+- **Selection** (row, column, day, tab) uses the `selected` tint, never an outline or border.
 - Touch targets are at least 40x40px.
-- **Tab strip (mortgage selector):** a `nav` list of buttons, not ARIA tabs. The selected item is shown by a `selected` tint and `aria-current="true"` (never an outline or border). No borders or dividers. The strip scrolls horizontally inside itself so the page never scrolls sideways. A trash icon button ("Delete {name}") sits beside each item's select button, and the trailing "Add mortgage" button has none. Long names truncate, with the full name in `title`.
-- **Toast:** a `raised` surface with `shadow-float` (the only permitted shadow), bottom-right on desktop and bottom-centre below 768px. `role="status"`, a text "Dismiss" button, auto-dismisses after 5 s and pauses while hovered or focused. Under `prefers-reduced-motion: reduce` it appears and disappears without animation.
+- **Tab strips** (e.g. `MortgageTabs.tsx`) are a `nav` list of buttons with `aria-current`, not ARIA tabs. They scroll within themselves, so the page never scrolls sideways.
+- **Toasts** use `toast.tsx`. **Dialogs** use `dialog.tsx`.
+
+## Patterns not yet in code
+
+No implementation exists yet, so this guidance stays here. The first feature that builds one adds
+a primitive, and that primitive then replaces the guidance.
+
+- **Multi-select and tag fields:** selections render as removable chips (with an x) inside the field, plus a ghost "+ Add" chip.
+- **Stat cards:** a large number (28-32px, semibold) with a small coloured delta indicator that is not colour-only.
+- **Non-working or disabled regions** (e.g. weekends in a timeline or calendar): a subtle diagonal hatch in `raised`.

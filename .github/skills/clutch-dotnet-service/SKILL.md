@@ -11,37 +11,43 @@ metadata:
 For database work also load `clutch-data-access`. For endpoints, auth, input handling or logging
 of user data also load `clutch-security-review`.
 
-## Project settings
+## Source of truth
 
-- Target .NET 10 or newer. Use the stable C# version selected by the SDK.
-- Enable nullable reference types and implicit usings.
-- Treat warnings as errors.
-- Enable build-time code style enforcement.
-- Modern C# features may be used when they improve clarity.
+The code defines the service conventions. Read it rather than restating it here; locations are in
+`docs/code-map.md`.
 
-## Code rules
+| Concern | Authoritative implementation |
+|---|---|
+| Target framework, nullable, implicit usings, warnings as errors, code-style enforcement | `src/Clutch.API/Clutch.API.csproj`, `tests/Clutch.API.Tests/Clutch.API.Tests.csproj` |
+| Service registration, middleware, health checks, OpenTelemetry meters | `src/Clutch.API/Program.cs` |
+| Error responses (RFC 9457 ProblemDetails) | `src/Clutch.API/Api/ProblemDetails/` |
+| Endpoint, use-case, domain and metrics patterns | sibling files in `Api/Endpoints/`, `Application/<Area>/`, `Domain/<Area>/` |
+| Test frameworks and patterns (unit, HTTP-level, Docker SQL Server) | the test `.csproj` and a sibling test in `tests/Clutch.API.Tests/` |
+
+Follow the nearest sibling's pattern. Do not change project settings without an approved plan. If
+the code and this skill disagree, raise it; do not pick a side.
+
+## Rules no tool enforces (review)
+
+There is no `.editorconfig` with project naming or analyzer rules, so review these:
 
 - Use async APIs for I/O. Async methods use the `Async` suffix unless the framework constrains the name.
 - Dispose resources deterministically. Await async disposal.
-- Support cancellation (`CancellationToken` flows through I/O paths).
-- Apply appropriate I/O timeouts.
-- Retries must be bounded and safe (idempotent operations only, with backoff).
-- Avoid exceptions for expected control flow. Use the Result pattern or typed validation failures where applicable.
-- ASP.NET Core applications return RFC 9457 ProblemDetails responses. Error responses must not disclose sensitive information.
+- `CancellationToken` flows through I/O paths. Apply appropriate I/O timeouts.
+- Retries are bounded and safe (idempotent operations only, with backoff).
+- Avoid exceptions for expected control flow. Use the Result pattern or typed validation failures as the existing use cases do.
+- Error responses use the established ProblemDetails handling and never disclose sensitive information.
 - Domain logic stays independent of HTTP, persistence and providers (ARC-001).
 
 ## Operations (OPS-001)
 
 - Structured logging with message templates. Never log credentials, tokens or sensitive data; redact or omit.
-- Appropriate health checks (liveness, plus readiness for dependencies the service needs).
-- OpenTelemetry metrics for the new or changed behaviour.
+- New or changed behaviour registers health checks and OpenTelemetry metrics the way existing areas do.
 
 ## Testing (ENG-001)
 
-- Behaviour changes require automated tests.
-- Use xUnit.
-- Use NSubstitute to isolate boundaries (external services, clocks, providers) where suitable. Do not substitute domain behaviour.
-- Use `WebApplicationFactory` for HTTP-level tests when appropriate.
+- Behaviour changes require automated tests, following the existing test patterns.
+- Substitute only boundaries (external services, clocks, providers), never domain behaviour.
 - Critical database behaviour uses provider-backed integration tests (see `clutch-data-access`).
 
 ## Test cadence

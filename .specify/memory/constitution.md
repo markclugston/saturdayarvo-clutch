@@ -1,20 +1,20 @@
 <!--
 Sync Impact Report
-- Version: 1.3.0 → 1.4.0 (MINOR: new binding input-validation rule)
-- Modified: WEB-001 Frontend — added restricted-entry and format-on-blur rule for percentage and
-  currency fields
-- Added/removed sections: none
-- Follow-up: add input-restriction detail and checklist item to `clutch-frontend` and
-  `clutch-ui-style`, then run .\scripts\sync-agent-config.ps1 -From claude
+- Version: 1.4.0 → 1.5.0 (MINOR: source-of-truth model)
+- Modified: Governance — running code is authoritative for implementation; WEB-001 % and $ rule
+  states the obligation and cites the implementing component instead of describing the mechanism
+- Follow-up: clutch-* skills reference code instead of restating it; run
+  .\scripts\sync-agent-config.ps1 -From claude
 -->
 # SaturdayArvo Clutch Constitution
 
-**Version**: 1.4.0 | **Last Amended**: 2026-11-21
+**Version**: 1.5.0 | **Last Amended**: 2026-11-22
 
 ## Governance
-Precedence: 1. Constitution 2. `clutch-*` skills and path-scoped instructions 3. Reference documentation.
-Conflicts must be raised and must not be silently waived. Constitutional violations are CRITICAL findings.
-Implementation detail for each requirement lives in the skill named in its heading. The procedure for applying this constitution is in `clutch-constitution-check`.
+Source of truth: the running code, its lint rules and its automated tests define implementation (design tokens, components, patterns, conventions). This constitution defines obligations, governance and process. Specifications define intent.
+Precedence for obligations: 1. Constitution 2. `clutch-*` skills and path-scoped instructions 3. Reference documentation. Guidance documents must reference implementation in code, not restate it; `docs/code-map.md` locates it.
+Conflicts between code and guidance, or between guidance documents, must be raised and must not be silently waived or resolved by picking a side. Constitutional violations are CRITICAL findings.
+Each heading names the skill holding the process for that requirement. The procedure for applying this constitution is in `clutch-constitution-check`.
 
 ## ARC-001 Architecture Boundaries
 - Specifications govern implementation.
@@ -67,9 +67,9 @@ Implementation detail for each requirement lives in the skill named in its headi
 - Frontend tests and quality gates required.
 - Third-party UI code requires independent security review.
 - Visible labels, headings and button text must use Title Case.
-- Percentage (%) and currency ($) entry controls, including those on the mortgages screen, must accept only valid values: characters that cannot form a valid value must be rejected at entry and never displayed in the field. When focus leaves the field, the entered text must be reformatted to the correct percentage or currency format.
-- UI work must apply the style guide. Plans must identify the applicable style guide sections, and its compliance checklist must appear in the Constitution Check and completion review.
-- Style-guide rule changes require synchronized updates.
+- Percentage (%) and currency ($) entry controls must never display characters that cannot form a valid value, and must show the formatted value when focus leaves the field. They reuse the established implementation (`docs/code-map.md`).
+- UI work must apply the style guide: the design system implemented in code and its enforcing lint rule and browser tests. Plans must identify the applicable style guide sections, and its compliance checklist must appear in the Constitution Check and completion review.
+- Style-guide rule changes are made in code first (tokens, primitives, lint rule, browser tests); guidance that references them is updated in the same change.
 
 ## Performance & Observability
 - User-initiated actions must provide visible feedback within 500ms or show progress.

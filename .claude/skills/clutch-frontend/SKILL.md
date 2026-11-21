@@ -10,35 +10,37 @@ metadata:
 
 For visual design (tokens, layout, forms, themes, UI checklist) also load `clutch-ui-style`.
 
-## React
+## Source of truth
 
-- Use current stable React with function components and hooks.
-- Class components are prohibited, except approved error-boundary scenarios.
+The code defines the frontend conventions. Read it rather than restating it here; locations are
+in `docs/code-map.md`.
+
+| Concern | Authoritative implementation | Enforced by |
+|---|---|---|
+| Stack and versions, npm scripts | `src/clutch-web/package.json` | — |
+| Compiler strictness | `src/clutch-web/tsconfig*.json` | `build` / `typecheck` scripts |
+| `any`, `@ts-ignore`, `@ts-expect-error` without a description | `src/clutch-web/eslint.config.js` (typescript-eslint recommended) | `lint` script |
+| Style tokens and class rules | `src/clutch-web/eslint-rules/clutch-style.js` | `lint` script |
+| Data fetching and server state, API client, response validation, ProblemDetails handling | `src/clutch-web/src/lib/api/` and a sibling feature's `api.ts` and hooks | Component tests |
+| Feature structure (components, `api.ts`, hooks, tests) | a sibling folder in `src/clutch-web/src/features/` | Review |
+| UI primitives and variants | `src/clutch-web/src/components/ui/` | Component tests |
+| % and $ entry fields | `src/clutch-web/src/features/mortgages/FormattedNumberField.tsx` and its tests | Component tests |
+
+Follow the nearest sibling's pattern. If the code and this skill disagree, raise it; do not pick a side.
+
+## Rules no tool enforces (review)
+
+The lint config has no React plugin, so review these:
+
+- Function components and hooks only. Class components are prohibited, except approved error boundaries.
 - Do not derive render state through `useEffect`.
-- Use dedicated server-state libraries for remote data.
+- Remote data goes through the established server-state pattern, never ad-hoc fetch-and-store state.
 - Stable keys are required for lists.
 - `dangerouslySetInnerHTML` with untrusted content is prohibited.
-
-## TypeScript
-
-- TypeScript is required, with `strict` and `noUncheckedIndexedAccess` enabled.
-- `any` is prohibited. `@ts-ignore` is prohibited. `@ts-expect-error` requires an explanation.
-- Validate data crossing trust boundaries at runtime. Generated types do not replace runtime validation.
-- Handle ProblemDetails (RFC 9457) responses as typed cases.
-
-## Styling and components
-
-- Tailwind utilities are required. Use theme tokens and the shared `cn` helper.
-- Responsive layouts are encouraged.
-- Navigation uses button controls.
-- File-selection controls must be accessible buttons.
-- shadcn/ui is the default primitive source. Third-party UI registries require an independent security review (see `clutch-security-review`).
-
-## Percentage and currency inputs
-
-- Every % and $ entry control (including the mortgages screen) filters input so invalid characters are never displayed, and reformats its text on blur (WEB-001). Field detail is in `clutch-ui-style` `references/forms-components.md`.
-- Build them on one shared input component and one shared parse/format helper. Do not hand-roll per field.
-- Component tests must type and paste invalid characters and assert the field value excludes them, then blur and assert the formatted text.
+- Validate data crossing trust boundaries at runtime, as the API client does. Generated types do not replace runtime validation.
+- Navigation and file-selection controls are accessible buttons.
+- New primitives come from shadcn/ui on Base UI, remapped to the tokens. Third-party UI registries require an independent security review (`clutch-security-review`).
+- % and $ entry controls reuse `FormattedNumberField` (WEB-001). Their component tests type and paste invalid characters, assert the field excludes them, then blur and assert the formatted text.
 
 ## Testing
 
@@ -65,7 +67,7 @@ assuming names. Add quiet reporter flags (`--reporter=dot` for Vitest, `--report
 
 Quiet output, failures only:
 
-1. Lint script (typescript-eslint, including the Tailwind token rules from `clutch-ui-style`)
+1. Lint script (typescript-eslint and the `clutch/style-tokens` rule)
 2. Unit and component test script
 3. Browser tests for affected critical journeys
 4. Build script. If it already runs the TypeScript compiler, skip the separate typecheck.

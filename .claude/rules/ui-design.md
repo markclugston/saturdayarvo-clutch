@@ -6,4 +6,4 @@ paths:
 ---
 # WEB-001 UI design
 
-Load the `clutch-ui-style` skill and only the style guide sections this change needs. Use tokens only: no raw colours, no non-token radii, and no borders on layout containers.
+Load the `clutch-ui-style` skill and only the style guide sections this change needs. The design system is in code: tokens in `src/index.css`, primitives in `src/components/ui/`, and class rules enforced by the `clutch/style-tokens` lint rule. Reuse primitives, and fix lint findings rather than suppressing them.

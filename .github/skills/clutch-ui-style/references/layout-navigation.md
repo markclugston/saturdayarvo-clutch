@@ -1,38 +1,19 @@
 # Layout and navigation (style guide §2–3)
 
+Implementation: `app-shell.tsx`, `side-nav.tsx`, `content-panel.tsx`, `card.tsx` in
+`src/clutch-web/src/components/ui/`. Read sizes, widths, padding and timings there.
+
 ## 2. Layout model
 
-Three nested layers:
-
-| Layer | Token | Treatment |
-|---|---|---|
-| Shell / canvas | `canvas` | App background. The side navigation sits directly on it, so it reads as part of the background. |
-| Content panel | `content` | Inset rounded panel (`rounded-panel`, 22px) with a visible gutter of canvas around it and 16-24px padding. |
-| Cards / sections | `card` | Rounded (`rounded-card`, 16px), one tone step from the content panel, 12-20px padding, 12-16px gaps. |
-
-- Nested controls (inputs, buttons, chips) use `rounded-control` (10px). Small tags and status chips use `rounded-chip` (6px). Avatars are circular.
-- Layout containers (nav, panels, cards, table regions) MUST NOT have borders or divider lines.
-- **Permitted exceptions:** (a) a 1px hairline at 6-8% text-colour opacity inside a card to separate a footer or metadata row; (b) focus rings.
-- Shadows are for floating elements only (popovers, dragged items, modals): `shadow-float`. Static panels MUST NOT have shadows.
-- Non-working or disabled regions (e.g. weekends in a timeline or calendar) use a subtle diagonal hatch in `raised`.
-
-```
-AppShell (bg-canvas)
-├── header             (bg-canvas, full width, sticky, no border; first in the DOM)
-├── SideNav            (bg-canvas, no border)
-└── ContentPanel       (bg-content rounded-panel, inset with gutter)
-    └── Card           (bg-card rounded-card)
-        └── controls   (bg-raised rounded-control)
-```
+- Three nested surfaces: canvas (shell and navigation), content panel, cards; controls sit on `raised`. Each step is one tone change, applied by the primitives.
+- Layout containers (navigation, panels, cards, table regions) MUST NOT have borders or divider lines. Exceptions are the `hairline-t` / `hairline-b` utilities inside a card, and focus rings.
+- Shadows are for floating elements only (popovers, dragged items, dialogs, toasts) and use `shadow-float`. Static panels MUST NOT have shadows.
 
 ## 3. Navigation
 
-**Existing expand/collapse behaviour MUST be preserved** (triggers, persisted state, breakpoints) unless an approved spec amends it (015: the content resizes at 768px and above). Otherwise only styling changes.
-
-- Surface is `canvas`. No border or divider against the content panel; the transition is the tone change alone.
-- Collapsed: icon-only rail, 64px (`w-16`). Expanded: 160px (`w-40`). The wider 240px of the original guide is not used: the navigation overlays the content below 768px and shrinks the content at 768px and above (015), and the width must be the same at every viewport.
-- Width animates 200ms ease-in-out (`transition-[width] duration-200 ease-in-out`); at 768px and above the shell's grid columns animate in step (`transition-[grid-template-columns]`). Labels fade with `transition-opacity` rather than popping.
-- Active item: `rounded-control` fill using the `selected` tint with `primary` text/icon and heavier text. Selection is not an action, so it never uses the solid `primary` fill reserved for primary buttons; the `selected` tint is under 3:1 against `canvas`, so the `primary` text and heavier weight carry the indicator too. Hover: a subtler fill (`hover`); a selected item keeps its `selected` fill on hover.
-- Icons 18-20px, consistent outline style, stroke about 1.5px.
-- Navigation items have no tooltips. At 768px and wider, hovering the collapsed rail with a mouse expands it. Below 768px hover does not expand it, because the expanded rail covers the content and hover-opened content must be dismissible (WCAG 2.2 SC 1.4.13); keyboard focus never expands it. The hamburger button at the top of the rail pins it open at any width until clicked again, and the pinned state is saved per user (018).
-- Group headings (e.g. "Division") are small, muted labels written in Title Case and rendered with the `uppercase` class. No divider lines.
+- **Existing expand/collapse behaviour MUST be preserved** (triggers, persisted state, breakpoints, widths) unless an approved spec amends it. Specs 015 and 018 define the current behaviour; `side-nav.tsx` and `e2e/navigation.spec.ts` implement and test it.
+- The navigation sits on `canvas`; its boundary with the content panel is the tone change alone.
+- The active item uses the `selected` tint with `primary` text and heavier weight, never the solid `primary` fill reserved for primary buttons.
+- Hover never expands the rail where it would cover content (WCAG 2.2 SC 1.4.13), and keyboard focus never expands it.
+- Icons come from Lucide, in one consistent outline style.
+- Group headings are written in Title Case; they may render all caps with the `uppercase` class.

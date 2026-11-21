@@ -8,52 +8,59 @@ metadata:
 
 # Clutch UI Style
 
-Binding design system for all UI work (React + Tailwind, themes **Light** and **Soft Dark**).
-MUST / MUST NOT / SHOULD are used in the RFC 2119 sense.
+The design system is implemented in code (themes **Light** and **Soft Dark**). This skill holds
+the principles, the review process and the rules no tool enforces. It never restates values:
+read them from the code. MUST / MUST NOT / SHOULD are used in the RFC 2119 sense.
 
-> **Source of truth for values:** `src/clutch-web/src/index.css` (CSS custom properties and
-> Tailwind v4 `@theme` mappings; there is no Tailwind config file). Hex values in the references are a
-> snapshot. If they disagree with `index.css`, that file wins and the reference must be updated.
+## Source of truth
+
+| Concern | Authoritative implementation | Enforced by |
+|---|---|---|
+| Colour, radius and shadow tokens, both themes; focus ring, hairlines, reduced motion | `src/clutch-web/src/index.css` | `clutch/style-tokens` lint rule; style-guide browser tests |
+| Forbidden classes (raw colours, palette classes, non-token radii, borders, rings, shadows, `dark:` colour, transitions, durations, easing) and allowed exceptions | `src/clutch-web/eslint-rules/clutch-style.js` | `npm run lint` (`clutch-style.test.js` tests the rule) |
+| Primitives and their variants (shell, navigation, panels, cards, fields, buttons, chips, dialog, toast) | `src/clutch-web/src/components/ui/` (`class-variance-authority`, `cn` in `src/lib/utils.ts`) | Component tests beside each primitive |
+| Theme runtime | `src/clutch-web/src/components/theme/` | Theme component and browser tests |
+| Contrast, focus outline, surface lightness, no pure-white text, transition timing, toast and tab-strip layout | — | `src/clutch-web/e2e/style-guide.spec.ts` (axe WCAG 2.2 AA tags, both themes) |
+| % and $ entry fields | `src/clutch-web/src/features/mortgages/FormattedNumberField.tsx` | Its component tests |
+
+If guidance here disagrees with the code, raise the conflict (constitution Governance). Do not
+pick a side.
 
 ## Principles
 
 1. **Tone and radius, not lines.** Structure comes from background changes and rounded corners.
-2. **Layered surfaces.** Canvas, then content panel, then cards, then raised controls. Each step is a slightly different tone.
-3. **Tokens only.** Components reference semantic tokens. Never raw hex, never the default Tailwind palette.
+2. **Layered surfaces.** Canvas, then content panel, then cards, then raised controls.
+3. **Tokens only.** Components reference semantic tokens, never raw colours or the default palette.
 4. **Calm.** Low contrast between surfaces, minimal shadow, short animations.
-5. **Accessible without borders.** Because there are no borders, focus rings and contrast carry the load.
+5. **Accessible without borders.** Focus rings and contrast carry the load.
 
 ## Load only the sections you need
 
-| Reference | Style guide § | Load when |
+| Style guide § | Read | Load when |
 |---|---|---|
-| [references/layout-navigation.md](references/layout-navigation.md) | 2, 3 | Page shells, panels, cards, side navigation |
-| [references/forms-components.md](references/forms-components.md) | 4, 5 | Inputs, selects, buttons, chips, stat cards, charts |
-| [references/tokens.md](references/tokens.md) | 6 | Choosing colours, status chips, dark theme surfaces |
-| [references/typography-motion-a11y.md](references/typography-motion-a11y.md) | 7, 8, 9 | Text styles, transitions, contrast, focus rings |
-| [references/implementation.md](references/implementation.md) | 10 | Editing `index.css`, primitives, theme runtime, lint rules |
-| [references/compliance-checklist.md](references/compliance-checklist.md) | 11 | Every plan and completion review for UI work |
+| 2, 3 | [references/layout-navigation.md](references/layout-navigation.md) | Page shells, panels, cards, side navigation |
+| 4, 5 | [references/forms-components.md](references/forms-components.md) | Fields, buttons, chips, stat cards, charts |
+| 6 | `index.css` (tokens) and the token-use rules in `forms-components.md` | Choosing colours or status styles |
+| 7, 8, 9 | [references/typography-motion-a11y.md](references/typography-motion-a11y.md) | Text, casing, motion, contrast, focus |
+| 10 | The Source of truth table above | Editing tokens, primitives, theme runtime or the lint rule |
+| 11 | [references/compliance-checklist.md](references/compliance-checklist.md) | Every plan and completion review for UI work |
 
 ## Use by phase
 
-- **Plan:** list the applicable sections (by §) in the plan and copy the compliance checklist into the Constitution Check.
-- **Implement:** load the references for the parts being built. Build from the shared UI primitives (location in `docs/code-map.md`).
-- **Review / completion:** validate every compliance checklist item. A deviation without explicit justification in the plan is rejected.
+- **Plan:** list the applicable sections (by §) and copy the compliance checklist into the Constitution Check.
+- **Implement:** build from the primitives (`docs/code-map.md`); open the nearest sibling and follow its pattern. Do not restyle primitives with ad-hoc classes.
+- **Review / completion:** run lint and the style-guide browser tests, then review the checklist items marked *Review*. A deviation without explicit justification in the plan is rejected.
 
 ## Review failures (reject on sight)
 
-- Raw colours: hex, arbitrary values like `bg-[#fff]`, default palette classes like `bg-white` or `text-gray-500`.
-- Non-token radii, such as `rounded-lg` or `rounded-xl`.
-- Pure black (`#000`) dark surfaces, or pure white (`#FFF`) dark-theme text.
-- Borders or dividers on layout containers (`border*`, `divide-*`), except the documented hairline.
-- `ring-*` other than the focus ring, and `shadow-*` other than `shadow-float`.
-- `dark:` variants used for colour.
-- External field labels without documented justification.
-- Labels, headings or button text not in Title Case (for example "Add category" instead of "Add Category").
-- Percentage or currency fields that display invalid characters, or that do not reformat on blur.
+- Any `clutch/style-tokens` lint error.
+- A primitive re-implemented or restyled instead of reused or given a new variant.
+- An external field label without documented justification.
+- Labels, headings or button text not in Title Case.
+- A % or $ field not built on the shared formatted field.
 
 ## Changing the style guide
 
-Style-guide rule changes require synchronized updates: `src/clutch-web/src/index.css`, the affected
-reference file here, the compliance checklist if a rule is added or removed, and the section
-table above.
+Change the code first: tokens in `index.css`, the primitive, the lint rule and its tests, and the
+browser tests. Update a reference here only when a rule that no tool enforces changes, and update
+the compliance checklist when a rule is added or removed.

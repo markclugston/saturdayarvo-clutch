@@ -6,14 +6,17 @@
   Clutch override. This file loads on every Spec Kit step, so keep it lean:
   - Keep every requirement ID and its heading format: `## <ID> <Name> · \`<clutch-* skill(s)>\``.
   - One short binding statement per bullet. No rationale paragraphs, examples or how-to detail.
-    Rationale goes in assumptions.md; implementation detail goes in the named clutch-* skill.
+    State obligations, not mechanisms: no colours, tokens, classes, component styling or other
+    implementation detail. The code is authoritative for implementation; process goes in the
+    named clutch-* skill; rationale goes in assumptions.md.
   - Never drop or merge an existing requirement ID without an explicit instruction to do so.
   - Keep the Sync Impact Report to 10 lines or fewer. It is removed after review.
 -->
 
 ## Governance
 [GOVERNANCE_RULES]
-<!-- Precedence (constitution > clutch-* skills and path-scoped instructions > reference docs),
+<!-- Source of truth (code for implementation, constitution for obligations, specs for intent),
+     precedence for obligations (constitution > clutch-* skills and path-scoped instructions > reference docs),
      conflicts must be raised, violations are CRITICAL, skill names in headings hold the detail,
      and clutch-constitution-check holds the procedure. -->
 

@@ -24,9 +24,12 @@ contains what's described, search for the concern and update the pointer.
 | Integration test pattern, Docker SQL Server fixture and its test trait | `tests/Clutch.API.Tests/Integration/Accounts/SqlServerFixture.cs` and a sibling test in the same area |
 | API client, CSRF handling, response schemas | `src/clutch-web/src/lib/api/` |
 | Frontend feature pattern (components, `api.ts`, hooks, tests) | a sibling folder in `src/clutch-web/src/features/` |
-| UI primitives | `src/clutch-web/src/components/ui/` |
-| Theme runtime and tokens | `src/clutch-web/src/components/theme/`, `src/clutch-web/src/index.css` |
+| UI primitives and their variants (`class-variance-authority`), class merging (`cn`) | `src/clutch-web/src/components/ui/`, `src/clutch-web/src/lib/utils.ts` |
+| Theme runtime and tokens (colours, radii, shadow, font, focus ring, hairlines, reduced motion) | `src/clutch-web/src/components/theme/`, `src/clutch-web/src/index.css` |
+| Lint configuration (typescript-eslint rules applied) | `src/clutch-web/eslint.config.js` |
+| Compiler strictness | `src/clutch-web/tsconfig.app.json`, `tsconfig.node.json` |
 | Style lint rule (`clutch/style-tokens`) and its tests | `src/clutch-web/eslint-rules/clutch-style.js`, `clutch-style.test.js` |
+| Percentage and currency entry fields; display formatting of amounts | `src/clutch-web/src/features/mortgages/FormattedNumberField.tsx`; `src/clutch-web/src/lib/formatCurrencyAmount.ts` |
 | Style-guide browser states (axe, focus, surfaces, screenshots) | `src/clutch-web/e2e/style-guide.spec.ts`, `playwright.style-guide.config.ts` |
 | Component test helpers | `src/clutch-web/src/test/` |
 | Browser test setup and per-journey configs | `src/clutch-web/playwright*.config.ts`, `src/clutch-web/e2e/fixtures.ts` |
