@@ -15,12 +15,22 @@ const currency = {
   }],
 }
 
-async function mockApi(page: Page) {
+type MockOptions = { navigation?: 'Pinned' | 'Unpinned'; navigationDelayMs?: number }
+
+async function mockApi(page: Page, options: MockOptions = {}) {
   let mode = 'Light'
+  let navigation = options.navigation ?? 'Unpinned'
   await page.route((url) => url.pathname.startsWith('/api/'), async (route) => {
     const path = new URL(route.request().url()).pathname
     if (path === '/api/security/session') {
       await route.fulfill({ json: { id: 'browser-user', roles: ['Administrator'] } })
+    } else if (path === '/api/preferences/navigation') {
+      if (route.request().method() === 'PUT') {
+        navigation = (route.request().postDataJSON() as { state: 'Pinned' | 'Unpinned' }).state
+      } else if (options.navigationDelayMs) {
+        await new Promise((resolve) => setTimeout(resolve, options.navigationDelayMs))
+      }
+      await route.fulfill({ json: { state: navigation } }).catch(() => undefined)
     } else if (path === '/api/preferences/theme') {
       if (route.request().method() === 'PUT') {
         mode = (route.request().postDataJSON() as { mode: string }).mode
@@ -756,4 +766,104 @@ test('expands on hover and the hamburger pins it open', async ({ page }) => {
   await page.mouse.move(600, 400)
   await expect(label).toBeHidden()
   await expect(nav).toHaveCSS('width', '56px')
+})
+
+test.describe('saved navigation state', () => {
+  for (const width of [1280, 767]) {
+    test(`starts pinned on first paint without a layout change at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 720 })
+      await mockApi(page, { navigation: 'Pinned' })
+      await page.goto('/')
+      const nav = page.getByRole('navigation', { name: 'Primary' })
+      const main = page.getByRole('main')
+      await expect(nav).toBeVisible()
+
+      const first = { nav: await nav.boundingBox(), main: await main.boundingBox() }
+      await expect(page.getByRole('button', { name: 'Toggle navigation' }))
+        .toHaveAttribute('aria-expanded', 'true')
+      await expect(nav.getByText('Accounts', { exact: true })).toBeVisible()
+      await page.waitForTimeout(400)
+      const settled = { nav: await nav.boundingBox(), main: await main.boundingBox() }
+
+      expect(first.nav?.width).toBeGreaterThan(56)
+      expect(settled).toEqual(first)
+    })
+  }
+
+  test('starts compact when unpinned and still expands on hover', async ({ page }) => {
+    await mockApi(page, { navigation: 'Unpinned' })
+    await page.goto('/')
+    const nav = page.getByRole('navigation', { name: 'Primary' })
+    const label = nav.getByText('Accounts', { exact: true })
+    await expect(nav).toHaveCSS('width', '56px')
+    await expect(label).toBeHidden()
+    await nav.getByRole('button', { name: 'Accounts' }).hover()
+    await expect(label).toBeVisible()
+  })
+
+  test('toggling saves the new state and a reload restores it', async ({ page }) => {
+    await mockApi(page)
+    await page.goto('/')
+    const toggle = page.getByRole('button', { name: 'Toggle navigation' })
+    const saved = page.waitForRequest((request) =>
+      request.url().endsWith('/api/preferences/navigation') && request.method() === 'PUT')
+    await toggle.click()
+    expect((await saved).postDataJSON()).toEqual({ state: 'Pinned' })
+    await page.reload()
+    await expect(page.getByRole('button', { name: 'Toggle navigation' }))
+      .toHaveAttribute('aria-expanded', 'true')
+  })
+
+  test('shows the shell compact within 2.5 s of the session when the preference is slow', async ({ page }) => {
+    await mockApi(page, { navigation: 'Pinned', navigationDelayMs: 5000 })
+    const session = page.waitForResponse((response) => response.url().endsWith('/api/security/session'))
+    await page.goto('/', { waitUntil: 'commit' })
+    await session
+    const start = Date.now()
+    const nav = page.getByRole('navigation', { name: 'Primary' })
+    await expect(nav).toBeVisible({ timeout: 2500 })
+    expect(Date.now() - start).toBeLessThan(2500)
+    await expect(page.getByRole('button', { name: 'Toggle navigation' }))
+      .toHaveAttribute('aria-expanded', 'false')
+    await page.waitForTimeout(3500)
+    await expect(page.getByRole('button', { name: 'Toggle navigation' }))
+      .toHaveAttribute('aria-expanded', 'false')
+  })
+
+  for (const scheme of ['light', 'dark'] as const) {
+    test(`pinned start has no accessibility violations in the ${scheme} theme`, async ({ page }, testInfo) => {
+      await mockApi(page, { navigation: 'Pinned' })
+      await page.emulateMedia({ colorScheme: scheme })
+      await page.goto('/')
+      await page.getByRole('combobox', { name: 'Theme' }).selectOption(scheme === 'dark' ? 'Dark' : 'Light')
+      await expect(page.locator('html')).toHaveClass(scheme === 'dark' ? /dark/ : /^(?!.*dark)/)
+      await expect(page.getByRole('button', { name: 'Toggle navigation' }))
+        .toHaveAttribute('aria-expanded', 'true')
+      await page.mouse.move(600, 400)
+      await expect(page.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
+      await testInfo.attach(`pinned-start-${scheme}`, {
+        body: await page.screenshot(),
+        contentType: 'image/png',
+      })
+      const accessibility = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+        .analyze()
+      expect(accessibility.violations).toEqual([])
+    })
+  }
+
+  test('applies the pinned start with no transition under reduced motion', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await mockApi(page, { navigation: 'Pinned' })
+    await page.goto('/')
+    const nav = page.getByRole('navigation', { name: 'Primary' })
+    await expect(nav).toBeVisible()
+    const widths: number[] = []
+    for (let sample = 0; sample < 5; sample++) {
+      widths.push((await nav.boundingBox())?.width ?? 0)
+      await page.waitForTimeout(20)
+    }
+    expect(new Set(widths).size).toBe(1)
+    expect(widths[0]).toBeGreaterThan(56)
+  })
 })

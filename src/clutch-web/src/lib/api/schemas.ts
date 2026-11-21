@@ -151,6 +151,12 @@ export const CsrfTokenSchema = z.object({
 
 export const ThemeModeSchema = z.enum(['Light', 'Dark', 'System'])
 
+export const NavigationStateSchema = z.enum(['Pinned', 'Unpinned'])
+
+export const NavigationPreferenceSchema = z.object({
+  state: NavigationStateSchema,
+})
+
 export const ThemePreferenceSchema = z.object({
   mode: ThemeModeSchema,
 }).strict()
@@ -206,5 +212,7 @@ export type TransactionItem = z.infer<typeof TransactionSchema>
 export type TransactionPage = z.infer<typeof TransactionPageSchema>
 export type UserSession = z.infer<typeof SessionSchema>
 export type ImportLimits = z.infer<typeof ImportLimitsSchema>
+export type NavigationState = z.infer<typeof NavigationStateSchema>
+export type NavigationPreference = z.infer<typeof NavigationPreferenceSchema>
 export type ThemeMode = z.infer<typeof ThemeModeSchema>
 export type ThemePreference = z.infer<typeof ThemePreferenceSchema>

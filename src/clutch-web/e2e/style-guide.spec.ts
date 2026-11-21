@@ -122,6 +122,7 @@ async function mockApi(page: Page, options: Partial<Mock> = {}): Promise<Mock> {
       return route.fulfill({ json: { id: 'browser-user', roles: ['Administrator'] } })
     }
     if (path === '/api/security/csrf-token') return route.fulfill({ json: { requestToken: 'test-token' } })
+    if (path === '/api/preferences/navigation') return route.fulfill({ json: { state: 'Unpinned' } })
     if (path === '/api/preferences/theme') {
       if (mock.themeLoadFails) return route.fulfill({ status: 500, json: { title: 'Preference failure' } })
       return route.fulfill({ json: { mode: mock.theme } })

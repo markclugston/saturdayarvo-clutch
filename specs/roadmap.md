@@ -15,3 +15,6 @@
 [x] make sure Title Case rule has been retrofitted.
 [x] make sure the constitution recognises % and $ inputs and proper validation occurs
 [x] address the poor ux for the delete confirmation in categories
+[] on the mortgages page it currently asks for first payment date.  but it should be load start date.
+[] need to have resiliance in the front end if the server is not available
+[] need to have resiliance on the server if the database is not available

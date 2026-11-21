@@ -34,6 +34,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<UserThemePreference> UserThemePreferences => Set<UserThemePreference>();
 
+    public DbSet<UserNavigationPreference> UserNavigationPreferences => Set<UserNavigationPreference>();
+
     public DbSet<Mortgage> Mortgages => Set<Mortgage>();
 
     public DbSet<InterestRateChange> MortgageInterestRateChanges => Set<InterestRateChange>();
@@ -228,6 +230,29 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .HasMaxLength(450)
                 .IsRequired();
             entity.Property(preference => preference.Mode)
+                .HasConversion<string>()
+                .HasMaxLength(16)
+                .IsUnicode(false)
+                .IsRequired();
+            entity.Property(preference => preference.UpdatedAtUtc)
+                .HasColumnType("datetimeoffset")
+                .IsRequired();
+            entity.HasOne<ApplicationUser>()
+                .WithMany()
+                .HasForeignKey(preference => preference.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<UserNavigationPreference>(entity =>
+        {
+            entity.ToTable("UserNavigationPreferences", table => table.HasCheckConstraint(
+                "CK_UserNavigationPreferences_State",
+                "[State] IN ('Pinned', 'Unpinned')"));
+            entity.HasKey(preference => preference.UserId);
+            entity.Property(preference => preference.UserId)
+                .HasMaxLength(450)
+                .IsRequired();
+            entity.Property(preference => preference.State)
                 .HasConversion<string>()
                 .HasMaxLength(16)
                 .IsUnicode(false)

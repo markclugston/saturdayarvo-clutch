@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getAccount, getCurrencies } from '@/features/accounts/api'
 import { getSession, signIn, signOut } from '@/features/auth/api'
 import { confirmImportReview, createImportReview, getAccountImportSettings, getImportStatus } from '@/features/imports/api'
-import { ApiError } from '@/lib/api/client'
+import { ApiError, apiRequest } from '@/lib/api/client'
 import { useUnsavedChanges } from '@/components/unsaved-changes/UnsavedChangesProvider'
 import { renderWithQueryClient } from '@/test/renderWithQueryClient'
 import App from './App'
@@ -17,7 +17,8 @@ vi.mock('@/features/auth/api', () => ({
   signOut: vi.fn(),
 }))
 
-vi.mock('@/features/preferences/api', () => ({
+vi.mock('@/features/preferences/api', async (importActual) => ({
+  ...await importActual<typeof import('@/features/preferences/api')>(),
   useThemePreference: () => ({
     data: { mode: 'Light' },
     isError: false,
@@ -28,6 +29,54 @@ vi.mock('@/features/preferences/api', () => ({
     mutate: vi.fn(),
   }),
 }))
+
+// The navigation preference hooks are real; only the HTTP boundary is replaced.
+vi.mock('@/lib/api/client', async (importActual) => ({
+  ...await importActual<typeof import('@/lib/api/client')>(),
+  apiRequest: vi.fn(),
+}))
+
+type ApiRequestInit = RequestInit | undefined
+
+function navigationRequests(method: 'GET' | 'PUT') {
+  return vi.mocked(apiRequest).mock.calls.filter(([path, , init]) =>
+    path === '/api/preferences/navigation' && ((init as ApiRequestInit)?.method ?? 'GET') === method)
+}
+
+function respondToNavigation(handlers: {
+  get?: (signal: AbortSignal | null | undefined) => Promise<unknown>
+  put?: (state: string) => Promise<unknown>
+} = {}) {
+  vi.mocked(apiRequest).mockImplementation((async (
+    path: string,
+    _schema: unknown,
+    init?: RequestInit,
+  ) => {
+    if (path !== '/api/preferences/navigation') {
+      // Anything else was never reachable in these tests (no network), so it still fails.
+      throw new TypeError('Failed to fetch')
+    }
+    if (init?.method === 'PUT') {
+      const { state } = JSON.parse(String(init.body)) as { state: string }
+      return handlers.put ? handlers.put(state) : { state }
+    }
+    return handlers.get ? handlers.get(init?.signal) : { state: 'Unpinned' }
+  }) as never)
+}
+
+function abortable(signal: AbortSignal | null | undefined, value?: unknown) {
+  return new Promise<unknown>((resolve, reject) => {
+    const fail = () => reject(new DOMException('Aborted', 'AbortError'))
+    if (signal?.aborted) {
+      fail()
+      return
+    }
+    signal?.addEventListener('abort', fail)
+    if (value !== undefined) {
+      resolve(value)
+    }
+  })
+}
 
 vi.mock('@/features/accounts/AccountsPage', () => ({
   AccountsPage: ({ onSelectAccount }: { onSelectAccount: (id: string) => void }) => {
@@ -110,6 +159,7 @@ describe('session loading', () => {
 
   beforeEach(() => {
     vi.resetAllMocks()
+    respondToNavigation()
     vi.mocked(getImportStatus).mockImplementation(async (accountId, reviewId) => reviewId ? ({
       accountId, availability: 'Blocked',
       activeImport: { id: reviewId, stage: 'Preview', canEnd: true, expiresAtUtc: '2027-01-15T14:00:00Z' },
@@ -656,5 +706,194 @@ describe('session loading', () => {
     expect(await screen.findByRole('heading', { name: 'Your Accounts' })).toBeInTheDocument()
     expect(screen.queryByText('Owner private account')).not.toBeInTheDocument()
     expect(screen.queryByText('Owner private import settings')).not.toBeInTheDocument()
+  })
+
+  describe('saved navigation state', () => {
+    it('holds the startup dialog while the preference is pending, then renders pinned first', async () => {
+      vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
+      let resolvePreference: ((value: unknown) => void) | undefined
+      respondToNavigation({
+        get: () => new Promise((resolve) => { resolvePreference = resolve }),
+      })
+      const expandedAtMount: boolean[] = []
+      const observer = new MutationObserver(() => {
+        const toggle = screen.queryByRole('button', { name: 'Toggle navigation' })
+        if (toggle) {
+          expandedAtMount.push(toggle.getAttribute('aria-expanded') === 'true')
+        }
+      })
+      observer.observe(document.body, { childList: true, subtree: true })
+      renderWithQueryClient(<App />)
+
+      await waitFor(() => expect(navigationRequests('GET')).toHaveLength(1))
+      expect(screen.queryByRole('navigation', { name: 'Primary' })).not.toBeInTheDocument()
+      expect(screen.getByRole('status')).toBeInTheDocument()
+
+      await act(async () => resolvePreference?.({ state: 'Pinned' }))
+
+      const toggle = await screen.findByRole('button', { name: 'Toggle navigation' })
+      expect(toggle).toHaveAttribute('aria-expanded', 'true')
+      observer.disconnect()
+      expect(expandedAtMount.length).toBeGreaterThan(0)
+      expect(expandedAtMount.every(Boolean)).toBe(true)
+    })
+
+    it('does not request the preference until the session has loaded', async () => {
+      vi.mocked(getSession).mockRejectedValue(new ApiError(401, { title: 'Authentication required' }))
+      renderWithQueryClient(<App />)
+
+      expect(await screen.findByRole('heading', { name: 'Sign In' })).toBeInTheDocument()
+      expect(navigationRequests('GET')).toHaveLength(0)
+    })
+
+    it('starts pinned after signing in from the sign-in screen', async () => {
+      vi.mocked(getSession)
+        .mockRejectedValueOnce(new ApiError(401, { title: 'Authentication required' }))
+        .mockResolvedValueOnce({ id: 'user-1', roles: [] })
+      vi.mocked(signIn).mockResolvedValue()
+      respondToNavigation({ get: async () => ({ state: 'Pinned' }) })
+      const user = userEvent.setup()
+      renderWithQueryClient(<App />)
+
+      await user.type(await screen.findByLabelText('Email'), 'user@example.test')
+      await user.type(screen.getByLabelText('Password'), 'password')
+      await user.click(screen.getByRole('button', { name: 'Sign In' }))
+
+      expect(await screen.findByRole('button', { name: 'Toggle navigation' }))
+        .toHaveAttribute('aria-expanded', 'true')
+    })
+
+    it('starts compact when the preference request fails', async () => {
+      vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
+      respondToNavigation({ get: async () => { throw new ApiError(500, { title: 'Server error' }) } })
+      renderWithQueryClient(<App />)
+
+      expect(await screen.findByRole('button', { name: 'Toggle navigation' }))
+        .toHaveAttribute('aria-expanded', 'false')
+    })
+
+    it('gives up after 2 s, starts compact and ignores a late response', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+      vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
+      respondToNavigation({ get: (signal) => abortable(signal) })
+      renderWithQueryClient(<App />)
+
+      await waitFor(() => expect(navigationRequests('GET')).toHaveLength(1))
+      expect(screen.queryByRole('navigation', { name: 'Primary' })).not.toBeInTheDocument()
+      await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
+
+      const toggle = await screen.findByRole('button', { name: 'Toggle navigation' })
+      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    })
+
+    it('flips aria-expanded at once and sends one PUT per toggle; hover and focus send none', async () => {
+      vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
+      const user = userEvent.setup()
+      renderWithQueryClient(<App />)
+
+      const toggle = await screen.findByRole('button', { name: 'Toggle navigation' })
+      const nav = screen.getByRole('navigation', { name: 'Primary' })
+      await user.hover(nav)
+      await user.unhover(nav)
+      await user.tab()
+      expect(navigationRequests('PUT')).toHaveLength(0)
+
+      await user.click(toggle)
+      expect(toggle).toHaveAttribute('aria-expanded', 'true')
+      await waitFor(() => expect(navigationRequests('PUT')).toHaveLength(1))
+      expect(JSON.parse(String(navigationRequests('PUT')[0]?.[2]?.body))).toEqual({ state: 'Pinned' })
+    })
+
+    it('shows a toast and keeps the chosen state when the save fails', async () => {
+      vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
+      respondToNavigation({ put: async () => { throw new ApiError(503, { title: 'Unavailable' }) } })
+      const user = userEvent.setup()
+      renderWithQueryClient(<App />)
+
+      const toggle = await screen.findByRole('button', { name: 'Toggle navigation' })
+      await user.click(toggle)
+
+      expect(await screen.findByText(/could not be saved/)).toBeInTheDocument()
+      expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    })
+
+    it('saves rapid toggles in order so the last request carries the final state', async () => {
+      vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
+      const user = userEvent.setup()
+      renderWithQueryClient(<App />)
+
+      const toggle = await screen.findByRole('button', { name: 'Toggle navigation' })
+      await user.click(toggle)
+      await user.click(toggle)
+      await user.click(toggle)
+
+      await waitFor(() => expect(navigationRequests('PUT')).toHaveLength(3))
+      const states = navigationRequests('PUT').map(([, , init]) =>
+        (JSON.parse(String((init as RequestInit).body)) as { state: string }).state)
+      expect(states).toEqual(['Pinned', 'Unpinned', 'Pinned'])
+      expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    })
+
+    it('shows the next user their own state and nothing from a save left pending at sign-out', async () => {
+      vi.mocked(getSession)
+        .mockResolvedValueOnce({ id: 'user-1', roles: [] })
+        .mockRejectedValueOnce(new ApiError(401, { title: 'Authentication required' }))
+        .mockResolvedValueOnce({ id: 'user-2', roles: [] })
+      vi.mocked(signOut).mockResolvedValue()
+      vi.mocked(signIn).mockResolvedValue()
+      let failPendingSave: (() => void) | undefined
+      respondToNavigation({
+        get: async () => ({ state: 'Unpinned' }),
+        put: () => new Promise((_resolve, reject) => {
+          failPendingSave = () => reject(new ApiError(503, { title: 'Unavailable' }))
+        }),
+      })
+      const user = userEvent.setup()
+      renderWithQueryClient(<App />)
+
+      await user.click(await screen.findByRole('button', { name: 'Toggle navigation' }))
+      await waitFor(() => expect(navigationRequests('PUT')).toHaveLength(1))
+      respondToNavigation({ get: async () => ({ state: 'Unpinned' }) })
+      await user.click(screen.getByRole('button', { name: 'Sign Out' }))
+      expect(await screen.findByRole('heading', { name: 'Sign In' })).toBeInTheDocument()
+
+      await act(async () => failPendingSave?.())
+      expect(screen.queryByText(/could not be saved/)).not.toBeInTheDocument()
+
+      await user.type(screen.getByLabelText('Email'), 'two@example.test')
+      await user.type(screen.getByLabelText('Password'), 'password')
+      await user.click(screen.getByRole('button', { name: 'Sign In' }))
+
+      const toggle = await screen.findByRole('button', { name: 'Toggle navigation' })
+      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+      expect(screen.queryByText(/could not be saved/)).not.toBeInTheDocument()
+    })
+
+    it('shows a different user their own saved state after sign-in', async () => {
+      vi.mocked(getSession)
+        .mockResolvedValueOnce({ id: 'user-1', roles: [] })
+        .mockRejectedValueOnce(new ApiError(401, { title: 'Authentication required' }))
+        .mockResolvedValueOnce({ id: 'user-2', roles: [] })
+      vi.mocked(signOut).mockResolvedValue()
+      vi.mocked(signIn).mockResolvedValue()
+      respondToNavigation({ get: async () => ({ state: 'Pinned' }) })
+      const user = userEvent.setup()
+      renderWithQueryClient(<App />)
+
+      expect(await screen.findByRole('button', { name: 'Toggle navigation' }))
+        .toHaveAttribute('aria-expanded', 'true')
+      await user.click(screen.getByRole('button', { name: 'Sign Out' }))
+      expect(await screen.findByRole('heading', { name: 'Sign In' })).toBeInTheDocument()
+
+      respondToNavigation({ get: async () => ({ state: 'Unpinned' }) })
+      await user.type(screen.getByLabelText('Email'), 'two@example.test')
+      await user.type(screen.getByLabelText('Password'), 'password')
+      await user.click(screen.getByRole('button', { name: 'Sign In' }))
+
+      expect(await screen.findByRole('button', { name: 'Toggle navigation' }))
+        .toHaveAttribute('aria-expanded', 'false')
+    })
   })
 })

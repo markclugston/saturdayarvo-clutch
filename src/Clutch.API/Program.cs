@@ -3,6 +3,7 @@ using Clutch.API.Api.Endpoints;
 using Clutch.API.Api.Security;
 using Clutch.API.Application.Imports;
 using Clutch.API.Application.Mortgages;
+using Clutch.API.Application.Preferences;
 using Clutch.API.Application.Transactions;
 using Clutch.API.Infrastructure;
 using Clutch.API.Infrastructure.Identity;
@@ -23,6 +24,7 @@ builder.Services.AddOpenTelemetry()
         .AddMeter(ImportMetrics.MeterName)
         .AddMeter(TransactionMetrics.MeterName)
         .AddMeter(MortgageMetrics.MeterName)
+        .AddMeter(PreferenceMetrics.MeterName)
         .AddOtlpExporter());
 builder.Services.AddHealthChecks();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -94,6 +96,7 @@ app.MapImportEndpoints();
 app.MapTransactionEndpoints();
 app.MapAdminImportLimitEndpoints();
 app.MapThemePreferenceEndpoints();
+app.MapNavigationPreferenceEndpoints();
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
     Predicate = _ => false,

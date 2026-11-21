@@ -329,6 +329,8 @@ test.describe('account import settings', () => {
             settingsSaved: true,
           },
         })
+      } else if (path === '/api/preferences/navigation') {
+        await route.fulfill({ json: { state: 'Unpinned' } })
       } else if (path === '/api/preferences/theme' && request.method() === 'GET') {
         await route.fulfill({ json: { mode: themeMode } })
       } else if (path === '/api/preferences/theme' && request.method() === 'PUT') {

@@ -89,6 +89,7 @@ public static class DependencyInjection
         services.AddScoped<AccountImportSettingsService>();
         services.AddScoped<ImportLimitSettingsService>();
         services.AddScoped<ThemePreferenceService>();
+        services.AddScoped<NavigationPreferenceService>();
         services.AddScoped<TransactionService>();
         services.AddScoped<IImportAttemptLimiter, ImportAttemptLimiter>();
         services.AddHostedService<ImportReviewCleanupService>();

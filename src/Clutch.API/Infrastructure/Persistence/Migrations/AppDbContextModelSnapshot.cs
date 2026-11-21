@@ -519,6 +519,29 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Clutch.API.Infrastructure.Persistence.Entities.UserNavigationPreference", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(16)");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("UserNavigationPreferences", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_UserNavigationPreferences_State", "[State] IN ('Pinned', 'Unpinned')");
+                        });
+                });
+
             modelBuilder.Entity("Clutch.API.Infrastructure.Persistence.Entities.UserThemePreference", b =>
                 {
                     b.Property<string>("UserId")
@@ -752,6 +775,15 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("Clutch.API.Infrastructure.Persistence.Entities.ImportRateWindow", b =>
+                {
+                    b.HasOne("Clutch.API.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Clutch.API.Infrastructure.Persistence.Entities.UserNavigationPreference", b =>
                 {
                     b.HasOne("Clutch.API.Infrastructure.Identity.ApplicationUser", null)
                         .WithMany()

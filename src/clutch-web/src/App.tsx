@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FolderTree, Landmark, Menu, Wallet } from 'lucide-react'
-import { useRef, useState, type PointerEvent } from 'react'
+import { useRef, useState, type PointerEvent, type ReactNode } from 'react'
+import { useNavigationPreference, useSaveNavigationPreference } from '@/features/preferences/api'
 import { AccountDetails } from '@/features/accounts/AccountDetails'
 import { AccountsPage } from '@/features/accounts/AccountsPage'
 import { ImportLimitsPage } from '@/features/admin/ImportLimitsPage'
@@ -18,7 +19,7 @@ import { AppShell } from '@/components/ui/app-shell'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ContentPanel } from '@/components/ui/content-panel'
-import { ToastProvider } from '@/components/ui/toast'
+import { ToastProvider, useToast } from '@/components/ui/toast'
 import { UnsavedChangesProvider, useUnsavedChanges } from '@/components/unsaved-changes/UnsavedChangesProvider'
 import { ErrorMessage } from '@/components/ui/error-message'
 import { SideNav, SideNavItem } from '@/components/ui/side-nav'
@@ -45,7 +46,6 @@ function AppContent() {
   const [showAdminSettings, setShowAdminSettings] = useState(false)
   const [showCategories, setShowCategories] = useState(false)
   const [showMortgages, setShowMortgages] = useState(false)
-  const navigation = useNavigationExpansion()
   const sessionQuery = useQuery({
     queryKey: ['session'],
     queryFn: async ({ signal }) => {
@@ -80,6 +80,8 @@ function AppContent() {
     refetchOnWindowFocus: !isDirty,
     refetchOnReconnect: !isDirty,
   })
+  const userId = sessionQuery.data?.id
+  const navigationPreference = useNavigationPreference(userId)
   const signOutMutation = useMutation({
     mutationFn: signOut,
     onSuccess: async () => {
@@ -88,7 +90,6 @@ function AppContent() {
       setShowAdminSettings(false)
       setShowCategories(false)
       setShowMortgages(false)
-      navigation.reset()
       setMode('Light')
       queryClient.removeQueries({
         predicate: (query) => query.queryKey[0] !== 'session',
@@ -133,35 +134,42 @@ function AppContent() {
     )
   }
 
+  // Hold the startup dialog until the saved navigation state has loaded (or failed / timed out
+  // after 2 s), so the shell renders once in its final state with no compact-to-pinned jump.
+  if (userId && navigationPreference.isPending) {
+    return (
+      <>
+        <AuthPage inert />
+        <StartupLoadingDialog open />
+      </>
+    )
+  }
+
   return (
-    <AppShell
-      title="Clutch"
-      navExpanded={navigation.expanded}
-      nav={(
-        <PrimaryNavigation
-          navigation={navigation}
-          accountsCurrent={!showCategories && !showMortgages && !showAdminSettings}
-          categoriesCurrent={showCategories && !showMortgages && !showAdminSettings}
-          mortgagesCurrent={showMortgages && !showAdminSettings}
-          onAccounts={() => run(() => {
-            setShowCategories(false)
-            setShowMortgages(false)
-            setShowAdminSettings(false)
-            setSelectedAccountId(null)
-            setIsImporting(false)
-          })}
-          onCategories={() => run(() => {
-            setShowCategories(true)
-            setShowMortgages(false)
-            setShowAdminSettings(false)
-          })}
-          onMortgages={() => run(() => {
-            setShowMortgages(true)
-            setShowCategories(false)
-            setShowAdminSettings(false)
-          })}
-        />
-      )}
+    <SignedInShell
+      key={userId ?? 'anonymous'}
+      userId={userId}
+      initialPinned={navigationPreference.data?.state === 'Pinned'}
+      accountsCurrent={!showCategories && !showMortgages && !showAdminSettings}
+      categoriesCurrent={showCategories && !showMortgages && !showAdminSettings}
+      mortgagesCurrent={showMortgages && !showAdminSettings}
+      onAccounts={() => run(() => {
+        setShowCategories(false)
+        setShowMortgages(false)
+        setShowAdminSettings(false)
+        setSelectedAccountId(null)
+        setIsImporting(false)
+      })}
+      onCategories={() => run(() => {
+        setShowCategories(true)
+        setShowMortgages(false)
+        setShowAdminSettings(false)
+      })}
+      onMortgages={() => run(() => {
+        setShowMortgages(true)
+        setShowCategories(false)
+        setShowAdminSettings(false)
+      })}
       header={(
         <header className="flex flex-wrap items-center justify-end gap-4 px-5 pb-2.5 pt-[18px] lg:pb-1.5">
           <div className="flex flex-wrap items-center gap-3">
@@ -232,6 +240,54 @@ function AppContent() {
         )}
       </ContentPanel>
       {showCategories && !showMortgages && !showAdminSettings && <AddCategoryForm />}
+    </SignedInShell>
+  )
+}
+
+type SignedInShellProps = {
+  userId: string | undefined
+  initialPinned: boolean
+  header: ReactNode
+  children: ReactNode
+} & Omit<PrimaryNavigationProps, 'navigation'>
+
+/**
+ * Owns the navigation state for one signed-in user. It mounts only after the saved preference
+ * has settled and is keyed by user ID, so it starts in its final state and sign-out discards it.
+ */
+function SignedInShell({
+  userId,
+  initialPinned,
+  header,
+  children,
+  ...destinations
+}: SignedInShellProps) {
+  const navigation = useNavigationExpansion(initialPinned)
+  const savePreference = useSaveNavigationPreference(userId)
+  const toast = useToast()
+
+  const toggle = () => {
+    const next = navigation.pinned ? 'Unpinned' : 'Pinned'
+    navigation.toggle()
+    if (userId) {
+      // Per-call onError is skipped once the shell unmounts, so a save pending at sign-out
+      // never shows a toast to the next user.
+      savePreference.mutate(next, {
+        onError: () => toast.show(
+          'Your navigation setting could not be saved. It stays as you set it for this visit.',
+        ),
+      })
+    }
+  }
+
+  return (
+    <AppShell
+      title="Clutch"
+      navExpanded={navigation.expanded}
+      nav={<PrimaryNavigation navigation={{ ...navigation, toggle }} {...destinations} />}
+      header={header}
+    >
+      {children}
     </AppShell>
   )
 }
@@ -241,16 +297,18 @@ type NavigationExpansion = ReturnType<typeof useNavigationExpansion>
 /**
  * The navigation expands while a mouse hovers it. Clicking the hamburger pins it open until
  * the hamburger is clicked again; unpinning while the pointer is still over the navigation
- * collapses it until the pointer leaves and re-enters. Nothing is persisted.
+ * collapses it until the pointer leaves and re-enters. Only the pinned choice is saved, per user;
+ * `initialPinned` is the saved value, applied before the first render.
  */
-function useNavigationExpansion() {
-  const [pinned, setPinned] = useState(false)
+function useNavigationExpansion(initialPinned: boolean) {
+  const [pinned, setPinned] = useState(initialPinned)
   const [hovered, setHovered] = useState(false)
   const [hoverSuppressed, setHoverSuppressed] = useState(false)
   const expanded = pinned || (hovered && !hoverSuppressed)
 
   return {
     expanded,
+    pinned,
     toggle: () => {
       if (pinned) {
         setPinned(false)
@@ -258,11 +316,6 @@ function useNavigationExpansion() {
       } else {
         setPinned(true)
       }
-    },
-    reset: () => {
-      setPinned(false)
-      setHovered(false)
-      setHoverSuppressed(false)
     },
     handlers: {
       onPointerEnter: (event: PointerEvent<HTMLElement>) => {
