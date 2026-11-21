@@ -34,14 +34,17 @@ accepted, preparation and transaction writing are protected. A session whose pre
 was ended shows a blocking notice naming the ending user; acknowledgement returns to
 that account's transactions.
 
-Run the isolated, real-API browser checks from `src/clutch-web`:
+Run the real-API browser checks from `src/clutch-web`:
 
 ```powershell
-npm exec playwright test -- --config playwright.active-import.config.ts
+npm run test:e2e:integration
 ```
 
-This provisions disposable SQL Server and HTTPS API instances with unique test-owned
-resources and free loopback ports. See the [validation guide](specs/011-validate-active-import/quickstart.md)
+This starts one disposable SQL Server container and HTTPS API, creates the test users
+(owner, a second user and the bootstrapped administrator) and their saved sign-in state, and
+runs every journey that needs a real backend. It needs Docker, the .NET SDK and ports 5173
+and 7180. `npm run test:e2e` runs the browser specs that mock the API, and `npm run test:all`
+runs every frontend suite. See the [validation guide](specs/011-validate-active-import/quickstart.md)
 for focused backend/frontend checks, prerequisites and release gates.
 
 Before deploying the additive `ActiveImportCoordination` migration, block import routes

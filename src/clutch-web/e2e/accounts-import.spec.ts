@@ -185,7 +185,7 @@ test.describe('authenticated personal accounts and transaction import', () => {
       .selectOption('dot-decimal-comma-grouping')
     await page.getByRole('button', { name: 'Review Import' }).click()
 
-    await expect(page.getByRole('status')).toContainText('Possible duplicates are highlighted')
+    await expect(page.getByRole('status').filter({ hasText: 'Possible duplicates are highlighted' })).toBeVisible()
     const accessibility = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
       .analyze()
@@ -196,10 +196,11 @@ test.describe('authenticated personal accounts and transaction import', () => {
     await page.getByLabel(/I reviewed the possible duplicates/).check()
     await expect(confirmButton).toBeEnabled()
     await confirmButton.click()
-    await expect(page.getByRole('status')).toContainText('2 transactions imported successfully')
+    await expect(page.getByRole('status').filter({ hasText: '2 transactions imported successfully' })).toBeVisible()
     await page.getByRole('button', { name: 'Return to Account' }).click()
     await expect(page.getByRole('button', { name: 'Back to Accounts' })).toBeFocused()
 
+    await page.getByRole('combobox', { name: 'Theme' }).selectOption('System')
     await page.emulateMedia({ colorScheme: 'dark' })
     await expect.poll(() => page.locator('html').evaluate((element) =>
       element.classList.contains('dark'))).toBe(true)

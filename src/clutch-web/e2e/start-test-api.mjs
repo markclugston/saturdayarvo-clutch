@@ -44,6 +44,12 @@ try {
     ASPNETCORE_Kestrel__Certificates__Default__Path: certificatePath,
     ASPNETCORE_Kestrel__Certificates__Default__Password: certificatePassword,
     'Logging__LogLevel__Microsoft.EntityFrameworkCore.Database.Command': 'Warning',
+    ...(process.env.CLUTCH_E2E_ADMIN_EMAIL && process.env.CLUTCH_E2E_ADMIN_PASSWORD
+      ? {
+        AdminBootstrap__Email: process.env.CLUTCH_E2E_ADMIN_EMAIL,
+        AdminBootstrap__Password: process.env.CLUTCH_E2E_ADMIN_PASSWORD,
+      }
+      : {}),
     ConnectionStrings__Clutch: `Server=127.0.0.1,${sqlPort};Database=ClutchE2E;User Id=sa;Password=${password};TrustServerCertificate=True;Encrypt=False`,
   }
   await applyMigrations()

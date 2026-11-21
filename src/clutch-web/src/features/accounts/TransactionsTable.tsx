@@ -49,7 +49,12 @@ export function TransactionsTable({
           transaction={pendingDelete}
         />
       )}
-      <div className="overflow-x-auto rounded-control">
+      <div
+        aria-label="Transactions"
+        className="overflow-x-auto rounded-control focus-visible:focus-ring"
+        role="region"
+        tabIndex={0}
+      >
         <table className="w-full text-left text-sm">
           <caption className="sr-only">Transactions for this account</caption>
           <thead className="bg-raised">

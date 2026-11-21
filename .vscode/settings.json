@@ -26,7 +26,7 @@
         "npm run typecheck": true,
         "/^Test-Path 'node_modules'$/": true,
         "npm run test:e2e": true,
-        "npm run test:e2e:ownership": true,
+        "npm run test:e2e:integration": true,
         "npx eslint": true
   },
 }

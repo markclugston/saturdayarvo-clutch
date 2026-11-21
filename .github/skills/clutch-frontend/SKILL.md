@@ -61,7 +61,7 @@ assuming names. Add quiet reporter flags (`--reporter=dot` for Vitest, `--report
 
 - Don't rerun a gate unless code it covers changed since it last passed.
 - Browser tests, the production build and the dependency audit run at completion, not per task.
-- Browser tests are slow. Run only the specs or per-journey Playwright configs the feature touches.
+- Browser tests are slow. Run only the specs the feature touches: `playwright.config.ts` for mocked-API specs, `playwright.integration.config.ts` (Docker, real API) for specs that need a backend.
 
 ## Quality gates (CI and completion)
 

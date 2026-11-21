@@ -30,6 +30,8 @@ test.describe('administrator import limits', () => {
       await rowLimit.fill(String(originalLimit + 1))
       await page.getByRole('button', { name: 'Save Limits' }).click()
       await expect(rowLimit).toHaveValue(String(originalLimit + 1))
+      // Wait for the save to finish and the form to reset, or the refetch overwrites the next edit.
+      await expect(page.getByRole('button', { name: 'Save Limits' })).toBeDisabled()
 
       await rowLimit.fill(String(originalLimit))
       await page.getByRole('button', { name: 'Save Limits' }).click()

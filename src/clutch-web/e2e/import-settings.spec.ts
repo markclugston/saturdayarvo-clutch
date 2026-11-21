@@ -48,7 +48,7 @@ test.describe('account import settings', () => {
     await expect(page.getByRole('button', { name: 'Confirm Import' })).toBeVisible()
     await expectAccessibleAcrossThemeAndViewports(page)
     await page.getByRole('button', { name: 'Confirm Import' }).click()
-    await expect(page.getByRole('status')).toContainText('1 transactions imported successfully')
+    await expect(page.getByRole('status').filter({ hasText: '1 transactions imported successfully' })).toBeVisible()
     await expectAccessibleAcrossThemeAndViewports(page)
 
     await page.getByRole('button', { name: 'Return to Account' }).click()
@@ -85,9 +85,12 @@ test.describe('account import settings', () => {
     await reviewWithSettingsButton.focus()
     await page.keyboard.press('Enter')
     const confirmSavedImport = page.getByRole('button', { name: 'Confirm Import' })
+    // Confirm stays disabled until the availability check reports the preview ready, and a
+    // disabled button cannot take focus.
+    await expect(confirmSavedImport).toBeEnabled()
     await confirmSavedImport.focus()
     await page.keyboard.press('Enter')
-    await expect(page.getByRole('status')).toContainText('1 transactions imported successfully')
+    await expect(page.getByRole('status').filter({ hasText: '1 transactions imported successfully' })).toBeVisible()
 
     await page.getByRole('button', { name: 'Return to Account' }).click()
     await page.getByRole('button', { name: 'Import Transactions' }).click()
@@ -105,9 +108,10 @@ test.describe('account import settings', () => {
     await page.getByLabel('Incoming Transactions Use').selectOption('Negative')
     await page.getByRole('button', { name: 'Review Import' }).click()
     const confirmButton = page.getByRole('button', { name: 'Confirm Import' })
+    await expect(confirmButton).toBeEnabled()
     await confirmButton.focus()
     await page.keyboard.press('Enter')
-    await expect(page.getByRole('status')).toContainText('1 transactions imported successfully')
+    await expect(page.getByRole('status').filter({ hasText: '1 transactions imported successfully' })).toBeVisible()
 
     const browserContext = await browser.newContext({
       storageState: await page.context().storageState(),
@@ -179,11 +183,12 @@ test.describe('account import settings', () => {
         .selectOption('dot-decimal-comma-grouping')
       await page.getByRole('button', { name: 'Review Import' }).click()
       await page.getByRole('button', { name: 'Confirm Import' }).click()
-      await expect(page.getByRole('status')).toContainText('1 transactions imported successfully')
+      await expect(page.getByRole('status').filter({ hasText: '1 transactions imported successfully' })).toBeVisible()
 
       await page.getByRole('button', { name: 'Return to Account' }).click()
       const headers = page.getByRole('columnheader')
-      await expect(headers.last()).toHaveText('Balance')
+      // The delete action column follows the data columns, so Balance is the right-most data column.
+      await expect(headers.nth(-2)).toHaveText('Balance')
 
       await page.getByRole('button', { name: 'Import Transactions' }).click()
       await page.locator('#csv-file').setInputFiles({
@@ -211,7 +216,7 @@ test.describe('account import settings', () => {
         .selectOption('dot-decimal-comma-grouping')
       await page.getByRole('button', { name: 'Review Import' }).click()
       await page.getByRole('button', { name: 'Confirm Import' }).click()
-      await expect(page.getByRole('status')).toContainText('1 transactions imported successfully')
+      await expect(page.getByRole('status').filter({ hasText: '1 transactions imported successfully' })).toBeVisible()
       await page.getByRole('button', { name: 'Return to Account' }).click()
       await expect(page.getByRole('columnheader', { name: 'Amount' })).toBeVisible()
       await expect(page.getByRole('columnheader', { name: 'Balance' })).toHaveCount(0)
@@ -385,7 +390,7 @@ test.describe('account import settings', () => {
       .selectOption('dot-decimal-comma-grouping')
     await page.getByRole('button', { name: 'Review Import' }).click()
     await page.getByRole('button', { name: 'Confirm Import' }).click()
-    await expect(page.getByRole('status')).toContainText('1 transactions imported successfully')
+    await expect(page.getByRole('status').filter({ hasText: '1 transactions imported successfully' })).toBeVisible()
 
     await page.getByRole('button', { name: 'Return to Account' }).click()
     await expect(page.getByRole('button', { name: 'Back to Accounts' })).toBeFocused()

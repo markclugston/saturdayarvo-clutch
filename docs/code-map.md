@@ -32,7 +32,7 @@ contains what's described, search for the concern and update the pointer.
 | Percentage and currency entry fields; display formatting of amounts | `src/clutch-web/src/features/mortgages/FormattedNumberField.tsx`; `src/clutch-web/src/lib/formatCurrencyAmount.ts` |
 | Style-guide browser states (axe, focus, surfaces, screenshots) | `src/clutch-web/e2e/style-guide.spec.ts`, `playwright.style-guide.config.ts` |
 | Component test helpers | `src/clutch-web/src/test/` |
-| Browser test setup and per-journey configs | `src/clutch-web/playwright*.config.ts`, `src/clutch-web/e2e/fixtures.ts` |
+| Browser test setup: mocked-API config, real-API config and its user provisioning | `src/clutch-web/playwright.config.ts`, `playwright.integration.config.ts`, `e2e/integration-setup.ts`, `e2e/fixtures.ts` |
 | Local run and debug setup | `.vscode/launch.json`, `README.md` |
 
 **Settled decisions:** a behaviour already implemented in the code (auth, ownership, error

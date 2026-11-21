@@ -16,7 +16,9 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "test:e2e:ownership": "playwright test --config playwright.ownership.config.ts"
+    "test:e2e:integration": "playwright test --config playwright.integration.config.ts",
+    "test:e2e:style-guide": "playwright test --config playwright.style-guide.config.ts",
+    "test:all": "vitest run && playwright test && playwright test --config playwright.style-guide.config.ts && playwright test --config playwright.integration.config.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

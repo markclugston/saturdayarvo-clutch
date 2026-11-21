@@ -24,7 +24,12 @@ export function ImportReviewTable({ review, currencyCode }: ImportReviewTablePro
           including these possible duplicates.
         </p>
       )}
-      <div className="overflow-x-auto rounded-control">
+      <div
+        aria-label="Validated transactions"
+        className="overflow-x-auto rounded-control focus-visible:focus-ring"
+        role="region"
+        tabIndex={0}
+      >
         <table className="w-full text-left text-sm">
           <caption className="sr-only">Validated transactions for review</caption>
           <thead className="bg-raised">

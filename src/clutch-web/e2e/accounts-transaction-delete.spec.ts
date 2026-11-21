@@ -426,6 +426,8 @@ test.describe('delete imported transaction', () => {
 
       await page.keyboard.press('Space')
       await expect(dialog).toBeVisible()
+      // Focus moves into the dialog after it opens; Shift+Tab before that walks the page behind it.
+      await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused()
       await page.keyboard.press('Shift+Tab')
       await expect(dialog.getByRole('button', { name: 'Delete', exact: true })).toBeFocused()
       await page.keyboard.press('Enter')
