@@ -163,8 +163,14 @@ test('shows contrasting current and keyboard focus indicators in both themes and
             const values = [luminance(first), luminance(second)].sort((a, b) => b - a)
             return ((values[0] ?? 0) + 0.05) / ((values[1] ?? 0) + 0.05)
           }
+          const other = [...element.parentElement?.querySelectorAll('button[aria-label]') ?? []]
+            .find((item) => item !== element && !item.hasAttribute('aria-current'))
+          if (!other) throw new Error('No other destination')
           return {
-            current: contrast(style.backgroundColor, background),
+            // Style guide §3: the selected tint is under 3:1 against canvas, so the primary text carries the indicator.
+            current: contrast(style.color, background),
+            distinct: style.color !== view.getComputedStyle(other).color
+              && style.backgroundColor !== view.getComputedStyle(other).backgroundColor,
             focus: contrast(style.outlineColor, background),
             text: contrast(style.color, style.backgroundColor),
             outlineStyle: style.outlineStyle,
@@ -172,6 +178,7 @@ test('shows contrasting current and keyboard focus indicators in both themes and
           }
         })
         expect(indicators.current).toBeGreaterThanOrEqual(3)
+        expect(indicators.distinct).toBe(true)
         expect(indicators.focus).toBeGreaterThanOrEqual(3)
         expect(indicators.text).toBeGreaterThanOrEqual(4.5)
         expect(indicators.outlineStyle).not.toBe('none')
@@ -211,6 +218,9 @@ test('keeps the pane and content usable across viewports and themes', async ({ p
         .analyze()
       expect(accessibility.violations).toEqual([])
     }
+    // Below 768px a pinned pane overlays the content (015 FR-009), so covered controls are
+    // reached by keyboard there; elsewhere they must also take a pointer.
+    let overlaid = false
     const checkControl = async (control: Locator) => {
       await expect(control).toBeVisible()
       await control.scrollIntoViewIfNeeded()
@@ -219,11 +229,25 @@ test('keeps the pane and content usable across viewports and themes', async ({ p
       if (!bounds || !viewport) throw new Error('Control or viewport has no bounds')
       expect(bounds.x).toBeGreaterThanOrEqual(0)
       expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width + 0.5)
-      await control.click({ trial: true })
+      if (overlaid) {
+        await control.focus()
+        await expect(control).toBeFocused()
+      } else {
+        await control.click({ trial: true })
+      }
+    }
+    const activate = async (control: Locator) => {
+      if (overlaid) {
+        await control.focus()
+        await page.keyboard.press('Enter')
+      } else {
+        await control.click()
+      }
     }
     for (const viewport of [{ width: 320, height: 812 }, { width: 1280, height: 720 }]) {
       await page.setViewportSize(viewport)
       for (const expanded of [false, true]) {
+        overlaid = expanded && viewport.width < 768
         for (const theme of [
           { mode: 'Light', scheme: 'light' },
           { mode: 'Dark', scheme: 'dark' },
@@ -241,7 +265,7 @@ test('keeps the pane and content usable across viewports and themes', async ({ p
           await checkControl(page.getByRole('button', { name: 'Add Account' }))
           await checkAccessibility()
 
-          await page.getByRole('button', { name: /Browser account/ }).click()
+          await activate(page.getByRole('button', { name: /Browser account/ }))
           await expect(page.getByRole('heading', { name: 'Account Details' })).toBeVisible()
           await checkLayout(expanded)
           await checkControl(page.getByLabel('Account Description'))
@@ -249,7 +273,7 @@ test('keeps the pane and content usable across viewports and themes', async ({ p
           await checkControl(page.getByRole('button', { name: 'Save Description' }))
           await checkAccessibility()
 
-          await page.getByRole('button', { name: 'Import Transactions' }).click()
+          await activate(page.getByRole('button', { name: 'Import Transactions' }))
           await expect(page.getByLabel('CSV File')).toBeAttached()
           await checkLayout(expanded)
           await checkControl(page.getByRole('button', { name: 'Choose CSV File' }))
@@ -267,7 +291,7 @@ test('keeps the pane and content usable across viewports and themes', async ({ p
           await expect(page.getByRole('heading', { name: 'Categories and Groups' })).toBeVisible()
           await checkLayout(expanded)
           await checkControl(page.getByRole('button', { name: 'Rename Groceries' }))
-          await page.getByRole('button', { name: 'Rename Groceries' }).click()
+          await activate(page.getByRole('button', { name: 'Rename Groceries' }))
           await checkControl(page.getByLabel('New name for Groceries'))
           await page.getByLabel('New name for Groceries').fill('Groceries updated')
           await checkControl(page.getByRole('button', { name: 'Save', exact: true }))
@@ -314,15 +338,17 @@ test('keeps deeply nested category actions usable beside navigation', async ({ p
     expect(await page.locator('html').evaluate((element) =>
       element.scrollWidth <= element.clientWidth)).toBe(true)
   }
-  const checkReachable = async (control: Locator) => {
+  // A modal dialog is centred over everything, navigation included, so only its viewport fit is checked.
+  const checkReachable = async (control: Locator, besideNavigation = true) => {
     await expect(control).toBeVisible()
     await control.scrollIntoViewIfNeeded()
     await control.click({ trial: true })
     const bounds = await control.boundingBox()
-    const pane = await nav.boundingBox()
+    // A modal dialog hides the navigation from the accessibility tree, so measure it by element.
+    const pane = await page.locator('nav[aria-label="Primary"]').boundingBox()
     const viewport = page.viewportSize()
     if (!bounds || !pane || !viewport) throw new Error('Control, pane or viewport has no bounds')
-    expect(bounds.x).toBeGreaterThanOrEqual(pane.x + pane.width - 0.5)
+    expect(bounds.x).toBeGreaterThanOrEqual(besideNavigation ? pane.x + pane.width - 0.5 : 0)
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width + 0.5)
   }
 
@@ -335,13 +361,14 @@ test('keeps deeply nested category actions usable beside navigation', async ({ p
       await checkNoPageOverflow()
       await setPaneState(page, false)
       if (viewport.width === 320 && expanded) {
-        const list = page.getByRole('list', { name: 'Groups and categories' })
-        await list.evaluate((element) => { element.scrollLeft = 0 })
+        // Each group card scrolls its own table horizontally.
+        const scrollArea = page.getByRole('table', { name: 'Level 0 and its categories' }).locator('xpath=..')
+        await scrollArea.evaluate((element) => { element.scrollLeft = 0 })
         await page.keyboard.press('Tab')
-        await list.focus()
-        await expect(list).toHaveCSS('outline-style', 'solid')
+        await scrollArea.focus()
+        await expect(scrollArea).toHaveCSS('outline-style', 'solid')
         await page.keyboard.press('ArrowRight')
-        await expect.poll(() => list.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0)
+        await expect.poll(() => scrollArea.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0)
       }
       await checkReachable(rename)
       await rename.click()
@@ -357,8 +384,8 @@ test('keeps deeply nested category actions usable beside navigation', async ({ p
       const dialog = page.getByRole('alertdialog')
       await expect(dialog).toContainText(deepestName)
       await checkNoPageOverflow()
-      await checkReachable(dialog.getByRole('button', { name: 'Delete', exact: true }))
-      await checkReachable(dialog.getByRole('button', { name: 'Cancel', exact: true }))
+      await checkReachable(dialog.getByRole('button', { name: 'Delete', exact: true }), false)
+      await checkReachable(dialog.getByRole('button', { name: 'Cancel', exact: true }), false)
       await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
     }
   }
@@ -390,7 +417,8 @@ for (const mode of ['Light', 'Dark'] as const) {
     await page.mouse.move(pane.x + 25, pane.y + 20)
     await categories.focus()
     await page.keyboard.press('Tab')
-    const list = page.getByRole('list', { name: 'Groups and categories' })
+    // The group card's focusable horizontal scroll area.
+    const list = page.getByRole('table', { name: 'Food and its categories' }).locator('xpath=..')
     await expect(list).toBeFocused()
     const listOverlay = await list.evaluate((element) => {
       const rect = element.getBoundingClientRect()
@@ -501,7 +529,8 @@ test('expands on hover and collapses on exit without changing destination behavi
   const nav = page.getByRole('navigation', { name: 'Primary' })
   const accounts = nav.getByRole('button', { name: 'Accounts' })
   const categories = nav.getByRole('button', { name: 'Categories' })
-  await expect(nav.getByRole('button', { name: 'Toggle navigation' })).toHaveCount(0)
+  // The hamburger pins the pane (cbc27b3); hover expansion works without it.
+  await expect(nav.getByRole('button', { name: 'Toggle navigation' })).toHaveAttribute('aria-expanded', 'false')
   await expect(accounts.getByText('Accounts', { exact: true })).toBeHidden()
   await expect(categories.getByText('Categories', { exact: true })).toBeHidden()
   const icon = await accounts.locator('svg').getAttribute('class')
@@ -549,18 +578,24 @@ test('shrinks the main section on expand at 1280 and 1920 and restores it on col
 })
 
 for (const theme of themes) {
-  test(`shrinks content for keyboard focus like hover without clipping in ${theme.mode} (${theme.scheme} scheme)`, async ({ page }) => {
+  // Keyboard users expand the navigation with the hamburger; focus alone no longer expands it (cbc27b3).
+  test(`shrinks content when the keyboard pins the navigation, without clipping, in ${theme.mode} (${theme.scheme} scheme)`, async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 })
     await mockApi(page)
     await page.goto('/')
     await applyTheme(page, theme)
     const nav = page.getByRole('navigation', { name: 'Primary' })
     const main = page.getByRole('main')
+    const toggle = page.getByRole('button', { name: 'Toggle navigation' })
+    await page.mouse.move(600, 400)
     const compactMain = await settledBox(main)
 
     await page.getByRole('button', { name: 'Sign Out' }).focus()
     await page.keyboard.press('Tab')
-    await expect(nav.getByRole('button', { name: 'Accounts' })).toBeFocused()
+    await expect(toggle).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    await expect(toggle).toBeFocused()
     await expect(nav.getByText('Accounts', { exact: true })).toBeVisible()
     const expandedMain = await settledBox(main)
     const pane = await settledBox(nav)
@@ -582,12 +617,16 @@ test('keeps focus and typed input in the page while the navigation expands and c
   await field.fill('Typed value')
   await expect(field).toBeFocused()
 
-  await setPaneState(page, true)
+  // Hover expands without taking focus (clicking the hamburger would move focus to it by design).
+  const label = page.getByRole('navigation', { name: 'Primary' }).getByText('Accounts', { exact: true })
+  await page.mouse.move(28, 300)
+  await expect(label).toBeVisible()
   await settledBox(page.getByRole('main'))
   await expect(field).toBeFocused()
   await expect(field).toHaveValue('Typed value')
   await page.keyboard.type(' more')
-  await setPaneState(page, false)
+  await page.mouse.move(600, 400)
+  await expect(label).toBeHidden()
   await settledBox(page.getByRole('main'))
   await expect(field).toBeFocused()
   await expect(field).toHaveValue('Typed value more')
@@ -617,7 +656,7 @@ test('applies the final geometry without a transition when reduced motion is req
   await page.goto('/')
   const main = page.getByRole('main')
   const compactMain = await settledBox(main)
-  const grid = page.locator('div.grid.min-h-svh')
+  const grid = page.locator('div.grid.h-svh')
   const seconds = parseFloat(await grid.evaluate((element) =>
     getComputedStyle(element).transitionDuration.split(',')[0] ?? '0s'))
   expect(seconds).toBeLessThanOrEqual(0.0001)
@@ -730,22 +769,18 @@ test('navigates directly from a compact touch pane', async ({ browser }) => {
   }
 })
 
-test('reveals navigation labels on keyboard focus and hides them after focus leaves', async ({ page }) => {
+test('reaches the hamburger and every destination by keyboard in order', async ({ page }) => {
   await mockApi(page)
   await page.goto('/')
   const nav = page.getByRole('navigation', { name: 'Primary' })
-  const accounts = nav.getByRole('button', { name: 'Accounts' })
-  const categories = nav.getByRole('button', { name: 'Categories' })
   await page.getByRole('button', { name: 'Sign Out' }).focus()
-  await page.keyboard.press('Tab')
-  await expect(accounts).toBeFocused()
-  await expect(nav.getByText('Accounts', { exact: true })).toBeVisible()
-  await page.keyboard.press('Tab')
-  await expect(categories).toBeFocused()
+  for (const name of ['Toggle navigation', 'Accounts', 'Mortgages', 'Categories']) {
+    await page.keyboard.press('Tab')
+    await expect(nav.getByRole('button', { name })).toBeFocused()
+  }
   await page.keyboard.press('Enter')
   await expect(page.getByRole('heading', { name: 'Categories and Groups' })).toBeVisible()
-  await page.keyboard.press('Tab')
-  await expect(nav.getByText('Accounts', { exact: true })).toBeHidden()
+  await expect(nav.getByRole('button', { name: 'Categories' })).toHaveAttribute('aria-current', 'page')
 })
 
 test('expands on hover and the hamburger pins it open', async ({ page }) => {
