@@ -71,6 +71,19 @@ export function draftsEqual(left: LoanDraft, right: LoanDraft): boolean {
       row.rate === right.rows[index]?.rate && row.date === right.rows[index]?.date)
 }
 
+/** Key of the Opening Rate row (dated on the Disbursal Date); undefined when none or no Disbursal Date. */
+export function openingRowKey(draft: LoanDraft): string | undefined {
+  if (draft.disbursalDate === '') {
+    return undefined
+  }
+  return draft.rows.find((row) => row.date === draft.disbursalDate)?.key
+}
+
+/** The Disbursal Date is editable only while no interest rate changes exist. */
+export function canEditDisbursalDate(draft: LoanDraft): boolean {
+  return draft.rows.length === 0
+}
+
 export function isEmptyRow(row: RateRowDraft): boolean {
   return row.rate.trim() === '' && row.date.trim() === ''
 }

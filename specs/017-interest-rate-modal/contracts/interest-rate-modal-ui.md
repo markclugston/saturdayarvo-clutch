@@ -8,12 +8,12 @@ there is unchanged.
 
 - The "Interest rate changes" rows are removed.
 - Read-only value labelled "Current Interest Rate" (a term/definition pair or labelled text, not an input): `formatPercent` with 2 decimal places (`5.25%`, `6.00%`), or "Not set".
-- Button "Change Interest Rate" beside it at 768 px and wider, stacked below it under 768 px (neither clipped at 320 px), `variant="neutral"`, disabled while saving. Selecting it opens the dialog.
-- Form summary near Save, conflict, save-failed and toast behaviour unchanged from 016, except: when every field error key is a rate-row key (`{rowKey}.newInterestRate` / `.effectiveDate`), the summary line reads "Correct the interest rate changes in Change Interest Rate and try again." With no field errors (for example only the set-level `interestRateChanges` message), neither "Correct …" line is shown, as in 016. No message is added beside Current Interest Rate.
+- Button "Interest Rates" beside it at 768 px and wider, stacked below it under 768 px (neither clipped at 320 px), `variant="neutral"`, disabled while saving. Selecting it opens the dialog.
+- Form summary near Save, conflict, save-failed and toast behaviour unchanged from 016, except: when every field error key is a rate-row key (`{rowKey}.newInterestRate` / `.effectiveDate`), the summary line reads "Correct the interest rate changes in Interest Rates and try again." With no field errors (for example only the set-level `interestRateChanges` message), neither "Correct …" line is shown, as in 016. No message is added beside Current Interest Rate.
 
-## Dialog "Change Interest Rate"
+## Dialog "Interest Rates"
 
-- `role="dialog"`, modal, accessible name "Change Interest Rate"; focus trapped; DOM and Tab order: header (title, "Close"), add area ("New Interest Rate", "Effective Date", "Add"), then each "Remove …" in list order, so "Close" is the first control; Escape or the icon button "Close" closes it and returns focus to "Change Interest Rate". No Save or Cancel buttons.
+- `role="dialog"`, modal, accessible name "Interest Rates"; focus trapped; DOM and Tab order: header (title, "Close"), add area ("New Interest Rate", "Effective Date", "Add"), then each "Remove …" in list order, so "Close" is the first control; Escape or the icon button "Close" closes it and returns focus to "Interest Rates". No Save or Cancel buttons.
 - Initial focus: the "New Interest Rate" add input (or "Close" when adding is unavailable).
 - **Add area** (fixed at top, does not scroll): floating-label fields "New Interest Rate" (%, decimal) and "Effective Date" (`type="date"`), button "Add".
   - Unavailable (`disabled`) until Disbursal Date, Duration and Payment Frequency are valid, with hint "Enter the disbursal date, duration and payment frequency first" linked by `aria-describedby`; at 60 changes, hint "You can add up to 60 interest rate changes".

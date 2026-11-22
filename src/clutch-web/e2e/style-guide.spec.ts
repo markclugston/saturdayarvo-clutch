@@ -265,23 +265,22 @@ async function fillNewMortgage(page: Page) {
   await page.getByLabel('Duration').fill('120')
   await page.getByLabel('Disbursal Date').fill('2020-01-01')
   await page.getByLabel('Payment Frequency').selectOption('Monthly')
-  await page.getByRole('button', { name: 'Change Interest Rate' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Change Interest Rate' })
+  await page.getByRole('button', { name: 'Interest Rates' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Interest Rates' })
   await dialog.getByLabel('New Interest Rate').fill('4.5')
-  await dialog.getByLabel('Effective Date').fill('2020-01-01')
   await dialog.getByRole('button', { name: 'Add', exact: true }).click()
   await dialog.getByRole('button', { name: 'Close' }).click()
   await expect(dialog).toHaveCount(0)
 }
 
-const rateDialog = (page: Page) => page.getByRole('dialog', { name: 'Change Interest Rate' })
+const rateDialog = (page: Page) => page.getByRole('dialog', { name: 'Interest Rates' })
 
 const timelineGroup = (page: Page) => page.getByRole('region', { name: 'Loan Payoff Timeline' })
 
 const timelineTooltip = (page: Page) => page.locator('[data-slot="tooltip-popup"]')
 
 async function openRateDialog(page: Page) {
-  await page.getByRole('button', { name: 'Change Interest Rate' }).click()
+  await page.getByRole('button', { name: 'Interest Rates' }).click()
   await expect(rateDialog(page)).toBeVisible()
   await page.mouse.move(5, 5)
 }
@@ -503,7 +502,6 @@ const states: StateDef[] = [
     reach: async (page) => {
       await openMortgages(page)
       await openRateDialog(page)
-      await rateDialog(page).getByRole('button', { name: 'Remove 5.25% from 1 Jan 2000' }).click()
       await rateDialog(page).getByLabel('New Interest Rate').fill('100.5')
       await rateDialog(page).getByLabel('Effective Date').fill('2005-06-01')
       await rateDialog(page).getByRole('button', { name: 'Add', exact: true }).click()
@@ -898,7 +896,8 @@ test.describe('Mortgages layout and motion', () => {
   test('one Loan Payoff Timeline group spans the content width with its switch top right at 320 px and 1280 px (019 FR-001, FR-003, SC-001)', async ({ page }) => {
     await mockApi(page, { theme: 'Light' })
     for (const width of [320, 1280]) {
-      await page.setViewportSize({ width, height: 800 })
+      // Taller than before: the locked Disbursal Date shows a hint (021), which lengthens Details.
+      await page.setViewportSize({ width, height: 1000 })
       await page.goto('/')
       await openMortgages(page)
       const group = timelineGroup(page)
@@ -989,7 +988,7 @@ test.describe('Mortgages layout and motion', () => {
   })
 
   for (const width of [320, 1280]) {
-    test(`Change Interest Rate: value and button layout, 60-row dialog scrolling and focus at ${width} px`, async ({ page }) => {
+    test(`Interest Rates: value and button layout, 60-row dialog scrolling and focus at ${width} px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 700 })
       await mockApi(page, { theme: 'Light', mortgages: 'rates' })
       await page.goto('/')
@@ -1006,7 +1005,7 @@ test.describe('Mortgages layout and motion', () => {
 
       // FR-001: stacked under 768 px, side by side from 768 px; neither clipped.
       const value = page.getByText('Current Interest Rate', { exact: true })
-      const button = page.getByRole('button', { name: 'Change Interest Rate' })
+      const button = page.getByRole('button', { name: 'Interest Rates' })
       const valueBox = (await value.boundingBox())!
       const buttonBox = (await button.boundingBox())!
       for (const box of [valueBox, buttonBox]) {
@@ -1042,12 +1041,13 @@ test.describe('Mortgages layout and motion', () => {
       await expect(removes.last()).toBeFocused()
 
       // After a remove focus is on the dialog itself; the next Tab reaches Close (FR-005).
-      await removes.first().click()
+      // The Opening Rate (first row) cannot be removed while other rows exist.
+      await removes.nth(1).click()
       await expect(dialog).toBeFocused()
       await page.keyboard.press('Tab')
       await expect(close).toBeFocused()
 
-      // Escape closes and returns focus to Change Interest Rate.
+      // Escape closes and returns focus to Interest Rates.
       await page.keyboard.press('Escape')
       await expect(dialog).toHaveCount(0)
       await expect(button).toBeFocused()
@@ -1055,7 +1055,7 @@ test.describe('Mortgages layout and motion', () => {
   }
 
   for (const scheme of ['light', 'dark'] as const) {
-    test(`System theme: the Change Interest Rate dialog passes the checks with an emulated ${scheme} scheme`, async ({ page }) => {
+    test(`System theme: the Interest Rates dialog passes the checks with an emulated ${scheme} scheme`, async ({ page }) => {
       await page.emulateMedia({ colorScheme: scheme })
       await mockApi(page, { theme: 'System' })
       await page.goto('/')

@@ -55,14 +55,72 @@ function currentRate(): string {
 }
 
 async function openDialog(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole('button', { name: 'Change Interest Rate' }))
-  return screen.findByRole('dialog', { name: 'Change Interest Rate' })
+  await user.click(screen.getByRole('button', { name: 'Interest Rates' }))
+  return screen.findByRole('dialog', { name: 'Interest Rates' })
 }
 
 async function closeDialog(user: ReturnType<typeof userEvent.setup>) {
   await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }))
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 }
+
+describe('LoanDetailsForm disbursal date lock', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    installFakeApi([])
+  })
+
+  it('disables Disbursal Date with a hint while rate changes exist and enables it at zero rows', async () => {
+    const user = userEvent.setup()
+    renderForm({ mortgage: makeMortgage() })
+
+    const field = screen.getByLabelText('Disbursal Date')
+    expect(field).toBeDisabled()
+    expect(field).toHaveAccessibleDescription('Delete all interest rate changes to edit the disbursal date')
+
+    const dialog = await openDialog(user)
+    for (const remove of within(dialog).getAllByRole('button', { name: /^Remove / }).reverse()) {
+      await user.click(remove)
+    }
+    await closeDialog(user)
+
+    expect(screen.getByLabelText('Disbursal Date')).toBeEnabled()
+  })
+})
+
+describe('LoanDetailsForm schedule report', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    installFakeApi([])
+  })
+
+  it('reports Duration, Disbursal Date and Payment Frequency only while all three are valid', async () => {
+    const onScheduleChange = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(
+      <LoanDetailsForm
+        onDeleted={() => {}}
+        onGone={() => {}}
+        onReload={async () => null}
+        onReloadAll={async () => {}}
+        onSaved={() => {}}
+        onScheduleChange={onScheduleChange}
+        onUnauthorized={() => {}}
+      />,
+    )
+    expect(onScheduleChange).toHaveBeenLastCalledWith(undefined)
+
+    await fillForm(user, { periods: '360', first: '2024-01-01', frequency: 'Monthly' })
+    expect(onScheduleChange).toHaveBeenLastCalledWith({
+      duration: 360,
+      disbursalDate: '2024-01-01',
+      paymentFrequency: 'Monthly',
+    })
+
+    await user.clear(screen.getByLabelText('Duration'))
+    expect(onScheduleChange).toHaveBeenLastCalledWith(undefined)
+  })
+})
 
 describe('LoanDetailsForm (new mortgage)', () => {
   let server: FakeServer
@@ -86,24 +144,24 @@ describe('LoanDetailsForm (new mortgage)', () => {
   })
 
   describe('current interest rate', () => {
-    it('shows "Not set" and a neutral "Change Interest Rate" button with no rate rows', () => {
+    it('shows "Not set" and a neutral "Interest Rates" button with no rate rows', () => {
       renderForm()
 
       expect(currentRate()).toBe('Not set')
-      const button = screen.getByRole('button', { name: 'Change Interest Rate' })
+      const button = screen.getByRole('button', { name: 'Interest Rates' })
       expect(button.className).toContain('bg-raised')
       expect(button.className).not.toMatch(/primary|secondary/)
       expect(screen.queryByLabelText('New Interest Rate')).not.toBeInTheDocument()
     })
 
-    it('disables Change Interest Rate while saving', async () => {
+    it('disables Interest Rates while saving', async () => {
       const user = userEvent.setup()
       renderForm()
       await fillForm(user, validValues)
       const release = server.hold('POST')
 
       await submit(user)
-      expect(screen.getByRole('button', { name: 'Change Interest Rate' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Interest Rates' })).toBeDisabled()
       await act(async () => release())
     })
   })
@@ -136,7 +194,7 @@ describe('LoanDetailsForm (new mortgage)', () => {
     it('flags a missing or future Disbursal Date before any request is sent', async () => {
       const user = userEvent.setup()
       renderForm()
-      await fillForm(user, validValues)
+      await fillForm(user, { ...validValues, rates: undefined })
       setDate('Disbursal Date', '')
       await submit(user)
       expect(screen.getByLabelText('Disbursal Date')).toHaveAccessibleDescription('Enter a valid date')
@@ -201,7 +259,7 @@ describe('LoanDetailsForm (new mortgage)', () => {
       expect(within(dialog).getByRole('listitem')).toHaveTextContent('Enter a valid date')
     })
 
-    it('shows server row errors in the dialog and points the summary at Change Interest Rate', async () => {
+    it('shows server row errors in the dialog and points the summary at Interest Rates', async () => {
       const user = userEvent.setup()
       renderForm()
       server.failNext('POST', problem(400, {
@@ -211,7 +269,7 @@ describe('LoanDetailsForm (new mortgage)', () => {
       await submit(user)
 
       const summary = await screen.findByRole('alert')
-      expect(summary).toHaveTextContent('Correct the interest rate changes in Change Interest Rate and try again.')
+      expect(summary).toHaveTextContent('Correct the interest rate changes in Interest Rates and try again.')
       expect(summary).not.toHaveTextContent('Correct the highlighted fields')
       const dialog = await openDialog(user)
       expect(within(dialog).getByRole('listitem')).toHaveTextContent('Enter an interest rate from 0 to 100')
@@ -460,42 +518,31 @@ describe('LoanDetailsForm (editing)', () => {
       const summary = screen.getByRole('alert')
       expect(summary).toHaveTextContent('Add the opening interest rate, effective on the disbursal date')
       expect(summary).not.toHaveTextContent('Correct')
-      const valueGroup = screen.getByRole('button', { name: 'Change Interest Rate' }).parentElement as HTMLElement
+      const valueGroup = screen.getByRole('button', { name: 'Interest Rates' }).parentElement as HTMLElement
       expect(valueGroup).not.toHaveTextContent('Add the opening')
       dialog = await openDialog(user)
       expect(within(dialog).getByRole('alert')).toHaveTextContent('Add the opening interest rate, effective on the disbursal date')
     })
 
-    it('moving Disbursal Date after the rates refuses Save and flags the out-of-range row in the dialog', async () => {
-      const mortgage = makeMortgage({ interestRateChanges: rates.slice(0, 2) })
-      const server = installFakeApi([mortgage])
-      const user = userEvent.setup()
-      renderForm({ mortgage })
-      setDate('Disbursal Date', '2000-06-01')
-
-      await submit(user)
-
-      expect(server.requests.filter((request) => request.method === 'PUT')).toHaveLength(0)
-      expect(screen.getByRole('alert')).toHaveTextContent('Correct the interest rate changes in Change Interest Rate and try again.')
-      const dialog = await openDialog(user)
-      const [first, second] = within(within(dialog).getByRole('list')).getAllByRole('listitem')
-      expect(first).toHaveTextContent('Choose a date from 1 Jun 2000 to 1 May 2030')
-      expect(second).not.toHaveTextContent('Choose a date')
-    })
-
-    it('uses the generic summary line when another field is also invalid', async () => {
-      const mortgage = makeMortgage({ interestRateChanges: rates.slice(0, 2) })
+    it('removes the "add the opening interest rate" message once an opening rate is added', async () => {
+      const mortgage = makeMortgage()
       installFakeApi([mortgage])
       const user = userEvent.setup()
       renderForm({ mortgage })
-      setDate('Disbursal Date', '2000-06-01')
-      await user.clear(screen.getByLabelText('Name'))
-
+      let dialog = await openDialog(user)
+      await user.click(within(dialog).getByRole('button', { name: 'Remove 5.25% from 1 Jan 2000' }))
+      await closeDialog(user)
       await submit(user)
+      expect(screen.getByRole('alert')).toHaveTextContent('Add the opening interest rate')
+      dialog = await openDialog(user)
+      expect(within(dialog).getByRole('alert')).toBeInTheDocument()
 
-      const summary = screen.getByRole('alert')
-      expect(summary).toHaveTextContent('Correct the highlighted fields and try again.')
-      expect(summary).not.toHaveTextContent('Change Interest Rate')
+      await user.type(within(dialog).getByLabelText('New Interest Rate'), '5.25')
+      await user.click(within(dialog).getByRole('button', { name: 'Add' }))
+
+      expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
+      await closeDialog(user)
+      expect(screen.queryByText(/Add the opening interest rate/)).not.toBeInTheDocument()
     })
   })
 })

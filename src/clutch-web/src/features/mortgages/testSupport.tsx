@@ -227,7 +227,7 @@ export type FormValues = {
   periods?: string
   first?: string
   frequency?: string
-  /** [rate, date] pairs, added through the Change Interest Rate dialog. */
+  /** [rate, date] pairs, added through the Interest Rates dialog. */
   rates?: Array<[string, string]>
 }
 
@@ -261,17 +261,21 @@ export async function fillForm(user: ReturnType<typeof userEvent.setup>, values:
   }
 }
 
-/** Opens "Change Interest Rate", adds each [rate, date] pair, then closes the dialog. */
+/** Opens "Interest Rates", adds each [rate, date] pair, then closes the dialog. */
 export async function addRates(user: ReturnType<typeof userEvent.setup>, rates: Array<[string, string]>) {
-  await user.click(screen.getByRole('button', { name: 'Change Interest Rate' }))
-  const dialog = await screen.findByRole('dialog', { name: 'Change Interest Rate' })
+  await user.click(screen.getByRole('button', { name: 'Interest Rates' }))
+  const dialog = await screen.findByRole('dialog', { name: 'Interest Rates' })
   for (const [rate, date] of rates) {
     const rateField = within(dialog).getByLabelText('New Interest Rate')
     await user.clear(rateField)
     if (rate !== '') {
       await user.type(rateField, rate)
     }
-    fireEvent.change(within(dialog).getByLabelText('Effective Date'), { target: { value: date } })
+    const dateField = within(dialog).getByLabelText('Effective Date')
+    // The opening rate's date is the Disbursal Date, prefilled and disabled.
+    if (!(dateField as HTMLInputElement).disabled) {
+      fireEvent.change(dateField, { target: { value: date } })
+    }
     await user.click(within(dialog).getByRole('button', { name: 'Add' }))
   }
   await user.click(within(dialog).getByRole('button', { name: 'Close' }))

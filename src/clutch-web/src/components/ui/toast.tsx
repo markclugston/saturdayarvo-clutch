@@ -18,7 +18,7 @@ function ToastList() {
     <Toast.Viewport className="pointer-events-none fixed bottom-4 left-1/2 z-[60] flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 flex-col gap-2 md:left-auto md:right-4 md:translate-x-0">
       {toasts.map((toast) => (
         <Toast.Root
-          className="pointer-events-auto flex items-center justify-between gap-3 rounded-card bg-raised px-4 py-3 text-sm text-fg shadow-float transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 data-[starting-style]:translate-y-2"
+          className="pointer-events-auto flex items-center justify-between gap-3 rounded-card bg-raised px-4 py-3 text-sm text-fg shadow-float transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 data-[starting-style]:translate-y-2 focus-visible:focus-ring"
           key={toast.id}
           aria-modal={undefined}
           role="status"

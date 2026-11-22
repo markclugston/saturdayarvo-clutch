@@ -5,7 +5,7 @@
 ## Summary
 
 Replace the inline "Interest Rate Changes" rows in Loan details with a read-only "Current Interest Rate"
-value and a grey "Change Interest Rate" button that opens a modal. The modal lists every change (opening
+value and a grey "Interest Rates" button that opens a modal. The modal lists every change (opening
 rate marked), adds a validated change from inputs fixed at the top, and removes changes. It edits the
 existing `LoanDraft.rows` only, so 016's Save, Cancel, validation, server mapping and unsaved-changes guard
 are reused unchanged. Frontend only: no API, schema or audit change.
@@ -43,7 +43,7 @@ are reused unchanged. Frontend only: no API, schema or audit change.
 | SEC-001 | Yes (marginal) | No endpoint or auth change; client input is still validated server-side by 016's unchanged validator; no new dependency | Independent security review over the diff | PENDING |
 | SEC-002 | No | No configuration, credentials or integrations touched | — | N/A |
 | SEC-003 | Yes | Interest rates are financial data: not logged, not put in URLs or storage; save errors stay 016's generic messages | Independent security review | PENDING |
-| WEB-001 | Yes | TypeScript; Title Case for "Current Interest Rate", "Change Interest Rate", "New Interest Rate", "Effective Date", "Add", "Opening Rate", "Close", and the accessible names "Interest Rate Changes" and "Remove {rate} from {date}"; style guide applied (below); axe in all themes | Frontend gates, UI compliance checklist | PENDING |
+| WEB-001 | Yes | TypeScript; Title Case for "Current Interest Rate", "Interest Rates", "New Interest Rate", "Effective Date", "Add", "Opening Rate", "Close", and the accessible names "Interest Rate Changes" and "Remove {rate} from {date}"; style guide applied (below); axe in all themes | Frontend gates, UI compliance checklist | PENDING |
 | Perf & Observability | Yes (marginal) | Opening, adding and removing are synchronous client state changes (< 500 ms); no service behaviour, so no new metrics | Review: no async work on these paths (Vitest covers the behaviour, not timing) | PASS |
 
 **Applicable style guide sections**: §2 (layout/surfaces: modal on `card`, inputs on `raised`), §4 (floating-label fields for the add inputs), §5 (new neutral button, icon remove/close buttons), §6 (tokens), §7–9 (Title Case, reduced motion, focus ring, contrast), §10 (primitive change in `button.tsx`, synchronized style-guide update).
@@ -92,7 +92,7 @@ src/clutch-web/src/components/ui/
 src/clutch-web/src/features/mortgages/
 ├── loanDraft.ts                        # + currentInterestRate, formatDisplayDate, validateNewRateChange
 ├── loanDraft.test.ts                   # new
-├── CurrentInterestRate.tsx             # new: value + "Change Interest Rate" button + dialog open state
+├── CurrentInterestRate.tsx             # new: value + "Interest Rates" button + dialog open state
 ├── InterestRateChangesDialog.tsx       # new: modal (add inputs, scrolling list, remove)
 ├── InterestRateChangesDialog.test.tsx  # new
 ├── InterestRateChangesField.tsx        # removed (replaced by the two above)

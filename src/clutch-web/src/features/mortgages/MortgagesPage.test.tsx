@@ -342,6 +342,33 @@ describe('MortgagesPage', () => {
     })
   })
 
+  describe('schedule of an unsaved mortgage', () => {
+    it('sizes the schedule from the valid Duration, Disbursal Date and Payment Frequency typed in the form', async () => {
+      server = installFakeApi([], 'Schedule')
+      const user = userEvent.setup()
+      renderWithProviders(<MortgagesPage userId="user-1" />)
+      await screen.findByRole('heading', { name: 'Details' })
+      expect(within(timeline()).getByText(PLEASE_ENTER)).toBeInTheDocument()
+
+      await fillForm(user, { periods: '360', first: '2024-01-01', frequency: 'Monthly' })
+
+      await waitFor(() => expect(within(timeline()).getByRole('table')).toHaveAttribute('aria-rowcount', '362'))
+    })
+
+    it('shows the prompt again when the Duration becomes invalid', async () => {
+      server = installFakeApi([], 'Schedule')
+      const user = userEvent.setup()
+      renderWithProviders(<MortgagesPage userId="user-1" />)
+      await screen.findByRole('heading', { name: 'Details' })
+      await fillForm(user, { periods: '360', first: '2024-01-01', frequency: 'Monthly' })
+      await waitFor(() => expect(within(timeline()).getByRole('table')).toBeInTheDocument())
+
+      await user.clear(screen.getByLabelText('Duration'))
+
+      await waitFor(() => expect(within(timeline()).getByText(PLEASE_ENTER)).toBeInTheDocument())
+    })
+  })
+
   describe('saving a new mortgage', () => {
     it('saves, shows the "Mortgage saved" toast, selects the new tab and keeps rate changes in the response order', async () => {
       server = installFakeApi([])
@@ -385,8 +412,8 @@ describe('MortgagesPage', () => {
 
       const user = userEvent.setup()
       await screen.findByRole('button', { name: 'Ordered' })
-      await user.click(screen.getByRole('button', { name: 'Change Interest Rate' }))
-      await screen.findByRole('dialog', { name: 'Change Interest Rate' })
+      await user.click(screen.getByRole('button', { name: 'Interest Rates' }))
+      await screen.findByRole('dialog', { name: 'Interest Rates' })
       expect(listedRates()).toEqual(['9.00% 1 Jan 2000', '7.00% 1 Feb 2000', '8.00% 1 Mar 2000'])
     })
 
@@ -459,8 +486,8 @@ describe('MortgagesPage', () => {
       const user = userEvent.setup()
       renderWithProviders(<MortgagesPage userId="user-1" />)
       await screen.findByRole('button', { name: 'Home' })
-      await user.click(screen.getByRole('button', { name: 'Change Interest Rate' }))
-      const dialog = await screen.findByRole('dialog', { name: 'Change Interest Rate' })
+      await user.click(screen.getByRole('button', { name: 'Interest Rates' }))
+      const dialog = await screen.findByRole('dialog', { name: 'Interest Rates' })
       await user.type(within(dialog).getByLabelText('New Interest Rate'), '7')
       setDate('Effective Date', '2001-01-01')
       await user.click(within(dialog).getByRole('button', { name: 'Close' }))
@@ -477,8 +504,8 @@ describe('MortgagesPage', () => {
       const user = userEvent.setup()
       renderWithProviders(<MortgagesPage userId="user-1" />)
       await screen.findByRole('button', { name: 'Home' })
-      await user.click(screen.getByRole('button', { name: 'Change Interest Rate' }))
-      const dialog = await screen.findByRole('dialog', { name: 'Change Interest Rate' })
+      await user.click(screen.getByRole('button', { name: 'Interest Rates' }))
+      const dialog = await screen.findByRole('dialog', { name: 'Interest Rates' })
       await user.click(within(dialog).getByRole('button', { name: 'Remove 5.25% from 1 Jan 2000' }))
       await user.click(within(dialog).getByRole('button', { name: 'Close' }))
       await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())

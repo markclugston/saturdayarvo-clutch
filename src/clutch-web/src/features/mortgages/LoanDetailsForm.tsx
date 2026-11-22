@@ -5,7 +5,7 @@ import { ErrorMessage } from '@/components/ui/error-message'
 import { FloatingField } from '@/components/ui/floating-field'
 import { useUnsavedChanges } from '@/components/unsaved-changes/UnsavedChangesProvider'
 import { getAccounts } from '@/features/accounts/api'
-import type { Mortgage } from '@/lib/api/schemas'
+import type { Mortgage, PaymentFrequency } from '@/lib/api/schemas'
 import {
   MortgageChangedError,
   MortgageGoneError,
@@ -18,10 +18,13 @@ import { DeleteMortgageControl } from './DeleteMortgageControl'
 import { FormattedNumberField, formatCurrency } from './FormattedNumberField'
 import { CurrentInterestRate } from './CurrentInterestRate'
 import {
+  canEditDisbursalDate,
   draftToInput,
   draftsEqual,
   emptyDraft,
+  headerIsValid,
   localToday,
+  openingRowKey,
   mapServerErrors,
   mortgageToDraft,
   validateDraft,
@@ -29,6 +32,7 @@ import {
   type LoanDraft,
 } from './loanDraft'
 
+export const DISBURSAL_LOCK_HINT = 'Delete all interest rate changes to edit the disbursal date'
 export const SAVE_FAILED_MESSAGE = 'The mortgage could not be saved. Please try again.'
 export const CONFLICT_MESSAGE = 'This mortgage was changed elsewhere; reload to see the latest'
 export const RELOAD_FAILED_MESSAGE = 'The latest version could not be loaded. Please try again.'
@@ -49,10 +53,14 @@ type LoanDetailsFormProps = {
   onReload: () => Promise<Mortgage | null>
   /** The drop-down's current account id ('' for none), reported on load and on every change. */
   onAccountChange?: (accountId: string) => void
+  /** The draft's Duration, Disbursal Date and Payment Frequency while all are valid; undefined otherwise. */
+  onScheduleChange?: (schedule: DraftSchedule | undefined) => void
 }
 
+export type DraftSchedule = { duration: number; disbursalDate: string; paymentFrequency: PaymentFrequency }
+
 // Errors without a field of their own; the set-level interestRateChanges message also shows in the
-// Change Interest Rate dialog.
+// Interest Rates dialog.
 const nonFieldKeys = ['mortgages', 'version', 'interestRateChanges']
 const rateRowKey = /\.(newInterestRate|effectiveDate)$/
 
@@ -65,6 +73,7 @@ export function LoanDetailsForm({
   onUnauthorized,
   onReload,
   onAccountChange,
+  onScheduleChange,
 }: LoanDetailsFormProps) {
   const idPrefix = useId()
   const { isDirty: guardDirty, setDirty, run } = useUnsavedChanges()
@@ -112,6 +121,17 @@ export function LoanDetailsForm({
   useEffect(() => {
     onAccountChange?.(draft.accountId)
   }, [draft.accountId, onAccountChange])
+
+  const headerValid = headerIsValid(draft, today)
+  useEffect(() => {
+    onScheduleChange?.(headerValid
+      ? {
+          duration: Number(draft.duration.trim()),
+          disbursalDate: draft.disbursalDate,
+          paymentFrequency: draft.paymentFrequency as PaymentFrequency,
+        }
+      : undefined)
+  }, [headerValid, draft.duration, draft.disbursalDate, draft.paymentFrequency, onScheduleChange])
 
   function change(patch: Partial<LoanDraft>) {
     setDraft((current) => ({ ...current, ...patch }))
@@ -234,7 +254,8 @@ export function LoanDetailsForm({
         />
         <FloatingField
           className="w-full sm:w-52"
-          disabled={saving}
+          description={canEditDisbursalDate(draft) ? undefined : { id: `${idPrefix}-disbursal-hint`, text: DISBURSAL_LOCK_HINT }}
+          disabled={saving || !canEditDisbursalDate(draft)}
           error={errors.disbursalDate}
           id={`${idPrefix}-disbursal-date`}
           label="Disbursal Date"
@@ -290,7 +311,13 @@ export function LoanDetailsForm({
       <CurrentInterestRate
         draft={draft}
         errors={errors}
-        onRowsChange={(rows) => change({ rows })}
+        onRowsChange={(rows) => {
+          change({ rows })
+          // The "add the opening interest rate" message goes as soon as that rate exists.
+          if (openingRowKey({ ...draft, rows }) !== undefined) {
+            setErrors(({ interestRateChanges: _cleared, ...rest }) => rest)
+          }
+        }}
         saving={saving}
         today={today}
       />
@@ -300,7 +327,7 @@ export function LoanDetailsForm({
           {hasFieldErrors && (
             <p>
               {onlyRateRowErrors
-                ? 'Correct the interest rate changes in Change Interest Rate and try again.'
+                ? 'Correct the interest rate changes in Interest Rates and try again.'
                 : 'Correct the highlighted fields and try again.'}
             </p>
           )}

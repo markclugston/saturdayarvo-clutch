@@ -12,7 +12,7 @@ type CurrentInterestRateProps = {
   onRowsChange: (rows: RateRowDraft[]) => void
 }
 
-/** The rate in force today, and the "Change Interest Rate" button with the dialog it opens. */
+/** The rate in force today, and the "Interest Rates" button with the dialog it opens. */
 export function CurrentInterestRate({ draft, today, errors, saving, onRowsChange }: CurrentInterestRateProps) {
   const id = useId()
   const trigger = useRef<HTMLButtonElement>(null)
@@ -34,7 +34,7 @@ export function CurrentInterestRate({ draft, today, errors, saving, onRowsChange
         type="button"
         variant="neutral"
       >
-        Change Interest Rate
+        Interest Rates
       </Button>
       <InterestRateChangesDialog
         draft={draft}

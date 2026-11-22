@@ -36,15 +36,18 @@ async function fillHeader(page: Page, name: string, balance: string, periods: st
   await page.getByLabel('Payment Frequency').selectOption('Monthly')
 }
 
-const rateDialog = (page: Page) => page.getByRole('dialog', { name: 'Change Interest Rate' })
+const rateDialog = (page: Page) => page.getByRole('dialog', { name: 'Interest Rates' })
 
-/** Opens "Change Interest Rate", adds each [rate, date] pair, then closes it. */
+/** Opens "Interest Rates", adds each [rate, date] pair, then closes it. */
 async function addRates(page: Page, rates: Array<[string, string]>) {
-  await page.getByRole('button', { name: 'Change Interest Rate' }).click()
+  await page.getByRole('button', { name: 'Interest Rates' }).click()
   const dialog = rateDialog(page)
   for (const [rate, date] of rates) {
     await dialog.getByLabel('New Interest Rate').fill(rate)
-    await dialog.getByLabel('Effective Date').fill(date)
+    // The opening rate's date is the Disbursal Date, prefilled and disabled.
+    if (await dialog.getByLabel('Effective Date').isEnabled()) {
+      await dialog.getByLabel('Effective Date').fill(date)
+    }
     await dialog.getByRole('button', { name: 'Add', exact: true }).click()
   }
   await dialog.getByRole('button', { name: 'Close' }).click()
@@ -53,7 +56,7 @@ async function addRates(page: Page, rates: Array<[string, string]>) {
 
 /** The listed changes in the dialog, read from their remove buttons ("5.25% 1 Jan 2000"). */
 async function listedRates(page: Page): Promise<string[]> {
-  await page.getByRole('button', { name: 'Change Interest Rate' }).click()
+  await page.getByRole('button', { name: 'Interest Rates' }).click()
   const labels = await rateDialog(page).getByRole('button', { name: /^Remove / }).evaluateAll(
     (buttons) => buttons.map((button) => button.getAttribute('aria-label') ?? ''),
   )
@@ -277,9 +280,9 @@ test('mortgages journey: add, reload, sign out and in, switch, rename, guard and
     await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Shed', { timeout: 1000 })
     expect(Date.now() - started).toBeLessThan(1000)
 
-    // Change Interest Rate: add one change and remove another, Save, reload, reopen (SC-005).
+    // Interest Rates: add one change and remove another, Save, reload, reopen (SC-005).
     await tab(page, 'Home loan').click()
-    await page.getByRole('button', { name: 'Change Interest Rate' }).click()
+    await page.getByRole('button', { name: 'Interest Rates' }).click()
     await rateDialog(page).getByLabel('New Interest Rate').fill('6.5')
     await rateDialog(page).getByLabel('Effective Date').fill('2010-01-01')
     await rateDialog(page).getByRole('button', { name: 'Add', exact: true }).click()
@@ -298,7 +301,7 @@ test('mortgages journey: add, reload, sign out and in, switch, rename, guard and
     expect(await listedRates(page)).toEqual(['5.25% 1 Jan 2000', '6.50% 1 Jan 2010'])
 
     // One add journey in exactly 6 actions: open, New Interest Rate, Effective Date, Add, Close, Save (SC-002).
-    await page.getByRole('button', { name: 'Change Interest Rate' }).click()
+    await page.getByRole('button', { name: 'Interest Rates' }).click()
     await rateDialog(page).getByLabel('New Interest Rate').fill('7.25')
     await rateDialog(page).getByLabel('Effective Date').fill('2015-01-01')
     await rateDialog(page).getByRole('button', { name: 'Add', exact: true }).click()

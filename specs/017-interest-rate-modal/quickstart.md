@@ -39,7 +39,7 @@ npm run test:e2e
 | 3 | Open dialog, add, remove, close, Save, reopen | `InterestRateChangesDialog.test.tsx`, `LoanDetailsForm.test.tsx`, `e2e/mortgages.spec.ts` | List matches after reload (SC-002, SC-005); Cancel discards modal edits |
 | 4 | Invalid add (duplicate date, 100.5, 3 dp, out-of-range date), header invalid, 60 rows | `InterestRateChangesDialog.test.tsx` | Field errors with 016 messages; Add disabled with hint; remove still works |
 | 5 | Typed but not added, close, reopen | `InterestRateChangesDialog.test.tsx`, `MortgagesPage.test.tsx` | Inputs empty; form not dirty |
-| 6 | Remove focus; Escape/Close focus return | `InterestRateChangesDialog.test.tsx`, `e2e/style-guide.spec.ts` | Focus on popup then "Close" (first control) on Tab; focus back on "Change Interest Rate" |
-| 7 | Remove opening rate, Save | `LoanDetailsForm.test.tsx` | Save refused; dialog shows "Add the opening interest rate, effective on the disbursal date"; nothing beside Current Interest Rate; with only rate-row errors the summary near Save reads "Correct the interest rate changes in Change Interest Rate and try again." |
+| 6 | Remove focus; Escape/Close focus return | `InterestRateChangesDialog.test.tsx`, `e2e/style-guide.spec.ts` | Focus on popup then "Close" (first control) on Tab; focus back on "Interest Rates" |
+| 7 | Remove opening rate, Save | `LoanDetailsForm.test.tsx` | Save refused; dialog shows "Add the opening interest rate, effective on the disbursal date"; nothing beside Current Interest Rate; with only rate-row errors the summary near Save reads "Correct the interest rate changes in Interest Rates and try again." |
 | 8 | Axe, focus ring, Light/Dark/System, 320 px and desktop, 60 rows | `e2e/style-guide.spec.ts` | No violations; no page horizontal scroll; add inputs visible while list scrolls (SC-004) |
 | 9 | Neutral variant | `button.test.tsx` | Uses `bg-raised text-fg`, not primary/secondary/selected classes |

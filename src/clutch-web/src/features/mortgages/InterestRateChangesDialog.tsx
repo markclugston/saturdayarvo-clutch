@@ -8,8 +8,11 @@ import { FormattedNumberField, formatPercent } from './FormattedNumberField'
 import {
   MAX_RATE_CHANGES,
   formatDisplayDate,
+  canEditDisbursalDate,
   headerIsValid,
   newRow,
+  openingRowKey,
+  validateDraft,
   validateNewRateChange,
   type DraftErrors,
   type LoanDraft,
@@ -17,6 +20,8 @@ import {
 } from './loanDraft'
 
 export const ADD_ROW_HINT = 'Enter the disbursal date, duration and payment frequency first'
+export const DISBURSAL_FIRST_HINT = 'Enter the disbursal date first'
+export const OPENING_DELETE_HINT = 'Delete the other interest rate changes first'
 export const LIMIT_HINT = `You can add up to ${MAX_RATE_CHANGES} interest rate changes`
 
 type InterestRateChangesDialogProps = {
@@ -62,7 +67,7 @@ export function InterestRateChangesDialog({
           tabIndex={-1}
         >
           <div className="flex items-center justify-between gap-3">
-            <DialogTitle>Change Interest Rate</DialogTitle>
+            <DialogTitle>Interest Rates</DialogTitle>
             <Button
               aria-label="Close"
               onClick={() => onOpenChange(false)}
@@ -84,14 +89,15 @@ export function InterestRateChangesDialog({
             today={today}
           />
           <RateList
+            draft={draft}
             errors={errors}
-            disbursalDate={draft.disbursalDate}
+            onRateChange={(key, rate) => onRowsChange(draft.rows.map((row) => (row.key === key ? { ...row, rate } : row)))}
             onRemove={(key) => {
               onRowsChange(draft.rows.filter((row) => row.key !== key))
               popup.current?.focus()
             }}
-            rows={draft.rows}
             saving={saving}
+            today={today}
           />
         </DialogPopup>
       </DialogPortal>
@@ -114,15 +120,19 @@ function AddArea({ draft, today, canAdd, atLimit, addAvailable, onAdd }: AddArea
   const [date, setDate] = useState('')
   const [addErrors, setAddErrors] = useState<{ newInterestRate?: string; effectiveDate?: string }>({})
   const hintId = `${id}-add-hint`
-  const hint = !canAdd ? ADD_ROW_HINT : atLimit ? LIMIT_HINT : null
+  const isOpening = canEditDisbursalDate(draft)
+  const disbursalMissing = draft.disbursalDate === ''
+  const available = addAvailable && !disbursalMissing
+  const hint = disbursalMissing ? DISBURSAL_FIRST_HINT : !canAdd ? ADD_ROW_HINT : atLimit ? LIMIT_HINT : null
+  const shownDate = isOpening ? draft.disbursalDate : date
 
   function add() {
-    const found = validateNewRateChange(draft, rate, date, today)
+    const found = validateNewRateChange(draft, rate, shownDate, today)
     setAddErrors(found)
     if (found.newInterestRate || found.effectiveDate) {
       return
     }
-    onAdd(newRow(rate.trim(), date))
+    onAdd(newRow(rate.trim(), shownDate))
     setRate('')
     setDate('')
     document.getElementById(`${id}-rate`)?.focus()
@@ -135,7 +145,7 @@ function AddArea({ draft, today, canAdd, atLimit, addAvailable, onAdd }: AddArea
           autoComplete="off"
           className="w-full sm:w-40"
           describedBy={hint ? hintId : undefined}
-          disabled={!addAvailable}
+          disabled={!available}
           error={addErrors.newInterestRate}
           format={formatPercent}
           id={`${id}-rate`}
@@ -147,17 +157,17 @@ function AddArea({ draft, today, canAdd, atLimit, addAvailable, onAdd }: AddArea
         <FloatingField
           className="w-full sm:w-44"
           describedBy={hint ? hintId : undefined}
-          disabled={!addAvailable}
+          disabled={!available || isOpening}
           error={addErrors.effectiveDate}
           id={`${id}-date`}
           label="Effective Date"
           onChange={(event) => setDate(event.currentTarget.value)}
           type="date"
-          value={date}
+          value={shownDate}
         />
         <Button
           aria-describedby={hint ? hintId : undefined}
-          disabled={!addAvailable}
+          disabled={!available}
           onClick={add}
           type="button"
           variant="secondary"
@@ -172,17 +182,37 @@ function AddArea({ draft, today, canAdd, atLimit, addAvailable, onAdd }: AddArea
 }
 
 type RateListProps = {
-  rows: RateRowDraft[]
-  disbursalDate: string
+  draft: LoanDraft
+  today: string
   errors: DraftErrors
   saving: boolean
   onRemove: (key: string) => void
+  onRateChange: (key: string, rate: string) => void
 }
 
-function RateList({ rows, disbursalDate, errors, saving, onRemove }: RateListProps) {
+function RateList({ draft, today, errors, saving, onRemove, onRateChange }: RateListProps) {
+  const id = useId()
+  const rows = draft.rows
   const setError = errors.interestRateChanges
+  const openingKey = openingRowKey(draft)
+  const [editing, setEditing] = useState<{ key: string; rate: string; error?: string } | null>(null)
   // Display order only; the draft keeps its own order.
   const sorted = [...rows].sort((left, right) => (left.date < right.date ? -1 : left.date > right.date ? 1 : 0))
+
+  function commit(row: RateRowDraft) {
+    if (editing === null || editing.key !== row.key) {
+      return
+    }
+    const next = editing.rate.trim()
+    const candidate = { ...draft, rows: rows.map((item) => (item.key === row.key ? { ...item, rate: next } : item)) }
+    const message = validateDraft(candidate, today)[`${row.key}.newInterestRate`]
+    if (message) {
+      setEditing({ key: row.key, rate: row.rate, error: message })
+      return
+    }
+    onRateChange(row.key, next)
+    setEditing(null)
+  }
 
   return (
     <div className="flex min-h-0 flex-col gap-3">
@@ -194,21 +224,41 @@ function RateList({ rows, disbursalDate, errors, saving, onRemove }: RateListPro
           {sorted.map((row) => {
             const rate = formatPercent(row.rate)
             const date = formatDisplayDate(row.date)
-            const rowErrors = [errors[`${row.key}.newInterestRate`], errors[`${row.key}.effectiveDate`]]
+            const isOpeningRow = row.key === openingKey
+            const lockedDelete = isOpeningRow && rows.length > 1
+            const deleteHintId = `${id}-${row.key}-delete-hint`
+            const rowEditing = editing?.key === row.key ? editing : null
+            const rowErrors = [rowEditing?.error, errors[`${row.key}.newInterestRate`], errors[`${row.key}.effectiveDate`]]
               .filter((message): message is string => Boolean(message))
             return (
               <li className="rounded-control bg-raised px-3 py-2" key={row.key}>
                 <div className="flex items-center gap-3">
-                  <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
-                    <span className="w-16 text-right font-medium tabular-nums">{rate}</span>
-                    <span className="text-fg-secondary">{date}</span>
-                    {row.date === disbursalDate && (
-                      <span className="text-xs font-medium text-fg-secondary">Opening Rate</span>
+                  <div className="flex min-w-0 flex-1 flex-wrap items-end gap-x-3 gap-y-1 text-sm">
+                    {isOpeningRow ? (
+                      <FormattedNumberField
+                        autoComplete="off"
+                        className="w-40 [&_input]:h-12 [&_input]:pt-6 [&_input]:text-left"
+                        disabled={saving}
+                        format={formatPercent}
+                        id={`${id}-${row.key}-rate`}
+                        inputMode="decimal"
+                        label="Opening Interest Rate"
+                        onBlur={() => commit(row)}
+                        onValueChange={(next) => setEditing({ key: row.key, rate: next })}
+                        value={rowEditing ? rowEditing.rate : row.rate}
+                      />
+                    ) : (
+                      <div className="relative h-12 w-40">
+                        <span className="absolute left-3 top-1.5 text-[0.625rem] leading-none text-fg-secondary">Interest Rate Change</span>
+                        <span className="absolute bottom-1.5 left-3 text-sm leading-4 tabular-nums">{rate}</span>
+                      </div>
                     )}
+                    <span className="pb-1.5 leading-4 text-fg-secondary">{date}</span>
                   </div>
                   <Button
+                    aria-describedby={lockedDelete ? deleteHintId : undefined}
                     aria-label={`Remove ${rate} from ${date}`}
-                    disabled={saving}
+                    disabled={saving || lockedDelete}
                     onClick={() => onRemove(row.key)}
                     size="icon"
                     type="button"
@@ -217,6 +267,7 @@ function RateList({ rows, disbursalDate, errors, saving, onRemove }: RateListPro
                     <X aria-hidden="true" />
                   </Button>
                 </div>
+                {lockedDelete && <p className="mt-1 text-xs text-fg-secondary" id={deleteHintId}>{OPENING_DELETE_HINT}</p>}
                 {rowErrors.map((message) => (
                   <ErrorMessage className="mt-1 text-xs" key={message} role="presentation">{message}</ErrorMessage>
                 ))}

@@ -43,8 +43,8 @@ function Harness({ initial, errors = {}, saving = false, onRows }: HarnessProps)
 }
 
 async function openDialog(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole('button', { name: 'Change Interest Rate' }))
-  return screen.findByRole('dialog', { name: 'Change Interest Rate' })
+  await user.click(screen.getByRole('button', { name: 'Interest Rates' }))
+  return screen.findByRole('dialog', { name: 'Interest Rates' })
 }
 
 function addTo(dialog: HTMLElement, rate: string, date: string, user: ReturnType<typeof userEvent.setup>) {
@@ -58,7 +58,7 @@ function addTo(dialog: HTMLElement, rate: string, date: string, user: ReturnType
 const opening = () => newRow('5.25', '2000-01-01')
 
 describe('InterestRateChangesDialog', () => {
-  it('opens titled "Change Interest Rate" with focus on New Interest Rate and no Save or Cancel', async () => {
+  it('opens titled "Interest Rates" with focus on New Interest Rate and no Save or Cancel', async () => {
     const user = userEvent.setup()
     render(<Harness initial={makeDraft([opening()])} />)
     const dialog = await openDialog(user)
@@ -76,8 +76,31 @@ describe('InterestRateChangesDialog', () => {
 
     expect(listedRates()).toEqual(['5.25% 1 Jan 2000', '6.00% 1 Jun 2001', '7.00% 1 Jan 2003'])
     const items = within(within(dialog).getByRole('list', { name: 'Interest Rate Changes' })).getAllByRole('listitem')
-    expect(items[0]).toHaveTextContent('Opening Rate')
-    expect(items[1]).not.toHaveTextContent('Opening Rate')
+    expect(items[0]).toHaveTextContent('Opening Interest Rate')
+    expect(items[1]).not.toHaveTextContent('Opening Interest Rate')
+  })
+
+  it('titles the opening row "Opening Interest Rate" and every other row "Interest Rate Change", with no extra Opening Rate text', async () => {
+    const user = userEvent.setup()
+    render(<Harness initial={makeDraft([opening(), newRow('6', '2001-06-01'), newRow('7', '2003-01-01')])} />)
+    const dialog = await openDialog(user)
+
+    const items = within(within(dialog).getByRole('list', { name: 'Interest Rate Changes' })).getAllByRole('listitem')
+    expect(within(items[0] as HTMLElement).getByLabelText('Opening Interest Rate')).toBeInTheDocument()
+    expect(items[0]).not.toHaveTextContent(/Opening Rate/)
+    for (const item of items.slice(1)) {
+      expect(item).toHaveTextContent('Interest Rate Change')
+      expect(item).not.toHaveTextContent('Opening')
+    }
+  })
+
+  it('left aligns the opening rate value', async () => {
+    const user = userEvent.setup()
+    render(<Harness initial={makeDraft([opening()])} />)
+    const dialog = await openDialog(user)
+
+    expect(within(dialog).getByLabelText('Opening Interest Rate').parentElement?.parentElement?.className)
+      .toContain('[&_input]:text-left')
   })
 
   it('shows "No interest rate changes yet" when empty', async () => {
@@ -144,7 +167,7 @@ describe('InterestRateChangesDialog', () => {
     const add = within(dialog).getByRole('button', { name: 'Add' })
     expect(add).toBeDisabled()
     expect(add).toHaveAccessibleDescription('You can add up to 60 interest rate changes')
-    expect(within(dialog).getAllByRole('button', { name: /^Remove / })[0]).toBeEnabled()
+    expect(within(dialog).getAllByRole('button', { name: /^Remove / })[1]).toBeEnabled()
   })
 
   it('removes a change by its named control, focuses the dialog, and the next Tab reaches Close', async () => {
@@ -174,7 +197,7 @@ describe('InterestRateChangesDialog', () => {
     await waitFor(() => expect(last).toHaveFocus())
   })
 
-  it.each(['Escape', 'Close'])('%s closes it and returns focus to Change Interest Rate', async (how) => {
+  it.each(['Escape', 'Close'])('%s closes it and returns focus to Interest Rates', async (how) => {
     const user = userEvent.setup()
     render(<Harness initial={makeDraft([opening()])} />)
     const dialog = await openDialog(user)
@@ -186,7 +209,7 @@ describe('InterestRateChangesDialog', () => {
     }
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Change Interest Rate' })).toHaveFocus())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Interest Rates' })).toHaveFocus())
   })
 
   it('discards typed values that were not added and opens with empty inputs', async () => {
@@ -207,7 +230,119 @@ describe('InterestRateChangesDialog', () => {
 
   it('disables the button while saving', () => {
     render(<Harness initial={makeDraft([opening()])} saving />)
-    expect(screen.getByRole('button', { name: 'Change Interest Rate' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Interest Rates' })).toBeDisabled()
+  })
+
+  describe('opening rate and disbursal date', () => {
+    it('prefills and disables Effective Date with the Disbursal Date when there are no rows, and adds on that date', async () => {
+      const user = userEvent.setup()
+      render(<Harness initial={makeDraft([])} />)
+      const dialog = await openDialog(user)
+
+      const date = within(dialog).getByLabelText('Effective Date')
+      expect(date).toHaveValue('2000-01-01')
+      expect(date).toBeDisabled()
+      await user.type(within(dialog).getByLabelText('New Interest Rate'), '5.25')
+      await user.click(within(dialog).getByRole('button', { name: 'Add' }))
+
+      expect(listedRates()).toEqual(['5.25% 1 Jan 2000'])
+      expect(within(dialog).getByLabelText('Opening Interest Rate')).toBeInTheDocument()
+      expect(within(dialog).getByLabelText('Effective Date')).toHaveValue('')
+      expect(within(dialog).getByLabelText('Effective Date')).toBeEnabled()
+    })
+
+    it('prefills again after every rate is removed', async () => {
+      const user = userEvent.setup()
+      render(<Harness initial={makeDraft([opening()])} />)
+      const dialog = await openDialog(user)
+
+      await user.click(within(dialog).getByRole('button', { name: 'Remove 5.25% from 1 Jan 2000' }))
+
+      expect(within(dialog).getByLabelText('Effective Date')).toHaveValue('2000-01-01')
+      expect(within(dialog).getByLabelText('Effective Date')).toBeDisabled()
+    })
+
+    it('rejects a later rate dated on or before the Disbursal Date', async () => {
+      const user = userEvent.setup()
+      render(<Harness initial={makeDraft([opening()])} />)
+      const dialog = await openDialog(user)
+
+      await addTo(dialog, '6', '1999-01-01', user)
+
+      expect(within(dialog).getByLabelText('Effective Date')).toHaveAttribute('aria-invalid', 'true')
+      expect(listedRates()).toEqual(['5.25% 1 Jan 2000'])
+    })
+
+    it('disables removing the Opening Rate while other rows exist, with a hint, and enables it when sole', async () => {
+      const user = userEvent.setup()
+      render(<Harness initial={makeDraft([opening(), newRow('6', '2001-06-01')])} />)
+      const dialog = await openDialog(user)
+
+      const remove = within(dialog).getByRole('button', { name: 'Remove 5.25% from 1 Jan 2000' })
+      expect(remove).toBeDisabled()
+      expect(remove).toHaveAccessibleDescription('Delete the other interest rate changes first')
+      expect(within(dialog).getByRole('button', { name: 'Remove 6.00% from 1 Jun 2001' })).toBeEnabled()
+
+      await user.click(within(dialog).getByRole('button', { name: 'Remove 6.00% from 1 Jun 2001' }))
+      expect(within(dialog).getByRole('button', { name: 'Remove 5.25% from 1 Jan 2000' })).toBeEnabled()
+    })
+
+    it('edits the Opening Rate on blur with restricted entry, and no date edit', async () => {
+      const user = userEvent.setup()
+      render(<Harness initial={makeDraft([opening(), newRow('6', '2001-06-01')])} />)
+      const dialog = await openDialog(user)
+
+      const field = within(dialog).getByLabelText('Opening Interest Rate')
+      await user.clear(field)
+      await user.type(field, '$4,5x.5%')
+      expect(field).toHaveValue('45.5')
+      await user.clear(field)
+      await user.type(field, '4.5')
+      await user.tab()
+
+      expect(listedRates()).toEqual(['4.50% 1 Jan 2000', '6.00% 1 Jun 2001'])
+      expect(within(dialog).getAllByLabelText('Effective Date')).toHaveLength(1)
+    })
+
+    it('rejects an invalid Opening Rate edit with a row error and keeps the previous rate', async () => {
+      const user = userEvent.setup()
+      render(<Harness initial={makeDraft([opening()])} />)
+      const dialog = await openDialog(user)
+
+      const field = within(dialog).getByLabelText('Opening Interest Rate')
+      await user.clear(field)
+      await user.type(field, '100.5')
+      await user.tab()
+
+      expect(within(dialog).getByText('Enter an interest rate from 0 to 100')).toBeInTheDocument()
+      expect(field).toHaveValue('5.25%')
+    })
+  })
+
+  describe('disbursal date not entered', () => {
+    it('disables rate, date and Add with the specific hint, even when other headers are missing', async () => {
+      const user = userEvent.setup()
+      render(<Harness initial={makeDraft([], { disbursalDate: '', duration: '' })} />)
+      const dialog = await openDialog(user)
+
+      for (const control of [
+        within(dialog).getByLabelText('New Interest Rate'),
+        within(dialog).getByLabelText('Effective Date'),
+        within(dialog).getByRole('button', { name: 'Add' }),
+      ]) {
+        expect(control).toBeDisabled()
+        expect(control).toHaveAccessibleDescription('Enter the disbursal date first')
+      }
+    })
+
+    it('keeps the general header hint when the Disbursal Date is entered but another header is missing', async () => {
+      const user = userEvent.setup()
+      render(<Harness initial={makeDraft([], { duration: '' })} />)
+      const dialog = await openDialog(user)
+
+      expect(within(dialog).getByRole('button', { name: 'Add' }))
+        .toHaveAccessibleDescription('Enter the disbursal date, duration and payment frequency first')
+    })
   })
 
   describe('errors after a refused save', () => {

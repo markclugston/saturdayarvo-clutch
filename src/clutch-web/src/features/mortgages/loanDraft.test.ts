@@ -8,6 +8,8 @@ import {
   mapServerErrors,
   mortgageToDraft,
   newRow,
+  canEditDisbursalDate,
+  openingRowKey,
   validateNewRateChange,
   type LoanDraft,
 } from './loanDraft'
@@ -128,5 +130,25 @@ describe('accountId in the draft', () => {
   it('keeps the server accountId error under its own key', () => {
     expect(mapServerErrors({ accountId: 'Choose one of your accounts' }, []))
       .toEqual({ accountId: 'Choose one of your accounts' })
+  })
+})
+
+describe('openingRowKey', () => {
+  it('is the key of the row dated on the Disbursal Date', () => {
+    const opening = newRow('5', '2020-01-01')
+    const draft = { ...emptyDraft(), disbursalDate: '2020-01-01', rows: [newRow('6', '2021-01-01'), opening] }
+    expect(openingRowKey(draft)).toBe(opening.key)
+  })
+
+  it('is undefined with no matching row or an empty Disbursal Date', () => {
+    expect(openingRowKey({ ...emptyDraft(), disbursalDate: '2020-01-01', rows: [newRow('6', '2021-01-01')] })).toBeUndefined()
+    expect(openingRowKey({ ...emptyDraft(), rows: [newRow('6', '')] })).toBeUndefined()
+  })
+})
+
+describe('canEditDisbursalDate', () => {
+  it('is true only when there are no rows', () => {
+    expect(canEditDisbursalDate(emptyDraft())).toBe(true)
+    expect(canEditDisbursalDate({ ...emptyDraft(), rows: [newRow('5', '2020-01-01')] })).toBe(false)
   })
 })
