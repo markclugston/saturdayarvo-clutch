@@ -29,4 +29,7 @@
         "npm run test:e2e:integration": true,
         "npx eslint": true
   },
+  "csharp-dev-tools.solutionViewer.selectedWorkspaceSolutions": [
+    "saturdayarvo-clutch.slnx"
+  ],
 }
