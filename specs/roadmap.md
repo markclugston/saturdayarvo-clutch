@@ -18,4 +18,4 @@
 [x] on the mortgages page it currently asks for first payment date.  but it should be load start date.
 [] need to have resiliance in the front end if the server is not available
 [] need to have resiliance on the server if the database is not available
-[] run converge over the entire workspace to enforce compliance.
+[x] run converge over the entire workspace to enforce compliance.

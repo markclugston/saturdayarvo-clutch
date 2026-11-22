@@ -115,7 +115,7 @@ public sealed class CsvImportParser
 
                 if (!DateOnly.TryParseExact(
                     dateValue,
-                    mapping.DateFormat,
+                    AcceptedDateFormats(mapping.DateFormat),
                     CultureInfo.InvariantCulture,
                     DateTimeStyles.None,
                     out var transactionDate))
@@ -260,8 +260,13 @@ public sealed class CsvImportParser
                     currency,
                     rowNumber);
 
-                if ((incomingAmount is > 0 && outgoingAmount is > 0)
-                    || (incomingAmount is null && outgoingAmount is null))
+                if (incomingAmount is null && outgoingAmount is null)
+                {
+                    // Balance-only line such as an opening balance: keep it as a zero amount.
+                    return (0, TransactionDirection.Outgoing);
+                }
+
+                if (incomingAmount is > 0 && outgoingAmount is > 0)
                 {
                     throw InvalidAmount(rowNumber);
                 }
@@ -428,6 +433,25 @@ public sealed class CsvImportParser
             token,
             currency.Code,
             StringComparison.Ordinal)));
+    }
+
+    // Bank exports often drop leading zeros (5/3/2024), which dd/MM formats reject.
+    private static string[] AcceptedDateFormats(string format)
+    {
+        if (!format.Contains("dd", StringComparison.Ordinal)
+            && !format.Contains("MM", StringComparison.Ordinal))
+        {
+            return [format];
+        }
+
+        // yyyyMMdd has no separators, so unpadded parts would be ambiguous.
+        if (format == "yyyyMMdd")
+        {
+            return [format];
+        }
+
+        return [format, format.Replace("dd", "d", StringComparison.Ordinal)
+            .Replace("MM", "M", StringComparison.Ordinal)];
     }
 
     private static string ReadField(

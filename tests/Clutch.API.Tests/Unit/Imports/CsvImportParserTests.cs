@@ -79,11 +79,10 @@ public sealed class CsvImportParserTests
     }
 
     [Theory]
-    [InlineData("", "")]
     [InlineData("-1.00", "2.00")]
     [InlineData("-1.00", "-2.00")]
     [InlineData("--1.00", "")]
-    public async Task SeparateAmountColumnsRejectMissingAmbiguousOrMalformedAmounts(
+    public async Task SeparateAmountColumnsRejectAmbiguousOrMalformedAmounts(
         string incoming,
         string outgoing)
     {
@@ -93,6 +92,23 @@ public sealed class CsvImportParserTests
 
         Assert.Equal("InvalidAmount", exception.Code);
         Assert.Equal(2, exception.RowNumber);
+    }
+
+    [Fact]
+    public async Task SeparateAmountColumnsImportRowsWithNoAmountAsZero()
+    {
+        const string csv = "Date,Description,Incoming,Outgoing\n2025-01-01,Opening balance,,\n2025-01-15,Salary,2500.00,";
+
+        var result = await ParseAsync(csv, "AUD", SeparateAmountMapping());
+
+        Assert.Collection(
+            result.Rows,
+            row =>
+            {
+                Assert.Equal(2, row.SourceRowNumber);
+                Assert.Equal(0m, row.Amount);
+            },
+            row => Assert.Equal(2500.00m, row.Amount));
     }
 
     [Fact]
