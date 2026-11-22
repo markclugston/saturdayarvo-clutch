@@ -30,7 +30,7 @@ export function LoanPayoffTimeline({ view, onSwitch, saved, duration }: LoanPayo
   const label = SWITCH_LABEL[view]
 
   return (
-    <section aria-labelledby="loan-payoff-timeline-heading" className="min-w-0 rounded-card bg-card p-4 xl:p-5">
+    <section aria-labelledby="loan-payoff-timeline-heading" className="flex min-w-0 flex-1 flex-col rounded-card bg-card p-4 xl:p-5">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-base font-semibold" id="loan-payoff-timeline-heading">Loan Payoff Timeline</h2>
         <Tooltip content={label}>

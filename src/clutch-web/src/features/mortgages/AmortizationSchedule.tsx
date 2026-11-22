@@ -1,4 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+
+function findScrollParent(element: HTMLElement): HTMLElement | null {
+  for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+    const { overflowY } = window.getComputedStyle(parent)
+    if (overflowY === 'auto' || overflowY === 'scroll') {
+      return parent
+    }
+  }
+  return null
+}
 
 export const ENTER_DETAILS_MESSAGE = 'Please enter your mortgage details'
 export const NOT_CALCULATED = 'Not yet calculated'
@@ -15,7 +25,7 @@ type AmortizationScheduleProps = {
 /** Read-only placeholder schedule: periods 1 to N + 1, rendered through a window so any N stays usable. */
 export function AmortizationSchedule({ duration }: AmortizationScheduleProps) {
   return (
-    <div className="flex min-h-0 min-w-0 flex-col">
+    <div className="flex min-w-0 flex-1 flex-col">
       {duration === undefined
         ? <p className="text-sm text-fg-secondary">{ENTER_DETAILS_MESSAGE}</p>
         : <ScheduleTable rowCount={duration + 1} />}
@@ -26,6 +36,34 @@ export function AmortizationSchedule({ duration }: AmortizationScheduleProps) {
 function ScheduleTable({ rowCount }: { rowCount: number }) {
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportHeight, setViewportHeight] = useState(FALLBACK_VIEWPORT_HEIGHT)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+
+  // The page's content area scrolls, not this group: window the rows against that scroller.
+  useEffect(() => {
+    const wrapper = wrapperRef.current
+    const scroller = wrapper ? findScrollParent(wrapper) : null
+    if (!wrapper || !scroller) {
+      return undefined
+    }
+    function measure() {
+      if (!wrapper || !scroller) {
+        return
+      }
+      const wrapperTop = wrapper.getBoundingClientRect().top
+      const scrollerTop = scroller.getBoundingClientRect().top
+      setScrollTop(Math.max(0, scrollerTop - wrapperTop))
+      if (scroller.clientHeight > 0) {
+        setViewportHeight(scroller.clientHeight)
+      }
+    }
+    measure()
+    scroller.addEventListener('scroll', measure, { passive: true })
+    window.addEventListener('resize', measure)
+    return () => {
+      scroller.removeEventListener('scroll', measure)
+      window.removeEventListener('resize', measure)
+    }
+  }, [])
 
   const first = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN)
   const last = Math.min(rowCount, Math.ceil((scrollTop + viewportHeight) / ROW_HEIGHT) + OVERSCAN)
@@ -35,21 +73,7 @@ function ScheduleTable({ rowCount }: { rowCount: number }) {
   }
 
   return (
-    <div
-      className="h-96 min-h-0 overflow-auto rounded-control focus-visible:focus-ring"
-      onScroll={(event) => {
-        setScrollTop(event.currentTarget.scrollTop)
-        if (event.currentTarget.clientHeight > 0) {
-          setViewportHeight(event.currentTarget.clientHeight)
-        }
-      }}
-      ref={(element) => {
-        if (element && element.clientHeight > 0 && element.clientHeight !== viewportHeight) {
-          setViewportHeight(element.clientHeight)
-        }
-      }}
-      tabIndex={0}
-    >
+    <div className="min-w-0 flex-1" ref={wrapperRef}>
       <div aria-rowcount={rowCount + 1} className="min-w-80 text-sm" role="table">
         <div
           aria-rowindex={1}

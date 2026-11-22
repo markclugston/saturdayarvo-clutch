@@ -122,3 +122,7 @@ View state here is page-local (`useState`, default `Burndown`) in `MortgagesPage
 
 MVP = User Story 1 (single switchable group, page-local view). US2 then makes the view persistent.
 Deliver stories incrementally; each must pass its own tests before the next starts.
+
+## Phase 7: Convergence
+
+- [ ] T039 Cover the kept height-filling layout (FR-013): add tests in `src/clutch-web/src/features/mortgages/AmortizationSchedule.test.tsx` and `LoanPayoffTimeline.test.tsx` (already partly updated for page-scroller windowing), update the T030 browser tests and screenshots in `src/clutch-web/e2e/style-guide.spec.ts` for 320 px and 1280 px in both views and themes with axe WCAG 2.2 AA, confirm the schedule is still keyboard reachable now that its own focusable scroll box is gone, and confirm other `ContentPanel` screens (`App.tsx`, `AuthPage.tsx`) look unchanged per FR-013 (WEB-001) (unrequested, now specified)
