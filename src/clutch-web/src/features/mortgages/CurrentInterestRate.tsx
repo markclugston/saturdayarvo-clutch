@@ -23,7 +23,7 @@ export function CurrentInterestRate({ draft, today, errors, saving, onRowsChange
     <div className="flex flex-col items-start gap-3 md:flex-row md:items-center">
       <dl className="min-w-0">
         <dt className="text-xs text-fg-secondary" id={`${id}-label`}>Current Interest Rate</dt>
-        <dd aria-labelledby={`${id}-label`} className="text-sm font-medium">
+        <dd aria-labelledby={`${id}-label`} className="text-right text-sm font-medium tabular-nums">
           {rate === null ? 'Not set' : formatPercent(rate)}
         </dd>
       </dl>

@@ -19,6 +19,8 @@ export type LoanDraft = {
   duration: string
   drawdownDate: string
   paymentFrequency: PaymentFrequency | ''
+  /** The linked account's id; '' for none. */
+  accountId: string
   rows: RateRowDraft[]
 }
 
@@ -39,6 +41,7 @@ export function emptyDraft(): LoanDraft {
     duration: '',
     drawdownDate: '',
     paymentFrequency: '',
+    accountId: '',
     rows: [],
   }
 }
@@ -50,6 +53,7 @@ export function mortgageToDraft(mortgage: Mortgage): LoanDraft {
     duration: String(mortgage.duration),
     drawdownDate: mortgage.drawdownDate,
     paymentFrequency: mortgage.paymentFrequency,
+    accountId: mortgage.accountId ?? '',
     rows: mortgage.interestRateChanges.map((change) =>
       newRow(String(change.newInterestRate), change.effectiveDate)),
   }
@@ -61,6 +65,7 @@ export function draftsEqual(left: LoanDraft, right: LoanDraft): boolean {
     && left.duration === right.duration
     && left.drawdownDate === right.drawdownDate
     && left.paymentFrequency === right.paymentFrequency
+    && left.accountId === right.accountId
     && left.rows.length === right.rows.length
     && left.rows.every((row, index) =>
       row.rate === right.rows[index]?.rate && row.date === right.rows[index]?.date)
@@ -199,6 +204,7 @@ export function draftToInput(draft: LoanDraft): { input: MortgageInput; rowKeys:
       duration: Number(draft.duration.trim()),
       drawdownDate: draft.drawdownDate,
       paymentFrequency: draft.paymentFrequency as PaymentFrequency,
+      accountId: draft.accountId === '' ? null : draft.accountId,
       interestRateChanges: rows.map((row) => ({
         newInterestRate: Number(row.rate.trim()),
         effectiveDate: row.date,

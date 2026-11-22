@@ -34,7 +34,7 @@ export function ImportReviewTable({ review, currencyCode }: ImportReviewTablePro
           <caption className="sr-only">Validated transactions for review</caption>
           <thead className="bg-raised">
             <tr>
-              <th className="px-3 py-2" scope="col">Row</th>
+              <th className="px-3 py-2 text-right" scope="col">Row</th>
               <th className="px-3 py-2" scope="col">Date</th>
               <th className="px-3 py-2" scope="col">Description</th>
               <th className="px-3 py-2" scope="col">Direction</th>
@@ -46,7 +46,7 @@ export function ImportReviewTable({ review, currencyCode }: ImportReviewTablePro
           <tbody>
             {review.rows.map((row) => (
               <tr className="hairline-b" key={row.sourceRowNumber}>
-                <th className="px-3 py-2 font-normal" scope="row">{row.sourceRowNumber}</th>
+                <th className="px-3 py-2 text-right font-normal tabular-nums" scope="row">{row.sourceRowNumber}</th>
                 <td className="px-3 py-2">
                   {new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' })
                     .format(new Date(`${row.transactionDate}T00:00:00`))}

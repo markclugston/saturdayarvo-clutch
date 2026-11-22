@@ -288,6 +288,37 @@ public sealed class MortgageValidatorTests
         Assert.Equal("Enter a opening balance greater than 0", errors["openingBalance"]);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void A_blank_account_id_means_no_account(string? accountId)
+    {
+        var result = MortgageValidator.Validate(Valid() with { AccountId = accountId }, Clock);
+
+        Assert.Empty(result.Errors);
+        Assert.Null(result.Value!.AccountId);
+    }
+
+    [Fact]
+    public void A_guid_account_id_is_parsed()
+    {
+        var id = Guid.NewGuid();
+
+        var result = MortgageValidator.Validate(Valid() with { AccountId = id.ToString() }, Clock);
+
+        Assert.Empty(result.Errors);
+        Assert.Equal(id, result.Value!.AccountId);
+    }
+
+    [Theory]
+    [InlineData("not-a-guid")]
+    [InlineData("12345")]
+    public void A_non_guid_account_id_is_an_account_id_error(string accountId) =>
+        Assert.Equal(
+            "Choose one of your accounts",
+            Errors(Valid() with { AccountId = accountId })["accountId"]);
+
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;

@@ -20,7 +20,8 @@ internal static class MortgageTestSupport
         string DrawdownDate,
         string PaymentFrequency,
         List<RateChange> InterestRateChanges,
-        int Version);
+        int Version,
+        Guid? AccountId = null);
 
     public sealed record ProblemDto(
         string? Type,
@@ -83,7 +84,8 @@ internal static class MortgageTestSupport
         string? drawdownDate = "2000-01-01",
         string? paymentFrequency = "Monthly",
         object? rates = null,
-        int? version = null) =>
+        int? version = null,
+        string? accountId = null) =>
         new Dictionary<string, object?>
         {
             ["name"] = name,
@@ -93,7 +95,49 @@ internal static class MortgageTestSupport
             ["paymentFrequency"] = paymentFrequency,
             ["interestRateChanges"] = rates ?? new[] { new { newInterestRate = 5.25m, effectiveDate = "2000-01-01" } },
             ["version"] = version,
+            ["accountId"] = accountId,
         };
+
+    private sealed record AccountDto(Guid Id);
+
+    public static async Task<Guid> CreateAccountAsync(
+        HttpClient client,
+        string description = "Offset account",
+        string currencyCode = "AUD")
+    {
+        using var response = await SendAsync(
+            client,
+            HttpMethod.Post,
+            "/api/accounts",
+            new { description, currencyCode });
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<AccountDto>())!.Id;
+    }
+
+    // Seeds a transaction straight into the database; a null balance is a balance-less row.
+    public static async Task SeedTransactionAsync(
+        SqlServerFixture fixture,
+        Guid accountId,
+        DateOnly date,
+        decimal? balance,
+        string description = "Seeded")
+    {
+        await using var scope = fixture.Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.True(Clutch.API.Domain.Shared.Currency.TryGet("AUD", out var currency));
+        Assert.True(Clutch.API.Domain.Transactions.Transaction.TryCreate(
+            accountId,
+            date,
+            description,
+            1m,
+            Clutch.API.Domain.Transactions.TransactionDirection.Incoming,
+            balance,
+            currency!,
+            DateTimeOffset.UtcNow,
+            out var transaction));
+        db.Transactions.Add(transaction!);
+        await db.SaveChangesAsync();
+    }
 
     public static async Task<MortgageDto> CreateAsync(HttpClient client, object body)
     {

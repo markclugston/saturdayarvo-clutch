@@ -44,6 +44,8 @@ export function MortgagesPage({ userId }: MortgagesPageProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [retained, setRetained] = useState<Mortgage | null>(null)
   const [sessionExpired, setSessionExpired] = useState(false)
+  // The Mortgage Account drop-down's live selection, saved or not; the schedule follows it.
+  const [liveAccountId, setLiveAccountId] = useState('')
 
   const mortgages = query.data
   // The default (first) mortgage is pinned by id so a refetch cannot silently change what is selected.
@@ -145,6 +147,7 @@ export function MortgagesPage({ userId }: MortgagesPageProps) {
           setSelectedId(null)
           void queryClient.invalidateQueries({ queryKey: mortgagesQueryKey })
         }}
+        onAccountChange={setLiveAccountId}
         onGone={() => handleGone(selectedMortgage?.id ?? '')}
         onReloadAll={async () => {
           await refetchLatest()
@@ -171,7 +174,10 @@ export function MortgagesPage({ userId }: MortgagesPageProps) {
         onUnauthorized={handleUnauthorized}
       />
       <LoanPayoffTimeline
+        accountId={liveAccountId === '' ? undefined : liveAccountId}
+        drawdownDate={selectedMortgage?.drawdownDate}
         duration={selectedMortgage?.duration}
+        paymentFrequency={selectedMortgage?.paymentFrequency}
         onSwitch={() => {
           const next: LoanPayoffTimelineView = view === 'Burndown' ? 'Schedule' : 'Burndown'
           // The cache is the shown view: set it first, so the switch never waits on the save.

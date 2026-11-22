@@ -1,8 +1,10 @@
-import { useEffect, useId, useState, type FormEvent } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useEffect, useId, useMemo, useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { ErrorMessage } from '@/components/ui/error-message'
 import { FloatingField } from '@/components/ui/floating-field'
 import { useUnsavedChanges } from '@/components/unsaved-changes/UnsavedChangesProvider'
+import { getAccounts } from '@/features/accounts/api'
 import type { Mortgage } from '@/lib/api/schemas'
 import {
   MortgageChangedError,
@@ -45,6 +47,8 @@ type LoanDetailsFormProps = {
   onUnauthorized: () => void
   /** Fetches the latest saved version. Resolves null when the mortgage is gone. */
   onReload: () => Promise<Mortgage | null>
+  /** The drop-down's current account id ('' for none), reported on load and on every change. */
+  onAccountChange?: (accountId: string) => void
 }
 
 // Errors without a field of their own; the set-level interestRateChanges message also shows in the
@@ -60,6 +64,7 @@ export function LoanDetailsForm({
   onReloadAll,
   onUnauthorized,
   onReload,
+  onAccountChange,
 }: LoanDetailsFormProps) {
   const idPrefix = useId()
   const { isDirty: guardDirty, setDirty, run } = useUnsavedChanges()
@@ -92,6 +97,21 @@ export function LoanDetailsForm({
   useEffect(() => () => setDirty(false), [setDirty])
 
   const today = localToday()
+
+  // A failed load leaves only None; the form stays usable.
+  const accountsQuery = useQuery({ queryKey: ['accounts'], queryFn: getAccounts })
+  const accountOptions = useMemo(
+    () => [...(accountsQuery.data ?? [])].sort((left, right) =>
+      left.description.localeCompare(right.description, undefined, { sensitivity: 'base' })),
+    [accountsQuery.data],
+  )
+  // A linked id missing from the list shows as none; saving is not blocked.
+  const shownAccountId = accountOptions.some((account) => account.id === draft.accountId)
+    ? draft.accountId
+    : ''
+  useEffect(() => {
+    onAccountChange?.(draft.accountId)
+  }, [draft.accountId, onAccountChange])
 
   function change(patch: Partial<LoanDraft>) {
     setDraft((current) => ({ ...current, ...patch }))
@@ -249,6 +269,21 @@ export function LoanDetailsForm({
           <option value="Weekly">Weekly</option>
           <option value="Fortnightly">Fortnightly</option>
           <option value="Monthly">Monthly</option>
+        </FloatingField>
+        <FloatingField
+          as="select"
+          className="w-full sm:w-64"
+          disabled={saving}
+          error={errors.accountId}
+          id={`${idPrefix}-account`}
+          label="Mortgage Account"
+          onChange={(event) => change({ accountId: event.currentTarget.value })}
+          value={shownAccountId}
+        >
+          <option value="">None</option>
+          {accountOptions.map((account) => (
+            <option key={account.id} value={account.id}>{account.description}</option>
+          ))}
         </FloatingField>
       </div>
 

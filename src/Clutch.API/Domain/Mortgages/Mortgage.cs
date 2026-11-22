@@ -26,6 +26,8 @@ public sealed class Mortgage
 
     public PaymentFrequency PaymentFrequency { get; private set; }
 
+    public Guid? AccountId { get; private set; }
+
     public DateTimeOffset CreatedAtUtc { get; private set; }
 
     public int Version { get; private set; }
@@ -41,6 +43,7 @@ public sealed class Mortgage
         DateOnly drawdownDate,
         PaymentFrequency paymentFrequency,
         IReadOnlyList<RateChangeValue> rateChanges,
+        Guid? accountId,
         DateTimeOffset createdAtUtc)
     {
         var mortgage = new Mortgage
@@ -51,7 +54,7 @@ public sealed class Mortgage
             Version = 1,
         };
         mortgage.Apply(
-            name, openingBalance, duration, drawdownDate, paymentFrequency, rateChanges);
+            name, openingBalance, duration, drawdownDate, paymentFrequency, rateChanges, accountId);
         return mortgage;
     }
 
@@ -62,9 +65,10 @@ public sealed class Mortgage
         int duration,
         DateOnly drawdownDate,
         PaymentFrequency paymentFrequency,
-        IReadOnlyList<RateChangeValue> rateChanges)
+        IReadOnlyList<RateChangeValue> rateChanges,
+        Guid? accountId)
     {
-        Apply(name, openingBalance, duration, drawdownDate, paymentFrequency, rateChanges);
+        Apply(name, openingBalance, duration, drawdownDate, paymentFrequency, rateChanges, accountId);
         Version++;
     }
 
@@ -82,9 +86,11 @@ public sealed class Mortgage
         int duration,
         DateOnly drawdownDate,
         PaymentFrequency paymentFrequency,
-        IReadOnlyList<RateChangeValue> rateChanges)
+        IReadOnlyList<RateChangeValue> rateChanges,
+        Guid? accountId)
     {
         Name = name.Trim();
+        AccountId = accountId;
         OpeningBalance = openingBalance;
         Duration = duration;
         DrawdownDate = drawdownDate;

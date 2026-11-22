@@ -59,3 +59,16 @@ it('renders a select', () => {
   )
   expect(screen.getByRole('combobox', { name: 'Currency' })).toBeInTheDocument()
 })
+
+it('right aligns numeric inputs and leaves text inputs alone', () => {
+  render(
+    <>
+      <FloatingField id="amount" inputMode="decimal" label="Amount" />
+      <FloatingField id="count" label="Count" type="number" />
+      <FloatingField id="note" label="Note" />
+    </>,
+  )
+  expect(screen.getByLabelText('Amount')).toHaveClass('text-right')
+  expect(screen.getByLabelText('Count')).toHaveClass('text-right')
+  expect(screen.getByLabelText('Note')).not.toHaveClass('text-right')
+})

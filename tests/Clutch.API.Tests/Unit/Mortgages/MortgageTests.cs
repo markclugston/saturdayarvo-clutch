@@ -24,8 +24,8 @@ public sealed class MortgageTests
     {
         var mortgage = Create("Home loan");
 
-        mortgage.Update(" Renamed ", 200m, 24, First, PaymentFrequency.Weekly, Changes((5m, First)));
-        mortgage.Update("Renamed", 200m, 24, First, PaymentFrequency.Weekly, Changes((5m, First)));
+        mortgage.Update(" Renamed ", 200m, 24, First, PaymentFrequency.Weekly, Changes((5m, First)), null);
+        mortgage.Update("Renamed", 200m, 24, First, PaymentFrequency.Weekly, Changes((5m, First)), null);
 
         Assert.Equal(3, mortgage.Version);
         Assert.Equal("Renamed", mortgage.Name);
@@ -42,7 +42,7 @@ public sealed class MortgageTests
 
         mortgage.Update(
             "Home loan", 100m, 12, First, PaymentFrequency.Monthly,
-            Changes((6m, First), (7m, First.AddMonths(3))));
+            Changes((6m, First), (7m, First.AddMonths(3))), null);
 
         Assert.Equal(2, mortgage.InterestRateChanges.Count);
         Assert.DoesNotContain(mortgage.InterestRateChanges, change => original.Contains(change.Id));
@@ -64,10 +64,37 @@ public sealed class MortgageTests
             mortgage.InterestRateChanges.Select(change => change.NewInterestRate));
     }
 
-    private static Mortgage Create(string name, IReadOnlyList<RateChangeValue>? changes = null) =>
+    [Fact]
+    public void Create_keeps_the_linked_account_or_none()
+    {
+        var accountId = Guid.NewGuid();
+
+        Assert.Equal(accountId, Create("Linked", accountId: accountId).AccountId);
+        Assert.Null(Create("Unlinked").AccountId);
+    }
+
+    [Fact]
+    public void Update_sets_and_clears_the_account_and_still_bumps_the_version()
+    {
+        var mortgage = Create("Home loan");
+        var accountId = Guid.NewGuid();
+
+        mortgage.Update("Home loan", 100m, 12, First, PaymentFrequency.Monthly, Changes((5m, First)), accountId);
+        Assert.Equal(accountId, mortgage.AccountId);
+        Assert.Equal(2, mortgage.Version);
+
+        mortgage.Update("Home loan", 100m, 12, First, PaymentFrequency.Monthly, Changes((5m, First)), null);
+        Assert.Null(mortgage.AccountId);
+        Assert.Equal(3, mortgage.Version);
+    }
+
+    private static Mortgage Create(
+        string name,
+        IReadOnlyList<RateChangeValue>? changes = null,
+        Guid? accountId = null) =>
         Mortgage.Create(
             "owner", name, 100m, 12, First, PaymentFrequency.Monthly,
-            changes ?? Changes((5m, First)), Now);
+            changes ?? Changes((5m, First)), accountId, Now);
 
     private static List<RateChangeValue> Changes(params (decimal Rate, DateOnly Date)[] values) =>
         values.Select(value => new RateChangeValue(value.Rate, value.Date)).ToList();

@@ -283,6 +283,9 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("AccountId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -317,6 +320,8 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
 
                     b.HasIndex("OwnerUserId", "CreatedAtUtc");
 
@@ -780,6 +785,11 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Clutch.API.Domain.Mortgages.Mortgage", b =>
                 {
+                    b.HasOne("Clutch.API.Domain.Accounts.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Clutch.API.Infrastructure.Identity.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("OwnerUserId")

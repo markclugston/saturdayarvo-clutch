@@ -59,11 +59,13 @@ export function FloatingField(props: FloatingFieldProps) {
     const { as, label: _label, error: _error, description: _description, describedBy: _describedBy, onPanel: _onPanel, className, ...rest } = props
     void [as, _label, _error, _description, _describedBy, _onPanel]
     wrapperClassName = className
+    // Numbers and currency amounts are right aligned (WEB-001).
+    const numeric = rest.type === 'number' || rest.inputMode === 'numeric' || rest.inputMode === 'decimal'
     control = (
       <input
         aria-describedby={ariaDescribedBy}
         aria-invalid={invalid}
-        className={controlClass}
+        className={numeric ? cn(controlClass, 'text-right tabular-nums') : controlClass}
         placeholder=" "
         {...rest}
       />

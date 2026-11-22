@@ -192,6 +192,8 @@ export const MortgageInputSchema = z.object({
   drawdownDate: z.iso.date(),
   paymentFrequency: PaymentFrequencySchema,
   interestRateChanges: z.array(InterestRateChangeSchema).max(60),
+  /** The linked account, or null/absent for none. */
+  accountId: z.uuid().nullable().optional(),
 })
 
 export const MortgageResponseSchema = MortgageInputSchema.extend({
@@ -201,9 +203,17 @@ export const MortgageResponseSchema = MortgageInputSchema.extend({
 
 export const MortgageListSchema = z.array(MortgageResponseSchema)
 
+/** End-of-period balances; a missing or null entry is blank, and trailing blanks are omitted. */
+export const PeriodBalancesSchema = z.object({
+  currencyCode: z.string().regex(/^[A-Z]{3}$/),
+  periodCount: z.number().int().min(0),
+  balances: z.array(z.string().regex(/^-?[0-9]+(\.[0-9]+)?$/).nullable()),
+})
+
 export type InterestRateChange = z.infer<typeof InterestRateChangeSchema>
 export type MortgageInput = z.infer<typeof MortgageInputSchema>
 export type Mortgage = z.infer<typeof MortgageResponseSchema>
+export type PeriodBalances = z.infer<typeof PeriodBalancesSchema>
 
 export type CategoryNode = z.infer<typeof CategoryNodeSchema>
 export type DeletionImpact = z.infer<typeof DeletionImpactSchema>

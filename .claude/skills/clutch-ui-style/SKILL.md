@@ -21,6 +21,7 @@ read them from the code. MUST / MUST NOT / SHOULD are used in the RFC 2119 sense
 | Primitives and their variants (shell, navigation, panels, cards, fields, buttons, chips, dialog, toast, tooltip) | `src/clutch-web/src/components/ui/` (`class-variance-authority`, `cn` in `src/lib/utils.ts`); tooltip in `components/ui/tooltip.tsx` | Component tests beside each primitive (`tooltip.test.tsx`); tooltip hover, Escape and reduced motion in `e2e/style-guide.spec.ts` |
 | Theme runtime | `src/clutch-web/src/components/theme/` | Theme component and browser tests |
 | Contrast, focus outline, surface lightness, no pure-white text, transition timing, toast and tab-strip layout | — | `src/clutch-web/e2e/style-guide.spec.ts` (axe WCAG 2.2 AA tags, both themes) |
+| Right alignment of numbers and currency (cells, headers, numeric inputs, displayed amounts) | `src/clutch-web/eslint-rules/clutch-numeric-align.js`; numeric inputs in `components/ui/floating-field.tsx` | `npm run lint` (`clutch-numeric-align.test.js`); `floating-field.test.tsx` |
 | % and $ entry fields | `src/clutch-web/src/features/mortgages/FormattedNumberField.tsx` | Its component tests |
 
 If guidance here disagrees with the code, raise the conflict (constitution Governance). Do not
@@ -58,6 +59,7 @@ pick a side.
 - An external field label without documented justification.
 - Labels, headings or button text not in Title Case.
 - A % or $ field not built on the shared formatted field.
+- A number, rate or currency amount that is not right aligned, including its column header. The lint rule catches formatter calls in `td`/`th` and raw numeric inputs; review the rest (div-based grids, standalone values, headers).
 
 ## Changing the style guide
 

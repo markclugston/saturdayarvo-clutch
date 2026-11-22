@@ -1,0 +1,33 @@
+import { RuleTester } from 'eslint'
+import { describe, it } from 'vitest'
+import { rule } from './clutch-numeric-align.js'
+
+RuleTester.describe = describe
+RuleTester.it = it
+RuleTester.itOnly = it.only
+
+const tester = new RuleTester({
+  languageOptions: {
+    ecmaVersion: 'latest',
+    sourceType: 'module',
+    parserOptions: { ecmaFeatures: { jsx: true } },
+  },
+})
+
+tester.run('clutch/numeric-align', rule, {
+  valid: [
+    'const a = <td className="px-3 py-2 text-right tabular-nums">{formatCurrencyAmount(x, c)}</td>',
+    'const a = <td className="px-3 justify-end">{row.ok ? formatPercent(x) : ""}</td>',
+    'const a = <td className="px-3">{row.description}</td>',
+    'const a = <input className="text-right" inputMode="decimal" />',
+    'const a = <input type="text" />',
+    'const a = <FloatingField inputMode="numeric" />',
+  ],
+  invalid: [
+    { code: 'const a = <td className="px-3">{formatCurrencyAmount(x, c)}</td>', errors: [{ messageId: 'cell' }] },
+    { code: 'const a = <td>{x == null ? "" : formatCurrency(x)}</td>', errors: [{ messageId: 'cell' }] },
+    { code: 'const a = <th className="text-left">{formatPercent(x)}</th>', errors: [{ messageId: 'cell' }] },
+    { code: 'const a = <input type="number" />', errors: [{ messageId: 'input' }] },
+    { code: 'const a = <input inputMode="numeric" className="w-full" />', errors: [{ messageId: 'input' }] },
+  ],
+})

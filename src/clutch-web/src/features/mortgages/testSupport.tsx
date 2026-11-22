@@ -5,7 +5,7 @@ import { expect, vi } from 'vitest'
 import { ToastProvider } from '@/components/ui/toast'
 import { UnsavedChangesProvider } from '@/components/unsaved-changes/UnsavedChangesProvider'
 import { ApiError, apiRequest } from '@/lib/api/client'
-import type { LoanPayoffTimelineView, Mortgage } from '@/lib/api/schemas'
+import type { Account, LoanPayoffTimelineView, Mortgage, PeriodBalances } from '@/lib/api/schemas'
 import { renderWithQueryClient } from '@/test/renderWithQueryClient'
 
 // Test-only helpers. The calling test file must `vi.mock('@/lib/api/client', ...)` so apiRequest is a mock.
@@ -35,6 +35,18 @@ export const conflictError = () => problem(409, { type: '/problems/mortgage-chan
 
 export type FakeServer = {
   mortgages: Mortgage[]
+  /** Accounts returned by `GET /api/accounts`. */
+  accounts: Account[]
+  /** Error thrown by `GET /api/accounts` while set. */
+  accountsError?: unknown
+  /** Response of `GET /api/mortgages/period-balances`. */
+  balances: PeriodBalances
+  /** Error thrown by the balances request while set. */
+  balancesError?: unknown
+  /** Hold the next balances response until released. */
+  holdBalances: () => () => void
+  /** Query strings of the balances requests, as received. */
+  balanceRequests: string[]
   /** Failures to throw for the next matching request, keyed `GET`, `POST`, `PUT` or `DELETE`. */
   failNext: (method: string, error: unknown) => void
   failAlways: (method: string, error: unknown) => void
@@ -61,6 +73,7 @@ export function installFakeApi(initial: Mortgage[], view: LoanPayoffTimelineView
   const preferenceHolds = new Map<string, Promise<void>>()
   const preferenceHoldAll = new Map<string, Array<() => void>>()
   const preferenceFailures = new Map<string, unknown[]>()
+  let balanceHold: Promise<void> | null = null
   const server: FakeServer = {
     view,
     preferenceRequests: [],
@@ -78,6 +91,14 @@ export function installFakeApi(initial: Mortgage[], view: LoanPayoffTimelineView
       preferenceFailures.set(method, [...(preferenceFailures.get(method) ?? []), error])
     },
     mortgages: structuredClone(initial),
+    accounts: [],
+    balances: { currencyCode: 'AUD', periodCount: 0, balances: [] },
+    balanceRequests: [],
+    holdBalances: () => {
+      let release: () => void = () => {}
+      balanceHold = new Promise<void>((resolve) => { release = resolve })
+      return release
+    },
     failNext: (method, error) => {
       failures.set(method, [...(failures.get(method) ?? []), error])
     },
@@ -97,6 +118,24 @@ export function installFakeApi(initial: Mortgage[], view: LoanPayoffTimelineView
     const body = typeof init?.body === 'string' ? JSON.parse(init.body) as Record<string, unknown> : undefined
     if (path === PREFERENCE_PATH) {
       return handlePreference(method, body, init?.signal)
+    }
+    if (path === '/api/accounts') {
+      if (server.accountsError) {
+        throw server.accountsError
+      }
+      return structuredClone(server.accounts)
+    }
+    if (path.startsWith('/api/mortgages/period-balances')) {
+      server.balanceRequests.push(path.split('?')[1] ?? '')
+      if (balanceHold) {
+        const held = balanceHold
+        balanceHold = null
+        await held
+      }
+      if (server.balancesError) {
+        throw server.balancesError
+      }
+      return structuredClone(server.balances)
     }
     server.requests.push({ method, path, body })
 

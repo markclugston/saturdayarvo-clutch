@@ -4,6 +4,7 @@ import { ApiError, apiRequest } from '@/lib/api/client'
 import {
   MortgageListSchema,
   MortgageResponseSchema,
+  PeriodBalancesSchema,
   type Mortgage,
   type MortgageInput,
 } from '@/lib/api/schemas'
@@ -105,6 +106,32 @@ export function deleteMortgage(id: string, version: number): Promise<void> {
     z.undefined(),
     { method: 'DELETE' },
   ))
+}
+
+export const periodBalancesQueryKey = ['mortgage-period-balances'] as const
+
+export type PeriodBalanceRequest = {
+  accountId: string
+  /** All three, or none (monthly fallback from the account's history). */
+  schedule?: { drawdownDate: string; frequency: string; duration: number }
+}
+
+export function getPeriodBalances({ accountId, schedule }: PeriodBalanceRequest) {
+  const params = new URLSearchParams({ accountId })
+  if (schedule) {
+    params.set('drawdownDate', schedule.drawdownDate)
+    params.set('frequency', schedule.frequency)
+    params.set('duration', String(schedule.duration))
+  }
+  return apiRequest(`/api/mortgages/period-balances?${params.toString()}`, PeriodBalancesSchema)
+}
+
+export function usePeriodBalances(request: PeriodBalanceRequest | null) {
+  return useQuery({
+    queryKey: [...periodBalancesQueryKey, request?.accountId, request?.schedule ?? null],
+    queryFn: () => getPeriodBalances(request as PeriodBalanceRequest),
+    enabled: request !== null,
+  })
 }
 
 export function useMortgages() {

@@ -10,7 +10,8 @@ public sealed record MortgageCandidate(
     decimal? Duration,
     string? DrawdownDate,
     string? PaymentFrequency,
-    IReadOnlyList<RateChangeCandidate> InterestRateChanges);
+    IReadOnlyList<RateChangeCandidate> InterestRateChanges,
+    string? AccountId = null);
 
 public sealed record ValidMortgage(
     string Name,
@@ -18,7 +19,8 @@ public sealed record ValidMortgage(
     int Duration,
     DateOnly DrawdownDate,
     PaymentFrequency PaymentFrequency,
-    IReadOnlyList<RateChangeValue> RateChanges);
+    IReadOnlyList<RateChangeValue> RateChanges,
+    Guid? AccountId);
 
 // One message per field key: the first applicable row of the contract's message table.
 public sealed record MortgageValidationResult(
@@ -38,6 +40,7 @@ public static class MortgageValidator
         var firstDate = ValidateDrawdownDate(candidate.DrawdownDate, timeProvider, errors);
         var frequency = ValidateFrequency(candidate.PaymentFrequency, errors);
         var periods = ValidatePeriods(candidate.Duration, firstDate, frequency, errors);
+        var accountId = ValidateAccountId(candidate.AccountId, errors);
 
         var rows = candidate.InterestRateChanges
             .Select((row, index) => (row, index))
@@ -116,11 +119,31 @@ public static class MortgageValidator
                 periods!.Value,
                 firstDate!.Value,
                 frequency!.Value,
-                changes));
+                changes,
+                accountId));
     }
+
+    public const string AccountIdMessage = "Choose one of your accounts";
 
     public static string FormatDate(DateOnly date) =>
         date.ToString("d MMM yyyy", CultureInfo.InvariantCulture);
+
+    // Blank means no linked account; ownership is checked by the service.
+    private static Guid? ValidateAccountId(string? value, Dictionary<string, string> errors)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (Guid.TryParse(value, out var id) && id != Guid.Empty)
+        {
+            return id;
+        }
+
+        errors["accountId"] = AccountIdMessage;
+        return null;
+    }
 
     private static string? ValidateName(string? value, Dictionary<string, string> errors)
     {

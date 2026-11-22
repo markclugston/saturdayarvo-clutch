@@ -2,6 +2,7 @@ import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { apiRequest } from '@/lib/api/client'
 import type { Mortgage } from '@/lib/api/schemas'
 import { LoanDetailsForm } from './LoanDetailsForm'
 import {
@@ -496,5 +497,109 @@ describe('LoanDetailsForm (editing)', () => {
       expect(summary).toHaveTextContent('Correct the highlighted fields and try again.')
       expect(summary).not.toHaveTextContent('Change Interest Rate')
     })
+  })
+})
+
+describe('LoanDetailsForm Mortgage Account', () => {
+  const accountA = { id: '11111111-1111-4111-8111-111111111111', description: 'banana offset', currencyCode: 'AUD' }
+  const accountB = { id: '22222222-2222-4222-8222-222222222222', description: 'Apple Everyday', currencyCode: 'AUD' }
+
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('offers None first then accounts alphabetically ignoring case', async () => {
+    const server = installFakeApi([])
+    server.accounts = [accountA, accountB]
+    renderForm()
+
+    const select = screen.getByLabelText('Mortgage Account')
+    await waitFor(() => expect(within(select).getAllByRole('option')).toHaveLength(3))
+    expect(within(select).getAllByRole('option').map((option) => option.textContent))
+      .toEqual(['None', 'Apple Everyday', 'banana offset'])
+    expect(select).toHaveValue('')
+  })
+
+  it('offers only None when there are no accounts', async () => {
+    installFakeApi([])
+    renderForm()
+
+    const select = screen.getByLabelText('Mortgage Account')
+    await waitFor(() => expect(vi.mocked(apiRequest)).toHaveBeenCalled())
+    expect(within(select).getAllByRole('option').map((option) => option.textContent)).toEqual(['None'])
+  })
+
+  it('offers only None when accounts fail to load and the form still saves', async () => {
+    const server = installFakeApi([])
+    server.accountsError = problem(500)
+    const user = userEvent.setup()
+    renderForm()
+    await fillForm(user, validValues)
+
+    await submit(user)
+
+    expect(within(screen.getByLabelText('Mortgage Account')).getAllByRole('option')).toHaveLength(1)
+    await waitFor(() => expect(server.requests.some((request) => request.method === 'POST')).toBe(true))
+  })
+
+  it('shows the saved account and treats a linked id missing from the list as none', async () => {
+    const server = installFakeApi([])
+    server.accounts = [accountA]
+    const linked = makeMortgage({ accountId: accountA.id })
+    const { unmount } = renderForm({ mortgage: linked })
+    await waitFor(() => expect(screen.getByLabelText('Mortgage Account')).toHaveValue(accountA.id))
+    unmount()
+
+    renderForm({ mortgage: makeMortgage({ accountId: accountB.id }) })
+    await waitFor(() => expect(vi.mocked(apiRequest)).toHaveBeenCalled())
+    expect(screen.getByLabelText('Mortgage Account')).toHaveValue('')
+  })
+
+  it('sends the chosen account on save, reports changes, and Cancel restores the saved link', async () => {
+    const server = installFakeApi([])
+    server.accounts = [accountA, accountB]
+    const onAccountChange = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(
+      <LoanDetailsForm
+        onAccountChange={onAccountChange}
+        onDeleted={() => {}}
+        onGone={() => {}}
+        onReload={async () => null}
+        onReloadAll={async () => {}}
+        onSaved={() => {}}
+        onUnauthorized={() => {}}
+      />,
+    )
+    const select = screen.getByLabelText('Mortgage Account')
+    await waitFor(() => expect(within(select).getAllByRole('option')).toHaveLength(3))
+
+    await user.selectOptions(select, accountA.id)
+    expect(onAccountChange).toHaveBeenLastCalledWith(accountA.id)
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(select).toHaveValue('')
+    expect(onAccountChange).toHaveBeenLastCalledWith('')
+
+    await user.selectOptions(select, accountB.id)
+    await fillForm(user, validValues)
+    await submit(user)
+
+    await waitFor(() => expect(server.requests.find((request) => request.method === 'POST')?.body)
+      .toMatchObject({ accountId: accountB.id }))
+  })
+
+  it('shows a server accountId error on the field', async () => {
+    const server = installFakeApi([])
+    server.accounts = [accountA]
+    server.failNext('POST', problem(400, { errors: { accountId: ['Choose one of your accounts'] } }))
+    const user = userEvent.setup()
+    renderForm()
+    await fillForm(user, validValues)
+    await waitFor(() => expect(within(screen.getByLabelText('Mortgage Account')).getAllByRole('option')).toHaveLength(2))
+    await user.selectOptions(screen.getByLabelText('Mortgage Account'), accountA.id)
+
+    await submit(user)
+
+    expect(await screen.findByText('Choose one of your accounts')).toBeInTheDocument()
   })
 })

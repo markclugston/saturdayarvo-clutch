@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text;
 using Clutch.API.Tests.Integration.Accounts;
+using Microsoft.EntityFrameworkCore;
+using Clutch.API.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -211,5 +213,74 @@ public sealed class MortgageCreateTests(SqlServerFixture fixture)
     internal sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
+    }
+
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task Create_saves_the_linked_account_and_reload_returns_it_and_one_audit_row_is_written()
+    {
+        using var client = await SignedInClientAsync(fixture.Factory);
+        var accountId = await CreateAccountAsync(client);
+
+        var created = await CreateAsync(client, Body("Joined loan", accountId: accountId.ToString()));
+
+        Assert.Equal(accountId, created.AccountId);
+        Assert.Equal(accountId, Assert.Single(await ListAsync(client)).AccountId);
+        var audits = await AuditsAsync(fixture, "Joined loan");
+        var audit = Assert.Single(audits);
+        Assert.Equal("MortgageCreate", audit.EventCode);
+        Assert.DoesNotContain(accountId.ToString(), audit.Description, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [Trait("Category", "SqlServer")]
+    public async Task A_blank_account_id_saves_with_no_link(string? accountId)
+    {
+        using var client = await SignedInClientAsync(fixture.Factory);
+
+        var created = await CreateAsync(client, Body("Unlinked loan", accountId: accountId));
+
+        Assert.Null(created.AccountId);
+    }
+
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task A_foreign_unknown_or_malformed_account_id_is_a_400_account_id_error()
+    {
+        using var client = await SignedInClientAsync(fixture.Factory);
+        using var other = await SignedInClientAsync(fixture.Factory);
+        var foreign = await CreateAccountAsync(other);
+
+        foreach (var accountId in new[] { foreign.ToString(), Guid.NewGuid().ToString(), "not-a-guid" })
+        {
+            using var response = await SendAsync(
+                client, HttpMethod.Post, "/api/mortgages", Body("Bad link", accountId: accountId));
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            Assert.Equal(
+                "Choose one of your accounts",
+                (await ProblemAsync(response)).Errors!["accountId"][0]);
+        }
+
+        Assert.Empty(await ListAsync(client));
+    }
+
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task Deleting_the_account_clears_the_link_and_the_mortgage_still_loads()
+    {
+        using var client = await SignedInClientAsync(fixture.Factory);
+        var accountId = await CreateAccountAsync(client);
+        await CreateAsync(client, Body("Orphaned loan", accountId: accountId.ToString()));
+
+        await using (var scope = fixture.Factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.Accounts.Where(account => account.Id == accountId).ExecuteDeleteAsync();
+        }
+
+        Assert.Null(Assert.Single(await ListAsync(client)).AccountId);
     }
 }

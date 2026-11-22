@@ -31,6 +31,34 @@ public static class MortgageEndpoints
             return Results.Ok(mortgages.Select(MortgageResponse.From));
         });
 
+        group.MapGet("/period-balances", async (
+            string? accountId,
+            string? drawdownDate,
+            string? frequency,
+            string? duration,
+            ClaimsPrincipal principal,
+            PeriodBalanceService service,
+            CancellationToken cancellationToken) =>
+        {
+            if (principal.FindFirstValue(ClaimTypes.NameIdentifier) is not { } ownerUserId)
+            {
+                return Results.Problem(statusCode: StatusCodes.Status401Unauthorized);
+            }
+
+            if (!Guid.TryParse(accountId, out var id) || id == Guid.Empty)
+            {
+                throw new ApiProblemException(
+                    StatusCodes.Status400BadRequest,
+                    "The period balance request is invalid.",
+                    "Correct the highlighted fields and try again.",
+                    new Dictionary<string, string[]> { ["accountId"] = [MortgageValidator.AccountIdMessage] });
+            }
+
+            var result = await service.GetAsync(
+                ownerUserId, id, drawdownDate, frequency, duration, cancellationToken);
+            return Results.Ok(result);
+        });
+
         group.MapPost("", async (
             MortgageRequest request,
             ClaimsPrincipal principal,
@@ -112,7 +140,8 @@ public static class MortgageEndpoints
         string? DrawdownDate,
         string? PaymentFrequency,
         List<RateChangeRequest?>? InterestRateChanges,
-        int? Version)
+        int? Version,
+        string? AccountId)
     {
         public MortgageCandidate ToCandidate() =>
             new(
@@ -125,7 +154,8 @@ public static class MortgageEndpoints
                     .Select(change => change is null
                         ? new RateChangeCandidate(null, null)
                         : new RateChangeCandidate(ToDecimal(change.NewInterestRate), change.EffectiveDate))
-                    .ToList());
+                    .ToList(),
+                AccountId);
     }
 
     private sealed record RateChangeRequest(JsonElement? NewInterestRate, string? EffectiveDate);
@@ -162,7 +192,8 @@ public static class MortgageEndpoints
         string DrawdownDate,
         string PaymentFrequency,
         List<InterestRateChangeResponse> InterestRateChanges,
-        int Version)
+        int Version,
+        Guid? AccountId)
     {
         public static MortgageResponse From(Mortgage mortgage) =>
             new(
@@ -178,7 +209,8 @@ public static class MortgageEndpoints
                         change.NewInterestRate,
                         FormatDate(change.EffectiveDate)))
                     .ToList(),
-                mortgage.Version);
+                mortgage.Version,
+                mortgage.AccountId);
     }
 
     private static string FormatDate(DateOnly date) =>

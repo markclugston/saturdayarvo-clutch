@@ -1,14 +1,13 @@
 <!--
 Sync Impact Report
-- Version: 1.4.0 → 1.5.0 (MINOR: source-of-truth model)
-- Modified: Governance — running code is authoritative for implementation; WEB-001 % and $ rule
-  states the obligation and cites the implementing component instead of describing the mechanism
-- Follow-up: clutch-* skills reference code instead of restating it; run
+- Version: 1.5.0 → 1.6.0 (MINOR: new WEB-001 obligation)
+- Added: WEB-001 — all numbers and currency amounts are right aligned (clutch/numeric-align lint rule)
+- Follow-up: clutch-ui-style skill, compliance checklist and code map reference the rule; run
   .\scripts\sync-agent-config.ps1 -From claude
 -->
 # SaturdayArvo Clutch Constitution
 
-**Version**: 1.5.0 | **Last Amended**: 2026-11-22
+**Version**: 1.6.0 | **Last Amended**: 2026-11-22
 
 ## Governance
 Source of truth: the running code, its lint rules and its automated tests define implementation (design tokens, components, patterns, conventions). This constitution defines obligations, governance and process. Specifications define intent.
@@ -68,6 +67,7 @@ Each heading names the skill holding the process for that requirement. The proce
 - Third-party UI code requires independent security review.
 - Visible labels, headings and button text must use Title Case.
 - Percentage (%) and currency ($) entry controls must never display characters that cannot form a valid value, and must show the formatted value when focus leaves the field. They reuse the established implementation (`docs/code-map.md`).
+- All numbers and currency amounts must be right aligned: numeric and currency table cells and their column headers, numeric entry controls, and displayed amounts and rates. Enforced by the `clutch/numeric-align` lint rule and the `FloatingField` primitive (`docs/code-map.md`).
 - UI work must apply the style guide: the design system implemented in code and its enforcing lint rule and browser tests. Plans must identify the applicable style guide sections, and its compliance checklist must appear in the Constitution Check and completion review.
 - Style-guide rule changes are made in code first (tokens, primitives, lint rule, browser tests); guidance that references them is updated in the same change.
 
