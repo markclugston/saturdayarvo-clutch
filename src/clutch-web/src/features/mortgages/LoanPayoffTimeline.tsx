@@ -4,6 +4,7 @@ import { Tooltip } from '@/components/ui/tooltip'
 import type { LoanPayoffTimelineView } from '@/lib/api/schemas'
 import { AmortizationSchedule } from './AmortizationSchedule'
 import { BurnDownChart } from './BurnDownChart'
+import type { PaymentFrequency } from './repaymentDates'
 
 const SWITCH_LABEL: Record<LoanPayoffTimelineView, string> = {
   Burndown: 'Show Amortization Schedule',
@@ -23,10 +24,23 @@ type LoanPayoffTimelineProps = {
   saved: boolean
   /** Saved Duration of the selected mortgage; undefined for a new, unsaved one. */
   duration?: number
+  /** Saved Drawdown Date and Payment Frequency of the selected mortgage. */
+  drawdownDate?: string
+  paymentFrequency?: PaymentFrequency
+  /** The Mortgage Account drop-down's current selection; none when undefined. */
+  accountId?: string
 }
 
 /** One card showing the burndown chart or the amortization schedule, with a switch at its top right. */
-export function LoanPayoffTimeline({ view, onSwitch, saved, duration }: LoanPayoffTimelineProps) {
+export function LoanPayoffTimeline({
+  view,
+  onSwitch,
+  saved,
+  duration,
+  drawdownDate,
+  paymentFrequency,
+  accountId,
+}: LoanPayoffTimelineProps) {
   const label = SWITCH_LABEL[view]
 
   return (
@@ -42,7 +56,14 @@ export function LoanPayoffTimeline({ view, onSwitch, saved, duration }: LoanPayo
       <p className="sr-only" role="status">{SHOWING[view]}</p>
       {view === 'Burndown'
         ? <BurnDownChart saved={saved} />
-        : <AmortizationSchedule duration={duration} />}
+        : (
+          <AmortizationSchedule
+            accountId={accountId}
+            drawdownDate={drawdownDate}
+            duration={duration}
+            paymentFrequency={paymentFrequency}
+          />
+        )}
     </section>
   )
 }

@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getTransactions } from '@/features/imports/api'
 import { ApiError } from '@/lib/api/client'
+import { periodBalancesQueryKey } from '@/features/mortgages/api'
 import { deleteTransaction } from './api'
 
 export function useTransactions(accountId: string) {
@@ -18,7 +19,10 @@ export function useDeleteTransaction(accountId: string) {
 
   return useMutation({
     mutationFn: (transactionId: string) => deleteTransaction(accountId, transactionId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['transactions', accountId] }),
+    onSuccess: () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['transactions', accountId] }),
+      queryClient.invalidateQueries({ queryKey: periodBalancesQueryKey }),
+    ]),
     onError: (error) => {
       // A 404 means the row is already gone, so refresh the list to remove it.
       if (error instanceof ApiError && error.status === 404) {

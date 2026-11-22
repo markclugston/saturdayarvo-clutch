@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card'
 import { ErrorMessage } from '@/components/ui/error-message'
 import { PageHeading } from '@/components/ui/page-heading'
 import { getAccount, getCurrencies } from '@/features/accounts/api'
+import { periodBalancesQueryKey } from '@/features/mortgages/api'
 import { ApiError } from '@/lib/api/client'
 import type { ImportReview } from '@/lib/api/schemas'
 import {
@@ -99,6 +100,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
         queryClient.invalidateQueries({ queryKey: ['accountImportSettings', accountId] }),
         queryClient.invalidateQueries({ queryKey: ['account', accountId] }),
         queryClient.invalidateQueries({ queryKey: ['accounts'] }),
+        queryClient.invalidateQueries({ queryKey: periodBalancesQueryKey }),
         queryClient.invalidateQueries({ queryKey: ['transactions', accountId] }),
       ])
     },
@@ -166,6 +168,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['account', accountId] }),
         queryClient.invalidateQueries({ queryKey: ['accounts'] }),
+        queryClient.invalidateQueries({ queryKey: periodBalancesQueryKey }),
         queryClient.invalidateQueries({ queryKey: ['transactions', accountId] }),
       ])
       onBack()

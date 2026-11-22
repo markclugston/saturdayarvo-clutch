@@ -80,6 +80,7 @@ public static class DependencyInjection
         services.AddScoped<AccountService>();
         services.AddScoped<CategoryNodeService>();
         services.AddScoped<MortgageService>();
+        services.AddScoped<PeriodBalanceService>();
         services.AddScoped<CsvImportParser>();
         services.AddScoped<AccountImportLease>();
         services.AddScoped<ImportAuditWriter>();

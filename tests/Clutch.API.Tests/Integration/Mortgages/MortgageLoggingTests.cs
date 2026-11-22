@@ -46,6 +46,32 @@ public sealed class MortgageLoggingTests(SqlServerFixture fixture)
         });
     }
 
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task Period_balance_reads_log_ids_only_and_never_a_balance_or_description()
+    {
+        var provider = new CapturingLoggerProvider();
+        using var factory = fixture.Factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services => services.AddSingleton<ILoggerProvider>(provider)));
+        using var client = await SignedInClientAsync(factory);
+        var accountId = await CreateAccountAsync(client, "Distinctive Offset Name");
+        await SeedTransactionAsync(fixture, accountId, new DateOnly(2026, 1, 10), 7654321.09m);
+
+        using var response = await client.GetAsync(
+            $"/api/mortgages/period-balances?accountId={accountId}&drawdownDate=2026-01-01&frequency=Monthly&duration=3");
+        using var missing = await client.GetAsync($"/api/mortgages/period-balances?accountId={Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+        var balanceLogs = provider.Entries.Where(entry => entry.Category.Contains("PeriodBalanceService")).ToList();
+        Assert.Contains(balanceLogs, entry => entry.Text.Contains(accountId.ToString()));
+        Assert.All(provider.Entries, entry =>
+        {
+            Assert.DoesNotContain("7654321", entry.Text);
+            Assert.DoesNotContain("Distinctive Offset Name", entry.Text);
+        });
+    }
+
     private sealed record Entry(string Category, string Text);
 
     private sealed class CapturingLoggerProvider : ILoggerProvider

@@ -79,6 +79,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .WithMany()
                 .HasForeignKey(mortgage => mortgage.OwnerUserId)
                 .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Account>()
+                .WithMany()
+                .HasForeignKey(mortgage => mortgage.AccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasIndex(mortgage => mortgage.AccountId);
             entity.HasIndex(mortgage => new { mortgage.OwnerUserId, mortgage.Name })
                 .IsUnique();
             entity.HasIndex(mortgage => new { mortgage.OwnerUserId, mortgage.CreatedAtUtc });

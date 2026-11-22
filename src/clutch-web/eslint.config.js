@@ -2,6 +2,7 @@ import eslint from '@eslint/js'
 import globals from 'globals'
 import tseslint from 'typescript-eslint'
 import clutchStyle from './eslint-rules/clutch-style.js'
+import numericAlign from './eslint-rules/clutch-numeric-align.js'
 
 export default tseslint.config(
   {
@@ -29,7 +30,7 @@ export default tseslint.config(
   },
   {
     files: ['src/**/*.{ts,tsx}'],
-    plugins: { clutch: clutchStyle },
-    rules: { 'clutch/style-tokens': 'error' },
+    plugins: { clutch: { rules: { ...clutchStyle.rules, 'numeric-align': numericAlign } } },
+    rules: { 'clutch/style-tokens': 'error', 'clutch/numeric-align': 'error' },
   },
 )

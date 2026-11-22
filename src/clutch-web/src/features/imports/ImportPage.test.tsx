@@ -364,6 +364,7 @@ describe('ImportPage', () => {
     await waitFor(() => expect(onBack).toHaveBeenCalledOnce())
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['account', account.id] })
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['transactions', account.id] })
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['mortgage-period-balances'] })
     expect(cancelImportReview).not.toHaveBeenCalled()
   })
 

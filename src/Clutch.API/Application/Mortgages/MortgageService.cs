@@ -1,5 +1,6 @@
 using System.Data;
 using Clutch.API.Api.ProblemDetails;
+using Clutch.API.Application.Accounts;
 using Clutch.API.Domain.Audit;
 using Clutch.API.Domain.Mortgages;
 using Clutch.API.Infrastructure.Persistence;
@@ -10,6 +11,7 @@ namespace Clutch.API.Application.Mortgages;
 
 public sealed class MortgageService(
     AppDbContext dbContext,
+    AccountService accountService,
     TimeProvider timeProvider,
     ILogger<MortgageService> logger)
 {
@@ -59,6 +61,8 @@ public sealed class MortgageService(
                     errors["name"] = DuplicateNameMessage;
                 }
 
+                await CheckAccountOwnedAsync(ownerUserId, result.Value, errors, cancellationToken);
+
                 if (errors.Count > 0 || result.Value is null)
                 {
                     throw Invalid(errors);
@@ -74,6 +78,7 @@ public sealed class MortgageService(
                     valid2.DrawdownDate,
                     valid2.PaymentFrequency,
                     valid2.RateChanges,
+                    valid2.AccountId,
                     now);
                 dbContext.Mortgages.Add(mortgage);
                 dbContext.Audits.Add(new Audit(
@@ -147,6 +152,8 @@ public sealed class MortgageService(
                 errors["name"] = DuplicateNameMessage;
             }
 
+            await CheckAccountOwnedAsync(ownerUserId, result.Value, errors, cancellationToken);
+
             if (errors.Count > 0 || result.Value is null)
             {
                 outcome = "invalid";
@@ -161,7 +168,8 @@ public sealed class MortgageService(
                 update.Duration,
                 update.DrawdownDate,
                 update.PaymentFrequency,
-                update.RateChanges);
+                update.RateChanges,
+                update.AccountId);
             var description = string.Equals(oldName, mortgage.Name, StringComparison.Ordinal)
                 ? $"Mortgage {mortgage.Name} was updated."
                 : $"Mortgage {mortgage.Name} was updated, renamed from {oldName} to {mortgage.Name}.";
@@ -280,6 +288,20 @@ public sealed class MortgageService(
     }
 
     private const string DuplicateNameMessage = "A mortgage with this name already exists";
+
+    // A foreign or unknown account looks the same as an invalid id (SEC-001).
+    private async Task CheckAccountOwnedAsync(
+        string ownerUserId,
+        ValidMortgage? valid,
+        Dictionary<string, string> errors,
+        CancellationToken cancellationToken)
+    {
+        if (valid?.AccountId is { } accountId
+            && await accountService.GetOwnedAsync(ownerUserId, accountId, cancellationToken) is null)
+        {
+            errors["accountId"] = MortgageValidator.AccountIdMessage;
+        }
+    }
 
     private Task<bool> NameExistsAsync(
         string ownerUserId,

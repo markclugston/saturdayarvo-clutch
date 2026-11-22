@@ -15,6 +15,7 @@ Copy into the plan's Constitution Check and the task-completion gate for any UI 
 | [ ] Form fields use floating labels | Review |
 | [ ] Labels, headings and button text use Title Case; helper, error and body text use sentence case | Review |
 | [ ] % and $ fields use the shared formatted field (invalid characters never displayed, formatted on blur) | Component |
+| [ ] Numbers and currency amounts, and their column headers, are right aligned (`text-right`, `tabular-nums`) | Lint, Component, Review |
 | [ ] Navigation expand/collapse behaviour unchanged unless an approved spec amends it | Browser |
 | [ ] Dark theme has no pure black surface or pure white text | Browser |
 | [ ] Both themes verified (screenshots) | Browser |

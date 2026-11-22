@@ -17,6 +17,11 @@ public static class MortgageMetrics
     private static readonly Histogram<double> DeleteDuration =
         Meter.CreateHistogram<double>("clutch.mortgage.delete.duration", "ms");
 
+    private static readonly Counter<long> BalanceOutcomes =
+        Meter.CreateCounter<long>("clutch.mortgage.balances.outcomes", "{read}");
+    private static readonly Histogram<double> BalanceDuration =
+        Meter.CreateHistogram<double>("clutch.mortgage.balances.duration", "ms");
+
     public static long Start() => Stopwatch.GetTimestamp();
 
     // operation: create | update. outcome: success | invalid | conflict | not_found | failure.
@@ -29,6 +34,18 @@ public static class MortgageMetrics
         };
         SaveOutcomes.Add(1, tags);
         SaveDuration.Record(Stopwatch.GetElapsedTime(startedAtTimestamp).TotalMilliseconds, tags);
+    }
+
+    // mode: mortgage | fallback. outcome: success | invalid | not_found | failure.
+    public static void RecordBalanceRead(string mode, string outcome, long startedAtTimestamp)
+    {
+        var tags = new KeyValuePair<string, object?>[]
+        {
+            new("mode", mode),
+            new("outcome", outcome),
+        };
+        BalanceOutcomes.Add(1, tags);
+        BalanceDuration.Record(Stopwatch.GetElapsedTime(startedAtTimestamp).TotalMilliseconds, tags);
     }
 
     public static void RecordDelete(string outcome, long startedAtTimestamp)

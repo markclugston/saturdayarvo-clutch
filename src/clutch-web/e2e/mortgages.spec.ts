@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import AxeBuilder from '@axe-core/playwright'
 import type { BrowserContext, Page } from '@playwright/test'
 import { test, expect } from './fixtures.js'
 
@@ -342,6 +343,85 @@ test('mortgages journey: add, reload, sign out and in, switch, rename, guard and
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     )
     expect(overflow).toBeLessThanOrEqual(0)
+  } finally {
+    await context.close()
+  }
+})
+
+async function importBalanceStatement(page: Page) {
+  await page.getByRole('button', { name: 'Import Transactions' }).click()
+  await expect(page.getByRole('button', { name: 'Choose CSV File' })).toBeEnabled()
+  await page.locator('#csv-file').setInputFiles({
+    name: 'balances.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(
+      ['Date,Description,Amount,Balance', '2000-01-15,First,10.00,1000.00', '2000-02-15,Second,20.00,1020.00'].join('\n'),
+    ),
+  })
+  await page.getByLabel('Transaction Date Column').selectOption('0')
+  await page.getByLabel('Description Column').selectOption('1')
+  await page.getByLabel('Date Format').selectOption('yyyy-MM-dd')
+  await page.getByLabel('Signed Amount Column').selectOption('2')
+  await page.getByLabel('Incoming Transactions Use').selectOption('Positive')
+  await page.getByLabel('Number Format Used in This File').selectOption('dot-decimal-comma-grouping')
+  await page.getByLabel('Balance Column (Optional)').selectOption('3')
+  await page.getByRole('button', { name: 'Review Import' }).click()
+  await page.getByRole('button', { name: 'Confirm Import' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'transactions imported successfully' })).toBeVisible()
+  await page.getByRole('button', { name: 'Return to Account' }).click()
+}
+
+test('mortgage account: linking shows a balance column right of Bank Schedule and clearing removes it', async ({ browser }) => {
+  const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:5173'
+  const context = await browser.newContext({ baseURL })
+
+  try {
+    await registerAndSignIn(context, `mortgage-account-${randomUUID()}@example.test`)
+    const page = await context.newPage()
+    await page.goto('/')
+
+    await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: 'Accounts' }).click()
+    await page.getByLabel('Account Description').fill('Offset Journey')
+    await page.getByLabel('Currency').selectOption('AUD')
+    await page.getByRole('button', { name: 'Add Account' }).click()
+    await expect(page.getByRole('heading', { name: 'Account Details' })).toBeVisible()
+    await importBalanceStatement(page)
+
+    await openMortgages(page)
+    await fillHeader(page, 'Linked Home', '500000', '12')
+    await addRates(page, [['5.25', '2000-01-01']])
+    await page.getByLabel('Mortgage Account').selectOption({ label: 'Offset Journey' })
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(page.getByText('Mortgage saved')).toBeVisible()
+
+    await timeline(page).getByRole('button', { name: 'Show Amortization Schedule' }).click()
+    const headers = timeline(page).getByRole('columnheader')
+    await expect(headers).toHaveText(['Period', 'Date', 'Bank Schedule', 'Offset Journey Balance'])
+    await expect(timeline(page).getByRole('cell', { name: '$1,020.00' }).first()).toBeVisible()
+
+    for (const mode of ['Light', 'Dark']) {
+      await page.getByLabel('Theme').selectOption(mode)
+      const accessibility = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+        .analyze()
+      expect(accessibility.violations).toEqual([])
+      // WEB-001 evidence: set CLUTCH_SHOT_DIR to keep a screenshot per theme.
+      if (process.env.CLUTCH_SHOT_DIR) {
+        await page.screenshot({ path: `${process.env.CLUTCH_SHOT_DIR}/mortgage-account-${mode.toLowerCase()}.png`, fullPage: true })
+      }
+    }
+
+    await page.getByLabel('Mortgage Account').selectOption({ label: 'None' })
+    await expect(timeline(page).getByRole('columnheader')).toHaveText(['Period', 'Date', 'Bank Schedule'])
+    // Wait for the save itself: the headers already show three columns before it completes.
+    const saved = page.waitForResponse((response) =>
+      response.url().includes('/api/mortgages/') && response.request().method() === 'PUT' && response.ok())
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await saved
+    await expect(timeline(page).getByRole('columnheader')).toHaveCount(3)
+    await page.reload()
+    await openMortgages(page)
+    await expect(page.getByLabel('Mortgage Account')).toHaveValue('')
   } finally {
     await context.close()
   }

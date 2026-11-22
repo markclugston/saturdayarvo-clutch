@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   currentInterestRate,
+  draftToInput,
+  draftsEqual,
   emptyDraft,
   formatDisplayDate,
+  mapServerErrors,
+  mortgageToDraft,
   newRow,
   validateNewRateChange,
   type LoanDraft,
@@ -81,5 +85,48 @@ describe('validateNewRateChange', () => {
 
   it('ignores problems on existing rows', () => {
     expect(validateNewRateChange(draft([newRow('101', '2000-01-01')]), '6', '2001-01-01', today)).toEqual({})
+  })
+})
+
+describe('accountId in the draft', () => {
+  const mortgage = {
+    id: '00000000-0000-4000-8000-000000000001',
+    name: 'Home',
+    openingBalance: 100,
+    duration: 12,
+    drawdownDate: '2000-01-01',
+    paymentFrequency: 'Monthly' as const,
+    interestRateChanges: [{ newInterestRate: 5, effectiveDate: '2000-01-01' }],
+    version: 1,
+  }
+  const accountId = '11111111-1111-4111-8111-111111111111'
+
+  it('is empty for a new draft and for a mortgage without an account', () => {
+    expect(emptyDraft().accountId).toBe('')
+    expect(mortgageToDraft(mortgage).accountId).toBe('')
+    expect(mortgageToDraft({ ...mortgage, accountId: null }).accountId).toBe('')
+  })
+
+  it('is read from the saved mortgage', () => {
+    expect(mortgageToDraft({ ...mortgage, accountId }).accountId).toBe(accountId)
+  })
+
+  it('takes part in the dirty comparison', () => {
+    const saved = mortgageToDraft(mortgage)
+
+    expect(draftsEqual(saved, { ...saved, accountId })).toBe(false)
+    expect(draftsEqual(saved, { ...saved })).toBe(true)
+  })
+
+  it('maps to the input as the id, or null for none', () => {
+    const saved = mortgageToDraft(mortgage)
+
+    expect(draftToInput({ ...saved, accountId }).input.accountId).toBe(accountId)
+    expect(draftToInput(saved).input.accountId).toBeNull()
+  })
+
+  it('keeps the server accountId error under its own key', () => {
+    expect(mapServerErrors({ accountId: 'Choose one of your accounts' }, []))
+      .toEqual({ accountId: 'Choose one of your accounts' })
   })
 })

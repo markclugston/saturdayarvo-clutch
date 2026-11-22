@@ -176,4 +176,75 @@ public sealed class MortgageUpdateTests(SqlServerFixture fixture)
 
         Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
     }
+
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task Update_sets_then_clears_the_account_link()
+    {
+        using var client = await SignedInClientAsync(fixture.Factory);
+        var accountId = await CreateAccountAsync(client);
+        var created = await CreateAsync(client, Body("Home loan"));
+        Assert.Null(created.AccountId);
+
+        using var linked = await SendAsync(client, HttpMethod.Put, $"/api/mortgages/{created.Id}", Body(
+            "Home loan", version: 1, accountId: accountId.ToString()));
+        Assert.Equal(HttpStatusCode.OK, linked.StatusCode);
+        var afterLink = (await linked.Content.ReadFromJsonAsync<MortgageDto>())!;
+        Assert.Equal(accountId, afterLink.AccountId);
+        Assert.Equal(accountId, Assert.Single(await ListAsync(client)).AccountId);
+
+        using var cleared = await SendAsync(client, HttpMethod.Put, $"/api/mortgages/{created.Id}", Body(
+            "Home loan", version: 2, accountId: null));
+        Assert.Equal(HttpStatusCode.OK, cleared.StatusCode);
+        Assert.Null((await cleared.Content.ReadFromJsonAsync<MortgageDto>())!.AccountId);
+        Assert.Null(Assert.Single(await ListAsync(client)).AccountId);
+    }
+
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task A_foreign_or_unknown_account_id_on_update_is_a_400_and_changes_nothing()
+    {
+        using var client = await SignedInClientAsync(fixture.Factory);
+        using var other = await SignedInClientAsync(fixture.Factory);
+        var foreign = await CreateAccountAsync(other);
+        var created = await CreateAsync(client, Body("Home loan"));
+
+        foreach (var accountId in new[] { foreign.ToString(), Guid.NewGuid().ToString() })
+        {
+            using var response = await SendAsync(client, HttpMethod.Put, $"/api/mortgages/{created.Id}", Body(
+                "Home loan", version: 1, accountId: accountId));
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            Assert.Equal(
+                "Choose one of your accounts",
+                (await ProblemAsync(response)).Errors!["accountId"][0]);
+        }
+
+        var listed = Assert.Single(await ListAsync(client));
+        Assert.Equal(1, listed.Version);
+        Assert.Null(listed.AccountId);
+    }
+
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task A_stale_version_with_an_account_id_returns_the_existing_conflict_response_and_one_audit_row_per_save()
+    {
+        using var client = await SignedInClientAsync(fixture.Factory);
+        var accountId = await CreateAccountAsync(client);
+        var created = await CreateAsync(client, Body("Audited loan"));
+        using var first = await SendAsync(client, HttpMethod.Put, $"/api/mortgages/{created.Id}", Body(
+            "Audited loan", version: 1, accountId: accountId.ToString()));
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+
+        using var stale = await SendAsync(client, HttpMethod.Put, $"/api/mortgages/{created.Id}", Body(
+            "Audited loan", version: 1, accountId: accountId.ToString()));
+
+        Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+        Assert.Equal("/problems/mortgage-changed", (await ProblemAsync(stale)).Type);
+        var updates = (await AuditsAsync(fixture, "Audited loan"))
+            .Where(audit => audit.EventCode == "MortgageUpdate")
+            .ToList();
+        var update = Assert.Single(updates);
+        Assert.DoesNotContain(accountId.ToString(), update.Description, StringComparison.OrdinalIgnoreCase);
+    }
 }
