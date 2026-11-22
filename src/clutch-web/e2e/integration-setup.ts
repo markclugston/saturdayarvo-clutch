@@ -3,7 +3,7 @@ import path from 'node:path'
 import { request, type APIRequestContext, type FullConfig } from '@playwright/test'
 import {
   adminEmail, adminState, otherEmail, otherState, ownerEmail, ownerState, testPassword,
-} from './integration-auth'
+} from './integration-auth.js'
 
 async function csrfHeaders(api: APIRequestContext) {
   const response = await api.get('/api/security/csrf-token')

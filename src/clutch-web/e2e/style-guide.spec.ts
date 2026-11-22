@@ -103,11 +103,22 @@ type Mock = {
   failWrites: boolean
   ended: boolean
   mortgages: MortgagesMode
+  /** The saved Loan Payoff Timeline view, or 'delay' to answer only after 5 s. */
+  loanPayoffTimeline: 'Burndown' | 'Schedule' | 'delay'
+  /** When the mocked route received the saved-view request (ms since epoch). */
+  loanPayoffTimelineRequestedAt?: number
 }
 
 async function mockApi(page: Page, options: Partial<Mock> = {}): Promise<Mock> {
   const mock: Mock = {
-    theme: 'Light', session: 'ok', themeLoadFails: false, failWrites: false, ended: false, mortgages: 'ok', ...options,
+    theme: 'Light',
+    session: 'ok',
+    themeLoadFails: false,
+    failWrites: false,
+    ended: false,
+    mortgages: 'ok',
+    loanPayoffTimeline: 'Burndown',
+    ...options,
   }
   await page.route((url) => url.pathname.startsWith('/api/'), async (route) => {
     const request = route.request()
@@ -123,6 +134,18 @@ async function mockApi(page: Page, options: Partial<Mock> = {}): Promise<Mock> {
     }
     if (path === '/api/security/csrf-token') return route.fulfill({ json: { requestToken: 'test-token' } })
     if (path === '/api/preferences/navigation') return route.fulfill({ json: { state: 'Unpinned' } })
+    if (path === '/api/preferences/loan-payoff-timeline') {
+      if (method === 'PUT') {
+        const body = request.postDataJSON() as { view: 'Burndown' | 'Schedule' }
+        return route.fulfill({ json: { view: body.view } })
+      }
+      mock.loanPayoffTimelineRequestedAt = Date.now()
+      if (mock.loanPayoffTimeline === 'delay') {
+        await new Promise((resolve) => setTimeout(resolve, 5000))
+        return route.fulfill({ json: { view: 'Schedule' } }).catch(() => undefined)
+      }
+      return route.fulfill({ json: { view: mock.loanPayoffTimeline } })
+    }
     if (path === '/api/preferences/theme') {
       if (mock.themeLoadFails) return route.fulfill({ status: 500, json: { title: 'Preference failure' } })
       return route.fulfill({ json: { mode: mock.theme } })
@@ -252,6 +275,10 @@ async function fillNewMortgage(page: Page) {
 }
 
 const rateDialog = (page: Page) => page.getByRole('dialog', { name: 'Change Interest Rate' })
+
+const timelineGroup = (page: Page) => page.getByRole('region', { name: 'Loan Payoff Timeline' })
+
+const timelineTooltip = (page: Page) => page.locator('[data-slot="tooltip-popup"]')
 
 async function openRateDialog(page: Page) {
   await page.getByRole('button', { name: 'Change Interest Rate' }).click()
@@ -427,14 +454,14 @@ const states: StateDef[] = [
     name: 'mortgages-empty', mock: { ...signedIn, mortgages: 'empty' },
     reach: async (page) => {
       await openMortgages(page)
-      await expect(page.getByText('Please enter your mortgage details')).toHaveCount(2)
+      await expect(page.getByText('Please enter your mortgage details')).toHaveCount(1)
     },
   },
   {
     name: 'mortgages-loaded', mock: signedIn,
     reach: async (page) => {
       await openMortgages(page)
-      await expect(page.getByRole('table')).toBeVisible()
+      await expect(timelineGroup(page).getByRole('img', { name: /balance over time/i })).toBeVisible()
     },
   },
   {
@@ -500,6 +527,40 @@ const states: StateDef[] = [
       await fillNewMortgage(page)
       await page.getByRole('button', { name: 'Save' }).click()
       await expect(page.getByRole('status').filter({ hasText: 'Mortgage saved' })).toBeVisible()
+    },
+  },
+  {
+    name: 'mortgages-timeline-burndown', mock: signedIn,
+    reach: async (page) => {
+      await openMortgages(page)
+      await expect(timelineGroup(page).getByRole('img', { name: /balance over time/i })).toBeVisible()
+    },
+  },
+  {
+    name: 'mortgages-timeline-schedule', mock: { ...signedIn, loanPayoffTimeline: 'Schedule' },
+    reach: async (page) => {
+      await openMortgages(page)
+      await expect(timelineGroup(page).getByRole('table')).toBeVisible()
+    },
+  },
+  {
+    name: 'mortgages-timeline-tooltip-hover', mock: signedIn,
+    reach: async (page) => {
+      await openMortgages(page)
+      await page.getByRole('button', { name: 'Show Amortization Schedule' }).hover()
+      await expect(timelineTooltip(page)).toBeVisible()
+    },
+  },
+  {
+    name: 'mortgages-timeline-tooltip-focus', mock: { ...signedIn, loanPayoffTimeline: 'Schedule' },
+    reach: async (page) => {
+      await openMortgages(page)
+      const button = page.getByRole('button', { name: 'Show Burndown Chart' })
+      await button.focus()
+      await page.keyboard.press('Shift+Tab')
+      await page.keyboard.press('Tab')
+      await expect(button).toBeFocused()
+      await expect(timelineTooltip(page)).toBeVisible()
     },
   },
   {
@@ -834,23 +895,97 @@ test.describe('Mortgages layout and motion', () => {
     })
   }
 
-  test('Burndown sits above the schedule at 320 px and to its left on desktop (FR-011)', async ({ page }) => {
+  test('one Loan Payoff Timeline group spans the content width with its switch top right at 320 px and 1280 px (019 FR-001, FR-003, SC-001)', async ({ page }) => {
     await mockApi(page, { theme: 'Light' })
     for (const width of [320, 1280]) {
       await page.setViewportSize({ width, height: 800 })
       await page.goto('/')
       await openMortgages(page)
-      const chart = await page.getByRole('heading', { name: 'Mortgage Burndown' }).locator('xpath=ancestor::section').boundingBox()
-      const schedule = await page.getByRole('heading', { name: 'Amortization Schedule' }).locator('xpath=ancestor::section').boundingBox()
-      expect(chart).not.toBeNull()
-      expect(schedule).not.toBeNull()
-      if (width < 768) {
-        expect(chart!.y + chart!.height).toBeLessThanOrEqual(schedule!.y + 1)
-      } else {
-        expect(chart!.x + chart!.width).toBeLessThanOrEqual(schedule!.x + 1)
-        expect(Math.abs(chart!.y - schedule!.y)).toBeLessThan(2)
+      const group = timelineGroup(page)
+      await expect(group).toHaveCount(1)
+      await expect(page.getByRole('heading', { name: 'Mortgage Burndown' })).toHaveCount(0)
+      await expect(page.getByRole('heading', { name: 'Amortization Schedule' })).toHaveCount(0)
+
+      // Full content width: the same width as the Details group above it.
+      const groupBox = (await group.boundingBox())!
+      const detailsBox = (await page.getByRole('form', { name: 'Details' }).boundingBox())!
+      expect(Math.abs(groupBox.width - detailsBox.width)).toBeLessThan(2)
+      expect(Math.abs(groupBox.x - detailsBox.x)).toBeLessThan(2)
+      expect(groupBox.y).toBeGreaterThan(detailsBox.y + detailsBox.height - 1)
+
+      // The switch is the trash button's size, at the group's top right, level with the title.
+      for (const name of ['Show Amortization Schedule', 'Show Burndown Chart']) {
+        const button = page.getByRole('button', { name })
+        await expect(button).toBeInViewport()
+        const buttonBox = (await button.boundingBox())!
+        const trashBox = (await page.getByRole('button', { name: /^Delete / }).boundingBox())!
+        const titleBox = (await group.getByRole('heading', { name: 'Loan Payoff Timeline' }).boundingBox())!
+        expect(buttonBox.width).toBeCloseTo(trashBox.width, 0)
+        expect(buttonBox.height).toBeCloseTo(trashBox.height, 0)
+        expect(groupBox.x + groupBox.width - (buttonBox.x + buttonBox.width)).toBeLessThanOrEqual(24)
+        expect(buttonBox.y - groupBox.y).toBeLessThanOrEqual(24)
+        expect(Math.abs((buttonBox.y + buttonBox.height / 2) - (titleBox.y + titleBox.height / 2))).toBeLessThan(2)
+
+        // Never both views.
+        const charts = await group.getByRole('img', { name: /balance over time/i }).count()
+        const tables = await group.getByRole('table').count()
+        expect(charts + tables).toBe(1)
+        await expectNoHorizontalScroll(page)
+        await button.click()
       }
     }
+  })
+
+  test('the switch tooltip stays while the pointer is over it and Escape dismisses it (SC 1.4.13)', async ({ page }) => {
+    await mockApi(page, { theme: 'Light' })
+    await page.goto('/')
+    await openMortgages(page)
+    const button = page.getByRole('button', { name: 'Show Amortization Schedule' })
+    await button.hover()
+    const tooltip = timelineTooltip(page)
+    await expect(tooltip).toHaveText('Show Amortization Schedule')
+
+    const box = (await tooltip.boundingBox())!
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 5 })
+    await page.waitForTimeout(500)
+    await expect(tooltip).toBeVisible()
+
+    await page.keyboard.press('Escape')
+    await expect(tooltip).toHaveCount(0)
+  })
+
+  test('the tooltip has no motion under reduced motion', async ({ page }) => {
+    await mockApi(page, { theme: 'Light' })
+    await page.goto('/')
+    await openMortgages(page)
+    await page.getByRole('button', { name: 'Show Amortization Schedule' }).hover()
+    const tooltip = timelineTooltip(page)
+    await expect(tooltip).toBeVisible()
+    expect(firstDurationMs(await tooltip.evaluate((element) => getComputedStyle(element).transitionDuration))).toBeLessThan(50)
+  })
+
+  test('waits 2 s for a saved view that does not answer, then shows Burndown within 250 ms (019 SC-006)', async ({ page }) => {
+    const mock = await mockApi(page, { theme: 'Light', loanPayoffTimeline: 'delay' })
+    await page.addInitScript(() => {
+      const record = () => {
+        if (!('timelineShownAt' in window) && document.querySelector('svg[aria-label^="Line chart of the mortgage balance"]')) {
+          Object.assign(window, { timelineShownAt: Date.now() })
+        }
+      }
+      new MutationObserver(record).observe(document, { childList: true, subtree: true })
+    })
+    await page.goto('/')
+    await openMortgages(page)
+
+    await expect(timelineGroup(page).getByRole('img', { name: /balance over time/i })).toBeVisible({ timeout: 4000 })
+    const shownAt = await page.evaluate(() => (window as unknown as { timelineShownAt: number }).timelineShownAt)
+    expect(mock.loanPayoffTimelineRequestedAt).toBeDefined()
+    // The request is abandoned 2,000 ms after it starts (it reaches the route a few ms later);
+    // the chart then renders within the 250 ms allowance.
+    const elapsed = shownAt - mock.loanPayoffTimelineRequestedAt!
+    expect(elapsed).toBeGreaterThanOrEqual(1950)
+    expect(elapsed).toBeLessThanOrEqual(2250)
+    await expect(timelineGroup(page).getByRole('table')).toHaveCount(0)
   })
 
   for (const width of [320, 1280]) {

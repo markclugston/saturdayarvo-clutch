@@ -221,7 +221,7 @@ function AppContent() {
         {showAdminSettings ? (
           <ImportLimitsPage onBack={() => setShowAdminSettings(false)} />
         ) : showMortgages ? (
-          <MortgagesPage />
+          <MortgagesPage userId={sessionQuery.data.id} />
         ) : showCategories ? (
           <CategoriesPage />
         ) : selectedAccountId ? (

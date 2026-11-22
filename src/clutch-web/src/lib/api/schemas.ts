@@ -161,6 +161,12 @@ export const ThemePreferenceSchema = z.object({
   mode: ThemeModeSchema,
 }).strict()
 
+export const LoanPayoffTimelineViewSchema = z.enum(['Burndown', 'Schedule'])
+
+export const LoanPayoffTimelinePreferenceSchema = z.object({
+  view: LoanPayoffTimelineViewSchema,
+})
+
 export const CategoryNodeSchema = z.object({
   id: z.string().min(1),
   parentId: z.string().min(1).nullable(),
@@ -216,3 +222,5 @@ export type NavigationState = z.infer<typeof NavigationStateSchema>
 export type NavigationPreference = z.infer<typeof NavigationPreferenceSchema>
 export type ThemeMode = z.infer<typeof ThemeModeSchema>
 export type ThemePreference = z.infer<typeof ThemePreferenceSchema>
+export type LoanPayoffTimelineView = z.infer<typeof LoanPayoffTimelineViewSchema>
+export type LoanPayoffTimelinePreference = z.infer<typeof LoanPayoffTimelinePreferenceSchema>

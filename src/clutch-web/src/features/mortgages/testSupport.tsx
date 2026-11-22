@@ -5,7 +5,7 @@ import { expect, vi } from 'vitest'
 import { ToastProvider } from '@/components/ui/toast'
 import { UnsavedChangesProvider } from '@/components/unsaved-changes/UnsavedChangesProvider'
 import { ApiError, apiRequest } from '@/lib/api/client'
-import type { Mortgage } from '@/lib/api/schemas'
+import type { LoanPayoffTimelineView, Mortgage } from '@/lib/api/schemas'
 import { renderWithQueryClient } from '@/test/renderWithQueryClient'
 
 // Test-only helpers. The calling test file must `vi.mock('@/lib/api/client', ...)` so apiRequest is a mock.
@@ -41,13 +41,42 @@ export type FakeServer = {
   requests: Array<{ method: string; path: string; body?: unknown }>
   /** Hold the next response of a method until released. */
   hold: (method: string) => () => void
+  /** The stored Loan Payoff Timeline view. */
+  view: LoanPayoffTimelineView
+  /** Loan payoff timeline preference requests, kept apart from the mortgage requests. */
+  preferenceRequests: Array<{ method: string; body?: unknown; signal?: AbortSignal | null }>
+  /** Hold the next preference response of a method until released (or aborted). */
+  holdPreference: (method: string) => () => void
+  /** Hold every preference response of a method; returns one release per held request. */
+  holdAllPreference: (method: string) => Array<() => void>
+  failPreference: (method: string, error: unknown) => void
 }
 
-export function installFakeApi(initial: Mortgage[]): FakeServer {
+const PREFERENCE_PATH = '/api/preferences/loan-payoff-timeline'
+
+export function installFakeApi(initial: Mortgage[], view: LoanPayoffTimelineView = 'Burndown'): FakeServer {
   const failures = new Map<string, unknown[]>()
   const permanent = new Map<string, unknown>()
   const holds = new Map<string, Promise<void>>()
+  const preferenceHolds = new Map<string, Promise<void>>()
+  const preferenceHoldAll = new Map<string, Array<() => void>>()
+  const preferenceFailures = new Map<string, unknown[]>()
   const server: FakeServer = {
+    view,
+    preferenceRequests: [],
+    holdPreference: (method) => {
+      let release: () => void = () => {}
+      preferenceHolds.set(method, new Promise<void>((resolve) => { release = resolve }))
+      return release
+    },
+    holdAllPreference: (method) => {
+      const releases: Array<() => void> = []
+      preferenceHoldAll.set(method, releases)
+      return releases
+    },
+    failPreference: (method, error) => {
+      preferenceFailures.set(method, [...(preferenceFailures.get(method) ?? []), error])
+    },
     mortgages: structuredClone(initial),
     failNext: (method, error) => {
       failures.set(method, [...(failures.get(method) ?? []), error])
@@ -66,6 +95,9 @@ export function installFakeApi(initial: Mortgage[]): FakeServer {
   vi.mocked(apiRequest).mockImplementation((async (path: string, _schema: unknown, init?: RequestInit) => {
     const method = (init?.method ?? 'GET').toUpperCase()
     const body = typeof init?.body === 'string' ? JSON.parse(init.body) as Record<string, unknown> : undefined
+    if (path === PREFERENCE_PATH) {
+      return handlePreference(method, body, init?.signal)
+    }
     server.requests.push({ method, path, body })
 
     const held = holds.get(method)
@@ -111,6 +143,33 @@ export function installFakeApi(initial: Mortgage[]): FakeServer {
     server.mortgages.splice(index, 1)
     return undefined
   }) as typeof apiRequest)
+
+  async function handlePreference(
+    method: string,
+    body: Record<string, unknown> | undefined,
+    signal: AbortSignal | null | undefined,
+  ) {
+    server.preferenceRequests.push({ method, body, signal })
+    const releases = preferenceHoldAll.get(method)
+    const held = releases
+      ? new Promise<void>((resolve) => { releases.push(resolve) })
+      : preferenceHolds.get(method)
+    preferenceHolds.delete(method)
+    if (held) {
+      await new Promise<void>((resolve, reject) => {
+        void held.then(resolve)
+        signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))
+      })
+    }
+    const queued = preferenceFailures.get(method)
+    if (queued && queued.length > 0) {
+      throw queued.shift()
+    }
+    if (method === 'PUT') {
+      server.view = body?.view as LoanPayoffTimelineView
+    }
+    return { view: server.view }
+  }
 
   return server
 }

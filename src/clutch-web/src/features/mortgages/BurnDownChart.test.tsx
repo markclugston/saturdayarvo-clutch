@@ -3,10 +3,11 @@ import { describe, expect, it } from 'vitest'
 import { BurnDownChart } from './BurnDownChart'
 
 describe('BurnDownChart', () => {
-  it('has the heading, a text-alternative image, labelled axes, the single legend entry and the message', () => {
-    render(<BurnDownChart saved />)
+  it('has no card or heading of its own, a text-alternative image, labelled axes, the single legend entry and the message', () => {
+    const { container } = render(<BurnDownChart saved />)
 
-    expect(screen.getByRole('heading', { name: 'Mortgage Burndown' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument()
+    expect(container.querySelector('section')).toBeNull()
     const chart = screen.getByRole('img')
     expect(chart).toHaveAccessibleName(/balance over time.*Bank schedule/i)
     expect(chart).toHaveTextContent('Balance ($)')

@@ -18,7 +18,7 @@ read them from the code. MUST / MUST NOT / SHOULD are used in the RFC 2119 sense
 |---|---|---|
 | Colour, radius and shadow tokens, both themes; focus ring, hairlines, reduced motion | `src/clutch-web/src/index.css` | `clutch/style-tokens` lint rule; style-guide browser tests |
 | Forbidden classes (raw colours, palette classes, non-token radii, borders, rings, shadows, `dark:` colour, transitions, durations, easing) and allowed exceptions | `src/clutch-web/eslint-rules/clutch-style.js` | `npm run lint` (`clutch-style.test.js` tests the rule) |
-| Primitives and their variants (shell, navigation, panels, cards, fields, buttons, chips, dialog, toast) | `src/clutch-web/src/components/ui/` (`class-variance-authority`, `cn` in `src/lib/utils.ts`) | Component tests beside each primitive |
+| Primitives and their variants (shell, navigation, panels, cards, fields, buttons, chips, dialog, toast, tooltip) | `src/clutch-web/src/components/ui/` (`class-variance-authority`, `cn` in `src/lib/utils.ts`); tooltip in `components/ui/tooltip.tsx` | Component tests beside each primitive (`tooltip.test.tsx`); tooltip hover, Escape and reduced motion in `e2e/style-guide.spec.ts` |
 | Theme runtime | `src/clutch-web/src/components/theme/` | Theme component and browser tests |
 | Contrast, focus outline, surface lightness, no pure-white text, transition timing, toast and tab-strip layout | — | `src/clutch-web/e2e/style-guide.spec.ts` (axe WCAG 2.2 AA tags, both themes) |
 | % and $ entry fields | `src/clutch-web/src/features/mortgages/FormattedNumberField.tsx` | Its component tests |

@@ -519,6 +519,37 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Clutch.API.Infrastructure.Persistence.Entities.UserLoanPayoffTimelinePreference", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("ClientSequence")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("View")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(16)");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("UserLoanPayoffTimelinePreferences", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_UserLoanPayoffTimelinePreferences_ClientSequence", "[ClientSequence] >= 1");
+
+                            t.HasCheckConstraint("CK_UserLoanPayoffTimelinePreferences_View", "[View] IN ('Burndown', 'Schedule')");
+                        });
+                });
+
             modelBuilder.Entity("Clutch.API.Infrastructure.Persistence.Entities.UserNavigationPreference", b =>
                 {
                     b.Property<string>("UserId")
@@ -775,6 +806,15 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("Clutch.API.Infrastructure.Persistence.Entities.ImportRateWindow", b =>
+                {
+                    b.HasOne("Clutch.API.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Clutch.API.Infrastructure.Persistence.Entities.UserLoanPayoffTimelinePreference", b =>
                 {
                     b.HasOne("Clutch.API.Infrastructure.Identity.ApplicationUser", null)
                         .WithMany()
