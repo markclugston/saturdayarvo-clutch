@@ -1,13 +1,14 @@
 <!--
 Sync Impact Report
-- Version: 1.5.0 → 1.6.0 (MINOR: new WEB-001 obligation)
-- Added: WEB-001 — all numbers and currency amounts are right aligned (clutch/numeric-align lint rule)
-- Follow-up: clutch-ui-style skill, compliance checklist and code map reference the rule; run
+- Version: 1.6.0 → 1.7.0 (MINOR: new requirement SEC-004)
+- Added: SEC-004 Data Validation — dual validation (UI for UX, server at earliest opportunity for
+  correctness and security), complete and correct, field-level errors, no information disclosure
+- Follow-up: clutch-security-review and clutch-frontend skills should reference SEC-004; run
   .\scripts\sync-agent-config.ps1 -From claude
 -->
 # SaturdayArvo Clutch Constitution
 
-**Version**: 1.6.0 | **Last Amended**: 2026-11-22
+**Version**: 1.7.0 | **Last Amended**: 2026-11-22
 
 ## Governance
 Source of truth: the running code, its lint rules and its automated tests define implementation (design tokens, components, patterns, conventions). This constitution defines obligations, governance and process. Specifications define intent.
@@ -59,6 +60,14 @@ Each heading names the skill holding the process for that requirement. The proce
 ## SEC-003 Sensitive Data · `clutch-security-review`
 - Sensitive information must not be logged or disclosed in error responses.
 - Payment and financial information requires approved handling controls.
+
+## SEC-004 Data Validation · `clutch-security-review`, `clutch-frontend`
+- All data must pass two independent forms of validation; neither may be omitted.
+- Data entered through the UI must be validated in the UI, with validation errors shown in the UI, for user experience.
+- All data must also be validated on the server at the earliest opportunity, for data correctness and security. UI validation never substitutes for server validation.
+- Validation must be complete and correct: every field and rule that defines valid data is enforced, in both places.
+- Failed server validation must return an error to the caller that identifies each failing field and why it failed.
+- Validation errors must not disclose server-side implementation details or anything the OWASP guidance prohibits exposing (stack traces, internal paths, types, queries, framework or version information).
 
 ## WEB-001 Frontend · `clutch-frontend`, `clutch-ui-style`
 - TypeScript required.
