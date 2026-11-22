@@ -64,6 +64,142 @@ async function listedRates(page: Page): Promise<string[]> {
 const tab = (page: Page, name: string) =>
   page.getByRole('navigation', { name: 'Mortgages' }).getByRole('button', { name, exact: true })
 
+const PREFERENCE_PATH = '/api/preferences/loan-payoff-timeline'
+
+const timeline = (page: Page) => page.getByRole('region', { name: 'Loan Payoff Timeline' })
+
+/** Clicks the switch and waits for that switch's save to be answered. */
+async function switchView(page: Page, name: 'Show Amortization Schedule' | 'Show Burndown Chart') {
+  const saved = page.waitForResponse((response) =>
+    new URL(response.url()).pathname === PREFERENCE_PATH && response.request().method() === 'PUT')
+  await timeline(page).getByRole('button', { name }).click()
+  expect((await saved).status()).toBe(200)
+}
+
+/** Asserts the group shows only `view`, and that the other view never appeared since the last load. */
+async function expectView(page: Page, view: 'Burndown' | 'Schedule') {
+  const chart = timeline(page).getByRole('img', { name: /balance over time/i })
+  const schedule = timeline(page).getByRole('table')
+  if (view === 'Burndown') {
+    await expect(timeline(page).getByRole('button', { name: 'Show Amortization Schedule' })).toBeVisible()
+    await expect(chart).toBeVisible()
+    await expect(schedule).toHaveCount(0)
+    expect(await page.evaluate(() => (window as unknown as { scheduleSeen?: boolean }).scheduleSeen ?? false)).toBe(false)
+  } else {
+    await expect(timeline(page).getByRole('button', { name: 'Show Burndown Chart' })).toBeVisible()
+    await expect(schedule).toBeVisible()
+    await expect(chart).toHaveCount(0)
+    expect(await page.evaluate(() => (window as unknown as { chartSeen?: boolean }).chartSeen ?? false)).toBe(false)
+  }
+}
+
+/** Records, per page load, whether the chart or schedule was ever on the page (to catch a swap). */
+async function watchForSwap(context: BrowserContext) {
+  await context.addInitScript(() => {
+    new MutationObserver(() => {
+      const state = window as unknown as { chartSeen?: boolean; scheduleSeen?: boolean }
+      if (document.querySelector('svg[aria-label^="Line chart of the mortgage balance"]')) state.chartSeen = true
+      if (document.querySelector('[role="table"]')) state.scheduleSeen = true
+    }).observe(document, { childList: true, subtree: true })
+  })
+}
+
+async function signOut(page: Page) {
+  await page.getByRole('button', { name: 'Sign Out' }).click()
+  await expect(page.getByRole('heading', { name: 'Sign In' })).toBeVisible()
+}
+
+async function signInThroughUi(page: Page, email: string) {
+  await page.getByLabel('Email').fill(email)
+  await page.getByLabel('Password').fill(testPassword)
+  await page.getByRole('button', { name: 'Sign In' }).click()
+}
+
+test('loan payoff timeline view is saved per user and shown on every load without a swap', async ({ browser }) => {
+  const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:5173'
+  const context = await browser.newContext({ baseURL })
+  const otherContext = await browser.newContext({ baseURL })
+
+  try {
+    const email = `timeline-${randomUUID()}@example.test`
+    const otherEmail = `timeline-other-${randomUUID()}@example.test`
+    await registerAndSignIn(otherContext, otherEmail)
+    await registerAndSignIn(context, email)
+    // A saved mortgage, so the chart and the schedule table both render and a swap would show.
+    const token = await (await context.request.get('/api/security/csrf-token')).json() as { requestToken: string }
+    const created = await context.request.post('/api/mortgages', {
+      headers: { 'X-CSRF-TOKEN': token.requestToken },
+      data: {
+        name: 'Home',
+        openingBalance: 1000,
+        duration: 12,
+        drawdownDate: '2000-01-01',
+        paymentFrequency: 'Monthly',
+        interestRateChanges: [{ newInterestRate: 4, effectiveDate: '2000-01-01' }],
+      },
+    })
+    expect(created.status(), await created.text()).toBe(201)
+    await watchForSwap(context)
+
+    const page = await context.newPage()
+    await page.goto('/')
+    await openMortgages(page)
+    await expectView(page, 'Burndown')
+
+    // US2-1: switch to the schedule, reload → schedule, with no chart first (US2-3).
+    await switchView(page, 'Show Amortization Schedule')
+    await page.reload()
+    await openMortgages(page)
+    await expectView(page, 'Schedule')
+
+    // Sign out and in → schedule.
+    await signOut(page)
+    await signInThroughUi(page, email)
+    await openMortgages(page)
+    await expectView(page, 'Schedule')
+
+    // SC-004: a second user in the same tab, without a reload, never sees the first user's view.
+    await signOut(page)
+    await signInThroughUi(page, otherEmail)
+    await openMortgages(page)
+    await expect(timeline(page).getByRole('button', { name: 'Show Amortization Schedule' })).toBeVisible()
+    await expect(timeline(page).getByRole('table')).toHaveCount(0)
+
+    // US2-4: each user sees their own view.
+    await signOut(page)
+    await signInThroughUi(page, email)
+    await openMortgages(page)
+    await expect(timeline(page).getByRole('button', { name: 'Show Burndown Chart' })).toBeVisible()
+
+    // US2-2: switch back, reload → chart.
+    await switchView(page, 'Show Burndown Chart')
+    await page.reload()
+    await openMortgages(page)
+    await expectView(page, 'Burndown')
+
+    // US2-6, SC-007: three quick switches, then reload without waiting for any answer → the last view.
+    await timeline(page).getByRole('button', { name: 'Show Amortization Schedule' }).click()
+    await timeline(page).getByRole('button', { name: 'Show Burndown Chart' }).click()
+    await timeline(page).getByRole('button', { name: 'Show Amortization Schedule' }).click()
+    await page.reload()
+    await openMortgages(page)
+    await expectView(page, 'Schedule')
+
+    // SC-003: leaving Mortgages and returning shows the view last chosen; a switch then persists.
+    await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: 'Accounts' }).click()
+    await expect(timeline(page)).toHaveCount(0)
+    await openMortgages(page)
+    await expectView(page, 'Schedule')
+    await switchView(page, 'Show Burndown Chart')
+    await page.reload()
+    await openMortgages(page)
+    await expectView(page, 'Burndown')
+  } finally {
+    await context.close()
+    await otherContext.close()
+  }
+})
+
 test('mortgages journey: add, reload, sign out and in, switch, rename, guard and delete', async ({ browser }) => {
   const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:5173'
   const context = await browser.newContext({ baseURL })
@@ -75,7 +211,9 @@ test('mortgages journey: add, reload, sign out and in, switch, rename, guard and
     const page = await context.newPage()
     await page.goto('/')
     await openMortgages(page)
-    await expect(page.getByText('Please enter your mortgage details')).toHaveCount(2)
+    await expect(page.getByText('Please enter your mortgage details')).toHaveCount(1)
+    // The schedule's row count is checked below; the view is saved, so it stays after reloads.
+    await switchView(page, 'Show Amortization Schedule')
 
     // Add a mortgage with two rate changes entered latest-first (US2-AS6).
     await fillHeader(page, 'Home loan', '500000.50', '360')

@@ -12,8 +12,7 @@ const GUIDES = [60, 110, 160, 210]
 /** Skeleton of the balance-over-time chart. No values exist yet, so no line is drawn. */
 export function BurnDownChart({ saved }: BurnDownChartProps) {
   return (
-    <section aria-labelledby="burndown-heading" className="min-w-0 rounded-card bg-card p-4 xl:p-5">
-      <h2 className="mb-3 text-base font-semibold" id="burndown-heading">Mortgage Burndown</h2>
+    <div className="min-w-0">
       {saved ? (
         <>
           <svg
@@ -61,6 +60,6 @@ export function BurnDownChart({ saved }: BurnDownChartProps) {
       ) : (
         <p className="text-sm text-fg-secondary">{ENTER_DETAILS_MESSAGE}</p>
       )}
-    </section>
+    </div>
   )
 }

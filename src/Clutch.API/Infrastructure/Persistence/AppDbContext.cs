@@ -36,6 +36,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<UserNavigationPreference> UserNavigationPreferences => Set<UserNavigationPreference>();
 
+    public DbSet<UserLoanPayoffTimelinePreference> UserLoanPayoffTimelinePreferences =>
+        Set<UserLoanPayoffTimelinePreference>();
+
     public DbSet<Mortgage> Mortgages => Set<Mortgage>();
 
     public DbSet<InterestRateChange> MortgageInterestRateChanges => Set<InterestRateChange>();
@@ -256,6 +259,41 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .HasConversion<string>()
                 .HasMaxLength(16)
                 .IsUnicode(false)
+                .IsRequired();
+            entity.Property(preference => preference.UpdatedAtUtc)
+                .HasColumnType("datetimeoffset")
+                .IsRequired();
+            entity.HasOne<ApplicationUser>()
+                .WithMany()
+                .HasForeignKey(preference => preference.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<UserLoanPayoffTimelinePreference>(entity =>
+        {
+            entity.ToTable("UserLoanPayoffTimelinePreferences", table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_UserLoanPayoffTimelinePreferences_View",
+                    "[View] IN ('Burndown', 'Schedule')");
+                table.HasCheckConstraint(
+                    "CK_UserLoanPayoffTimelinePreferences_ClientSequence",
+                    "[ClientSequence] >= 1");
+            });
+            entity.HasKey(preference => preference.UserId);
+            entity.Property(preference => preference.UserId)
+                .HasMaxLength(450)
+                .IsRequired();
+            entity.Property(preference => preference.View)
+                .HasConversion<string>()
+                .HasMaxLength(16)
+                .IsUnicode(false)
+                .IsRequired();
+            entity.Property(preference => preference.ClientId)
+                .HasColumnType("uniqueidentifier")
+                .IsRequired();
+            entity.Property(preference => preference.ClientSequence)
+                .HasColumnType("bigint")
                 .IsRequired();
             entity.Property(preference => preference.UpdatedAtUtc)
                 .HasColumnType("datetimeoffset")

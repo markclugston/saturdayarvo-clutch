@@ -5,10 +5,14 @@ import { Button } from '@/components/ui/button'
 import { ErrorMessage } from '@/components/ui/error-message'
 import { useToast } from '@/components/ui/toast'
 import { useUnsavedChanges } from '@/components/unsaved-changes/UnsavedChangesProvider'
-import type { Mortgage } from '@/lib/api/schemas'
-import { AmortizationSchedule } from './AmortizationSchedule'
-import { BurnDownChart } from './BurnDownChart'
+import {
+  loanPayoffTimelinePreferenceQueryKey,
+  useLoanPayoffTimelinePreference,
+  useSaveLoanPayoffTimelinePreference,
+} from '@/features/preferences/api'
+import type { LoanPayoffTimelineView, Mortgage } from '@/lib/api/schemas'
 import { LoanDetailsForm } from './LoanDetailsForm'
+import { LoanPayoffTimeline } from './LoanPayoffTimeline'
 import { MortgageTabs } from './MortgageTabs'
 import {
   MortgageUnauthorizedError,
@@ -22,9 +26,18 @@ export const LOAD_FAILED_MESSAGE = 'We couldn’t load your mortgages. Please tr
 export const GONE_MESSAGE = 'This mortgage was deleted elsewhere'
 export const SAVED_MESSAGE = 'Mortgage saved'
 
-export function MortgagesPage() {
+type MortgagesPageProps = {
+  /** The signed-in user's id; keys the saved Loan Payoff Timeline view. */
+  userId: string
+}
+
+export function MortgagesPage({ userId }: MortgagesPageProps) {
   const queryClient = useQueryClient()
   const toast = useToast()
+  // Loaded alongside the mortgages; Burndown when nothing is saved or it fails or takes over 2 s.
+  const viewPreference = useLoanPayoffTimelinePreference(userId)
+  const view: LoanPayoffTimelineView = viewPreference.data?.view ?? 'Burndown'
+  const viewSave = useSaveLoanPayoffTimelinePreference()
   const { isDirty } = useUnsavedChanges()
   const query = useMortgages()
   // null: the first mortgage (or the empty form when there are none). 'new': the Add mortgage tab.
@@ -93,7 +106,7 @@ export function MortgagesPage() {
     return result.data ?? []
   }
 
-  if (query.isPending || (query.isFetching && !mortgages)) {
+  if (query.isPending || (query.isFetching && !mortgages) || viewPreference.isLoading) {
     return (
       <div className="flex items-center gap-3 text-fg-secondary" role="status">
         <LoaderCircle aria-hidden="true" className="size-5 shrink-0 animate-spin motion-reduce:animate-none" />
@@ -157,10 +170,17 @@ export function MortgagesPage() {
         }}
         onUnauthorized={handleUnauthorized}
       />
-      <div className="grid gap-4 md:grid-cols-2">
-        <BurnDownChart saved={selectedMortgage !== undefined} />
-        <AmortizationSchedule duration={selectedMortgage?.duration} />
-      </div>
+      <LoanPayoffTimeline
+        duration={selectedMortgage?.duration}
+        onSwitch={() => {
+          const next: LoanPayoffTimelineView = view === 'Burndown' ? 'Schedule' : 'Burndown'
+          // The cache is the shown view: set it first, so the switch never waits on the save.
+          queryClient.setQueryData(loanPayoffTimelinePreferenceQueryKey(userId), { view: next })
+          viewSave.save(next)
+        }}
+        saved={selectedMortgage !== undefined}
+        view={view}
+      />
       {sessionExpired && (
         <SessionExpiredDialog
           onSignInAgain={() => {

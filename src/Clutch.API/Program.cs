@@ -97,6 +97,7 @@ app.MapTransactionEndpoints();
 app.MapAdminImportLimitEndpoints();
 app.MapThemePreferenceEndpoints();
 app.MapNavigationPreferenceEndpoints();
+app.MapLoanPayoffTimelinePreferenceEndpoints();
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
     Predicate = _ => false,

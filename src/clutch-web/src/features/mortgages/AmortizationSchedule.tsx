@@ -15,12 +15,11 @@ type AmortizationScheduleProps = {
 /** Read-only placeholder schedule: periods 1 to N + 1, rendered through a window so any N stays usable. */
 export function AmortizationSchedule({ duration }: AmortizationScheduleProps) {
   return (
-    <section aria-labelledby="schedule-heading" className="flex min-h-0 min-w-0 flex-col rounded-card bg-card p-4 xl:p-5">
-      <h2 className="mb-3 text-base font-semibold" id="schedule-heading">Amortization Schedule</h2>
+    <div className="flex min-h-0 min-w-0 flex-col">
       {duration === undefined
         ? <p className="text-sm text-fg-secondary">{ENTER_DETAILS_MESSAGE}</p>
         : <ScheduleTable rowCount={duration + 1} />}
-    </section>
+    </div>
   )
 }
 

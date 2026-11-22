@@ -49,9 +49,10 @@ describe('AmortizationSchedule', () => {
   })
 
   it('shows the prompt instead of a table for a new mortgage', () => {
-    render(<AmortizationSchedule />)
+    const { container } = render(<AmortizationSchedule />)
 
-    expect(screen.getByRole('heading', { name: 'Amortization Schedule' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument()
+    expect(container.querySelector('section')).toBeNull()
     expect(screen.getByText('Please enter your mortgage details')).toBeInTheDocument()
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
   })
