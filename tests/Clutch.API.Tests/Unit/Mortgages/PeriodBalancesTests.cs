@@ -9,7 +9,7 @@ public sealed class PeriodBalancesTests
     private static BalancePoint P(DateOnly date, decimal balance) => new(date, balance);
 
     [Fact]
-    public void Period_1_starts_on_the_drawdown_date_and_ends_one_payment_interval_later()
+    public void Period_1_starts_on_the_disbursal_date_and_ends_one_payment_interval_later()
     {
         var periods = PeriodBalances.MortgagePeriods(D(2026, 1, 31), 3, PaymentFrequency.Monthly).ToList();
 

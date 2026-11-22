@@ -40,6 +40,14 @@ public sealed class ApiExceptionHandler(
             return true;
         }
 
+        // The client disconnected or navigated away; nobody is left to read a response.
+        if (exception is OperationCanceledException && httpContext.RequestAborted.IsCancellationRequested)
+        {
+            logger.LogDebug("Request was canceled by the client.");
+            httpContext.Response.StatusCode = StatusCodes.Status499ClientClosedRequest;
+            return true;
+        }
+
         logger.LogError(
             "Unhandled request exception of type {ExceptionType}.",
             exception.GetType().Name);

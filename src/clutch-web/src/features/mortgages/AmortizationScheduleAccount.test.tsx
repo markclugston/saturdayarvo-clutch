@@ -13,7 +13,7 @@ vi.mock('@/lib/api/client', async (importOriginal) => ({
 
 describe('AmortizationSchedule with a Mortgage Account', () => {
   const account = { id: '11111111-1111-4111-8111-111111111111', description: 'Offset Account', currencyCode: 'AUD' }
-  const saved = { drawdownDate: '2026-01-01', paymentFrequency: 'Monthly' as const }
+  const saved = { disbursalDate: '2026-01-01', paymentFrequency: 'Monthly' as const }
   let server: FakeServer
 
   beforeEach(() => {
@@ -39,13 +39,13 @@ describe('AmortizationSchedule with a Mortgage Account', () => {
     expect(table.querySelectorAll('input, select, textarea')).toHaveLength(0)
   })
 
-  it('sends all three of drawdown date, frequency and duration', async () => {
+  it('sends all three of disbursal date, frequency and duration', async () => {
     renderWithProviders(<AmortizationSchedule accountId={account.id} duration={3} {...saved} />)
 
     await waitFor(() => expect(server.balanceRequests).toHaveLength(1))
     const params = new URLSearchParams(server.balanceRequests[0])
     expect(params.get('accountId')).toBe(account.id)
-    expect(params.get('drawdownDate')).toBe('2026-01-01')
+    expect(params.get('disbursalDate')).toBe('2026-01-01')
     expect(params.get('frequency')).toBe('Monthly')
     expect(params.get('duration')).toBe('3')
   })

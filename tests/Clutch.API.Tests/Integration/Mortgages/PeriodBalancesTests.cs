@@ -17,8 +17,8 @@ public sealed class PeriodBalancesTests(SqlServerFixture fixture)
     private static async Task<HttpResponseMessage> GetAsync(HttpClient client, string query) =>
         await client.GetAsync($"/api/mortgages/period-balances?{query}");
 
-    private static string Schedule(string drawdown = "2026-01-01", string frequency = "Monthly", int duration = 6) =>
-        $"drawdownDate={drawdown}&frequency={frequency}&duration={duration}";
+    private static string Schedule(string disbursal = "2026-01-01", string frequency = "Monthly", int duration = 6) =>
+        $"disbursalDate={disbursal}&frequency={frequency}&duration={duration}";
 
     [Fact]
     [Trait("Category", "SqlServer")]
@@ -89,10 +89,10 @@ public sealed class PeriodBalancesTests(SqlServerFixture fixture)
     }
 
     [Theory]
-    [InlineData("drawdownDate=2026-01-01", "frequency", "duration")]
-    [InlineData("frequency=Monthly&duration=5", "drawdownDate")]
-    [InlineData("drawdownDate=2026-13-01&frequency=Daily&duration=0", "drawdownDate", "frequency", "duration")]
-    [InlineData("drawdownDate=2026-01-01&frequency=Monthly&duration=1.5", "duration")]
+    [InlineData("disbursalDate=2026-01-01", "frequency", "duration")]
+    [InlineData("frequency=Monthly&duration=5", "disbursalDate")]
+    [InlineData("disbursalDate=2026-13-01&frequency=Daily&duration=0", "disbursalDate", "frequency", "duration")]
+    [InlineData("disbursalDate=2026-01-01&frequency=Monthly&duration=1.5", "duration")]
     [Trait("Category", "SqlServer")]
     public async Task Partial_or_invalid_schedule_values_are_400_with_field_keys(string query, params string[] keys)
     {

@@ -113,13 +113,13 @@ export const periodBalancesQueryKey = ['mortgage-period-balances'] as const
 export type PeriodBalanceRequest = {
   accountId: string
   /** All three, or none (monthly fallback from the account's history). */
-  schedule?: { drawdownDate: string; frequency: string; duration: number }
+  schedule?: { disbursalDate: string; frequency: string; duration: number }
 }
 
 export function getPeriodBalances({ accountId, schedule }: PeriodBalanceRequest) {
   const params = new URLSearchParams({ accountId })
   if (schedule) {
-    params.set('drawdownDate', schedule.drawdownDate)
+    params.set('disbursalDate', schedule.disbursalDate)
     params.set('frequency', schedule.frequency)
     params.set('duration', String(schedule.duration))
   }

@@ -24,8 +24,8 @@ type LoanPayoffTimelineProps = {
   saved: boolean
   /** Saved Duration of the selected mortgage; undefined for a new, unsaved one. */
   duration?: number
-  /** Saved Drawdown Date and Payment Frequency of the selected mortgage. */
-  drawdownDate?: string
+  /** Saved Disbursal Date and Payment Frequency of the selected mortgage. */
+  disbursalDate?: string
   paymentFrequency?: PaymentFrequency
   /** The Mortgage Account drop-down's current selection; none when undefined. */
   accountId?: string
@@ -37,7 +37,7 @@ export function LoanPayoffTimeline({
   onSwitch,
   saved,
   duration,
-  drawdownDate,
+  disbursalDate,
   paymentFrequency,
   accountId,
 }: LoanPayoffTimelineProps) {
@@ -59,7 +59,7 @@ export function LoanPayoffTimeline({
         : (
           <AmortizationSchedule
             accountId={accountId}
-            drawdownDate={drawdownDate}
+            disbursalDate={disbursalDate}
             duration={duration}
             paymentFrequency={paymentFrequency}
           />

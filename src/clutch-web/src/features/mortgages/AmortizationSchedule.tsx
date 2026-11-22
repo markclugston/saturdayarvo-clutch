@@ -28,8 +28,8 @@ const OVERSCAN = 8
 type AmortizationScheduleProps = {
   /** Saved Duration of the selected mortgage; undefined for a new, unsaved one. */
   duration?: number
-  /** Saved Drawdown Date and Payment Frequency; undefined for a new, unsaved mortgage. */
-  drawdownDate?: string
+  /** Saved Disbursal Date and Payment Frequency; undefined for a new, unsaved mortgage. */
+  disbursalDate?: string
   paymentFrequency?: PaymentFrequency
   /** The Mortgage Account selection; with one, a balance column follows Bank Schedule. */
   accountId?: string
@@ -63,18 +63,18 @@ function PlainSchedule({ duration }: { duration?: number }) {
 function AccountSchedule({
   accountId,
   duration,
-  drawdownDate,
+  disbursalDate,
   paymentFrequency,
 }: AmortizationScheduleProps & { accountId: string }) {
   const accountsQuery = useQuery({ queryKey: ['accounts'], queryFn: getAccounts })
   // An account missing from the list (deleted elsewhere) behaves as none.
   const account = accountsQuery.data?.find((item) => item.id === accountId)
-  const complete = duration !== undefined && drawdownDate !== undefined && paymentFrequency !== undefined
+  const complete = duration !== undefined && disbursalDate !== undefined && paymentFrequency !== undefined
   const request: PeriodBalanceRequest | null = account
     ? {
         accountId,
         schedule: complete
-          ? { drawdownDate, frequency: paymentFrequency, duration }
+          ? { disbursalDate, frequency: paymentFrequency, duration }
           : undefined,
       }
     : null

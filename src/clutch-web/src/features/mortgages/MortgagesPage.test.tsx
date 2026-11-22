@@ -363,7 +363,7 @@ describe('MortgagesPage', () => {
         name: 'Home loan',
         openingBalance: 500000,
         duration: 360,
-        drawdownDate: '2000-01-01',
+        disbursalDate: '2000-01-01',
         paymentFrequency: 'Monthly',
         interestRateChanges: [
           { newInterestRate: 5.25, effectiveDate: '2000-01-01' },
@@ -703,7 +703,7 @@ describe('MortgagesPage', () => {
     server = installFakeApi([])
     renderWithProviders(<MortgagesPage userId="user-1" />)
     await screen.findByRole('heading', { name: 'Details' })
-    setDate('Drawdown Date', '2000-01-01')
-    expect(screen.getByLabelText('Drawdown Date')).toHaveValue('2000-01-01')
+    setDate('Disbursal Date', '2000-01-01')
+    expect(screen.getByLabelText('Disbursal Date')).toHaveValue('2000-01-01')
   })
 })

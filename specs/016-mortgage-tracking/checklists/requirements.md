@@ -31,5 +31,5 @@
 
 ## Notes
 
-- Resolved 2026-11-21: delete with confirmation (FR-017), Bank schedule series only (FR-018), Drawdown date + Payment frequency fields (FR-019), audited changes (FR-020), no upper limit on periods (opening balance later capped at 999,999,999,999.99 for exact storage and display), 2-decimal rates. All other defaults accepted by the user.
+- Resolved 2026-11-21: delete with confirmation (FR-017), Bank schedule series only (FR-018), Disbursal date + Payment frequency fields (FR-019), audited changes (FR-020), no upper limit on periods (opening balance later capped at 999,999,999,999.99 for exact storage and display), 2-decimal rates. All other defaults accepted by the user.
 - Amortization Schedule is display only (confirmed by user 2026-11-21); values are calculated from Loan details in a later feature.

@@ -29,7 +29,7 @@ fetching) follows the code and is not repeated.
 
 ## R5 "Not later than today" on the server
 
-- **Decision**: Screen checks against the user's local date. Server rejects a Drawdown date after `DateOnly.FromDateTime(timeProvider.GetUtcNow().AddHours(14).UtcDateTime)`, the latest date anywhere in the world (UTC+14), using an injected `TimeProvider`. (`UTC today + 1 day` is wrong: before 10:00 UTC it accepts a date that is still in the future everywhere.)
+- **Decision**: Screen checks against the user's local date. Server rejects a Disbursal date after `DateOnly.FromDateTime(timeProvider.GetUtcNow().AddHours(14).UtcDateTime)`, the latest date anywhere in the world (UTC+14), using an injected `TimeProvider`. (`UTC today + 1 day` is wrong: before 10:00 UTC it accepts a date that is still in the future everywhere.)
 - **Rationale**: The server cannot trust a client-sent "today"; the bound never rejects a valid local date.
 - **Alternatives**: Client-supplied time zone — untrusted input that still needs a bound.
 
@@ -41,7 +41,7 @@ fetching) follows the code and is not repeated.
 
 ## R7 Error shape that separates field errors from clashes
 
-- **Decision**: Validation (including duplicate name and limits) → 400 ProblemDetails with `errors` keyed by field path (`name`, `openingBalance`, `duration`, `drawdownDate`, `paymentFrequency`, `interestRateChanges`, `interestRateChanges[i].newInterestRate`, `interestRateChanges[i].effectiveDate`, `mortgages` for the 20-limit). 409 is reserved for version clashes.
+- **Decision**: Validation (including duplicate name and limits) → 400 ProblemDetails with `errors` keyed by field path (`name`, `openingBalance`, `duration`, `disbursalDate`, `paymentFrequency`, `interestRateChanges`, `interestRateChanges[i].newInterestRate`, `interestRateChanges[i].effectiveDate`, `mortgages` for the 20-limit). 409 is reserved for version clashes.
 - **Rationale**: The UI must tell "show next to field" (FR-008) from "changed elsewhere, Reload" (FR-021). Categories uses 409 for duplicates; here 409 already means a clash.
 - **Alternatives**: 409 for both with a discriminator — harder to type on the client.
 

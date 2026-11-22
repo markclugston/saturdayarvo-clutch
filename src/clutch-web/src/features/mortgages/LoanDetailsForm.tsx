@@ -235,12 +235,12 @@ export function LoanDetailsForm({
         <FloatingField
           className="w-full sm:w-52"
           disabled={saving}
-          error={errors.drawdownDate}
-          id={`${idPrefix}-drawdown-date`}
-          label="Drawdown Date"
-          onChange={(event) => change({ drawdownDate: event.currentTarget.value })}
+          error={errors.disbursalDate}
+          id={`${idPrefix}-disbursal-date`}
+          label="Disbursal Date"
+          onChange={(event) => change({ disbursalDate: event.currentTarget.value })}
           type="date"
-          value={draft.drawdownDate}
+          value={draft.disbursalDate}
         />
         <FloatingField
           autoComplete="off"

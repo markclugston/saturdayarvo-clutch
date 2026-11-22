@@ -17,7 +17,7 @@ export type LoanDraft = {
   name: string
   openingBalance: string
   duration: string
-  drawdownDate: string
+  disbursalDate: string
   paymentFrequency: PaymentFrequency | ''
   /** The linked account's id; '' for none. */
   accountId: string
@@ -39,7 +39,7 @@ export function emptyDraft(): LoanDraft {
     name: '',
     openingBalance: '',
     duration: '',
-    drawdownDate: '',
+    disbursalDate: '',
     paymentFrequency: '',
     accountId: '',
     rows: [],
@@ -51,7 +51,7 @@ export function mortgageToDraft(mortgage: Mortgage): LoanDraft {
     name: mortgage.name,
     openingBalance: String(mortgage.openingBalance),
     duration: String(mortgage.duration),
-    drawdownDate: mortgage.drawdownDate,
+    disbursalDate: mortgage.disbursalDate,
     paymentFrequency: mortgage.paymentFrequency,
     accountId: mortgage.accountId ?? '',
     rows: mortgage.interestRateChanges.map((change) =>
@@ -63,7 +63,7 @@ export function draftsEqual(left: LoanDraft, right: LoanDraft): boolean {
   return left.name === right.name
     && left.openingBalance === right.openingBalance
     && left.duration === right.duration
-    && left.drawdownDate === right.drawdownDate
+    && left.disbursalDate === right.disbursalDate
     && left.paymentFrequency === right.paymentFrequency
     && left.accountId === right.accountId
     && left.rows.length === right.rows.length
@@ -114,10 +114,10 @@ export function validateDraft(draft: LoanDraft, today: string): DraftErrors {
     errors.openingBalance = 'Enter a opening balance with up to 2 decimal places'
   }
 
-  if (parseDate(draft.drawdownDate) === null) {
-    errors.drawdownDate = 'Enter a valid date'
-  } else if (draft.drawdownDate > today) {
-    errors.drawdownDate = 'Enter a date that is not in the future'
+  if (parseDate(draft.disbursalDate) === null) {
+    errors.disbursalDate = 'Enter a valid date'
+  } else if (draft.disbursalDate > today) {
+    errors.disbursalDate = 'Enter a date that is not in the future'
   }
 
   if (draft.paymentFrequency === '') {
@@ -130,14 +130,14 @@ export function validateDraft(draft: LoanDraft, today: string): DraftErrors {
     errors.duration = 'Enter a whole number of 1 or more'
   } else if (periods > MAX_PERIODS) {
     errors.duration = tooLate
-  } else if (!errors.drawdownDate && draft.paymentFrequency !== ''
-    && finalRepaymentDate(draft.drawdownDate, periods, draft.paymentFrequency) === null) {
+  } else if (!errors.disbursalDate && draft.paymentFrequency !== ''
+    && finalRepaymentDate(draft.disbursalDate, periods, draft.paymentFrequency) === null) {
     errors.duration = tooLate
   }
 
-  const headerValid = !errors.drawdownDate && !errors.duration && !errors.paymentFrequency
+  const headerValid = !errors.disbursalDate && !errors.duration && !errors.paymentFrequency
   const final = headerValid && periods !== null && draft.paymentFrequency !== ''
-    ? finalRepaymentDate(draft.drawdownDate, periods, draft.paymentFrequency)
+    ? finalRepaymentDate(draft.disbursalDate, periods, draft.paymentFrequency)
     : null
 
   const rows = draft.rows.filter((row) => !isEmptyRow(row))
@@ -170,28 +170,28 @@ export function validateDraft(draft: LoanDraft, today: string): DraftErrors {
       errors[dateKey] = 'Enter a valid date'
     } else if ((usedDates.get(row.date) ?? 0) > 1) {
       errors[dateKey] = 'This effective date is already used'
-    } else if (final !== null && (row.date < draft.drawdownDate || row.date > final)) {
+    } else if (final !== null && (row.date < draft.disbursalDate || row.date > final)) {
       errors[dateKey] =
-        `Choose a date from ${formatMessageDate(draft.drawdownDate)} to ${formatMessageDate(final)}`
+        `Choose a date from ${formatMessageDate(draft.disbursalDate)} to ${formatMessageDate(final)}`
     }
 
-    if (dateValid && rate !== null && row.date === draft.drawdownDate) {
+    if (dateValid && rate !== null && row.date === draft.disbursalDate) {
       openingRateFound = true
     }
   }
 
   if (headerValid && !errors.interestRateChanges && !openingRateFound) {
     errors.interestRateChanges =
-      'Add the opening interest rate, effective on the drawdown date'
+      'Add the opening interest rate, effective on the disbursal date'
   }
 
   return errors
 }
 
-/** True when Drawdown Date, Duration and Payment Frequency are all valid. */
+/** True when Disbursal Date, Duration and Payment Frequency are all valid. */
 export function headerIsValid(draft: LoanDraft, today: string): boolean {
   const errors = validateDraft({ ...draft, rows: [] }, today)
-  return !errors.drawdownDate && !errors.duration && !errors.paymentFrequency
+  return !errors.disbursalDate && !errors.duration && !errors.paymentFrequency
 }
 
 /** Empty rows are dropped. `rowKeys[i]` is the screen row that became `interestRateChanges[i]`. */
@@ -202,7 +202,7 @@ export function draftToInput(draft: LoanDraft): { input: MortgageInput; rowKeys:
       name: draft.name.trim(),
       openingBalance: Number(draft.openingBalance.trim()),
       duration: Number(draft.duration.trim()),
-      drawdownDate: draft.drawdownDate,
+      disbursalDate: draft.disbursalDate,
       paymentFrequency: draft.paymentFrequency as PaymentFrequency,
       accountId: draft.accountId === '' ? null : draft.accountId,
       interestRateChanges: rows.map((row) => ({

@@ -16,7 +16,7 @@ import {
   type RateRowDraft,
 } from './loanDraft'
 
-export const ADD_ROW_HINT = 'Enter the drawdown date, duration and payment frequency first'
+export const ADD_ROW_HINT = 'Enter the disbursal date, duration and payment frequency first'
 export const LIMIT_HINT = `You can add up to ${MAX_RATE_CHANGES} interest rate changes`
 
 type InterestRateChangesDialogProps = {
@@ -85,7 +85,7 @@ export function InterestRateChangesDialog({
           />
           <RateList
             errors={errors}
-            drawdownDate={draft.drawdownDate}
+            disbursalDate={draft.disbursalDate}
             onRemove={(key) => {
               onRowsChange(draft.rows.filter((row) => row.key !== key))
               popup.current?.focus()
@@ -173,13 +173,13 @@ function AddArea({ draft, today, canAdd, atLimit, addAvailable, onAdd }: AddArea
 
 type RateListProps = {
   rows: RateRowDraft[]
-  drawdownDate: string
+  disbursalDate: string
   errors: DraftErrors
   saving: boolean
   onRemove: (key: string) => void
 }
 
-function RateList({ rows, drawdownDate, errors, saving, onRemove }: RateListProps) {
+function RateList({ rows, disbursalDate, errors, saving, onRemove }: RateListProps) {
   const setError = errors.interestRateChanges
   // Display order only; the draft keeps its own order.
   const sorted = [...rows].sort((left, right) => (left.date < right.date ? -1 : left.date > right.date ? 1 : 0))
@@ -202,7 +202,7 @@ function RateList({ rows, drawdownDate, errors, saving, onRemove }: RateListProp
                   <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
                     <span className="w-16 text-right font-medium tabular-nums">{rate}</span>
                     <span className="text-fg-secondary">{date}</span>
-                    {row.date === drawdownDate && (
+                    {row.date === disbursalDate && (
                       <span className="text-xs font-medium text-fg-secondary">Opening Rate</span>
                     )}
                   </div>

@@ -14,7 +14,7 @@ function makeDraft(rows: RateRowDraft[], patch: Partial<LoanDraft> = {}): LoanDr
     name: 'Home',
     openingBalance: '500000',
     duration: '120',
-    drawdownDate: '2000-01-01',
+    disbursalDate: '2000-01-01',
     paymentFrequency: 'Monthly',
     rows,
     ...patch,
@@ -129,7 +129,7 @@ describe('InterestRateChangesDialog', () => {
 
     const add = within(dialog).getByRole('button', { name: 'Add' })
     expect(add).toBeDisabled()
-    expect(add).toHaveAccessibleDescription('Enter the drawdown date, duration and payment frequency first')
+    expect(add).toHaveAccessibleDescription('Enter the disbursal date, duration and payment frequency first')
     await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Close' })).toHaveFocus())
     expect(within(dialog).getByRole('button', { name: 'Remove 5.25% from 1 Jan 2000' })).toBeEnabled()
   })
@@ -217,12 +217,12 @@ describe('InterestRateChangesDialog', () => {
       const errors = {
         [`${bad.key}.effectiveDate`]: 'This effective date is already used',
         [`${bad.key}.newInterestRate`]: 'Enter an interest rate from 0 to 100',
-        interestRateChanges: 'Add the opening interest rate, effective on the drawdown date',
+        interestRateChanges: 'Add the opening interest rate, effective on the disbursal date',
       }
       render(<Harness errors={errors} initial={makeDraft([bad, newRow('7', '2002-01-01')])} />)
       const dialog = await openDialog(user)
 
-      expect(within(dialog).getByRole('alert')).toHaveTextContent('Add the opening interest rate, effective on the drawdown date')
+      expect(within(dialog).getByRole('alert')).toHaveTextContent('Add the opening interest rate, effective on the disbursal date')
       const [first, second] = within(within(dialog).getByRole('list')).getAllByRole('listitem')
       expect(first).toHaveTextContent('This effective date is already used')
       expect(first).toHaveTextContent('Enter an interest rate from 0 to 100')
@@ -234,7 +234,7 @@ describe('InterestRateChangesDialog', () => {
       const bad = newRow('6', '2001-06-01')
       const errors = {
         [`${bad.key}.effectiveDate`]: 'This effective date is already used',
-        interestRateChanges: 'Add the opening interest rate, effective on the drawdown date',
+        interestRateChanges: 'Add the opening interest rate, effective on the disbursal date',
       }
       render(<Harness errors={errors} initial={makeDraft([bad])} />)
       const dialog = await openDialog(user)

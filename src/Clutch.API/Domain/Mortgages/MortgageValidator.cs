@@ -8,7 +8,7 @@ public sealed record MortgageCandidate(
     string? Name,
     decimal? OpeningBalance,
     decimal? Duration,
-    string? DrawdownDate,
+    string? DisbursalDate,
     string? PaymentFrequency,
     IReadOnlyList<RateChangeCandidate> InterestRateChanges,
     string? AccountId = null);
@@ -17,7 +17,7 @@ public sealed record ValidMortgage(
     string Name,
     decimal OpeningBalance,
     int Duration,
-    DateOnly DrawdownDate,
+    DateOnly DisbursalDate,
     PaymentFrequency PaymentFrequency,
     IReadOnlyList<RateChangeValue> RateChanges,
     Guid? AccountId);
@@ -37,7 +37,7 @@ public static class MortgageValidator
         var errors = new Dictionary<string, string>(StringComparer.Ordinal);
         var name = ValidateName(candidate.Name, errors);
         var balance = ValidateOpeningBalance(candidate.OpeningBalance, errors);
-        var firstDate = ValidateDrawdownDate(candidate.DrawdownDate, timeProvider, errors);
+        var firstDate = ValidateDisbursalDate(candidate.DisbursalDate, timeProvider, errors);
         var frequency = ValidateFrequency(candidate.PaymentFrequency, errors);
         var periods = ValidatePeriods(candidate.Duration, firstDate, frequency, errors);
         var accountId = ValidateAccountId(candidate.AccountId, errors);
@@ -60,7 +60,7 @@ public static class MortgageValidator
             .Select(group => group.Key)
             .ToHashSet();
 
-        var headerValid = !errors.ContainsKey("drawdownDate")
+        var headerValid = !errors.ContainsKey("disbursalDate")
             && !errors.ContainsKey("duration")
             && !errors.ContainsKey("paymentFrequency")
             && firstDate is not null
@@ -103,7 +103,7 @@ public static class MortgageValidator
             && !changes.Any(change => change.EffectiveDate == firstDate!.Value))
         {
             errors["interestRateChanges"] =
-                "Add the opening interest rate, effective on the drawdown date";
+                "Add the opening interest rate, effective on the disbursal date";
         }
 
         if (errors.Count > 0)
@@ -186,7 +186,7 @@ public static class MortgageValidator
         return value;
     }
 
-    private static DateOnly? ValidateDrawdownDate(
+    private static DateOnly? ValidateDisbursalDate(
         string? value,
         TimeProvider timeProvider,
         Dictionary<string, string> errors)
@@ -194,7 +194,7 @@ public static class MortgageValidator
         var date = ParseDate(value);
         if (date is null)
         {
-            errors["drawdownDate"] = "Enter a valid date";
+            errors["disbursalDate"] = "Enter a valid date";
             return null;
         }
 
@@ -202,7 +202,7 @@ public static class MortgageValidator
         var latest = DateOnly.FromDateTime(timeProvider.GetUtcNow().AddHours(14).UtcDateTime);
         if (date.Value > latest)
         {
-            errors["drawdownDate"] = "Enter a date that is not in the future";
+            errors["disbursalDate"] = "Enter a date that is not in the future";
             return null;
         }
 

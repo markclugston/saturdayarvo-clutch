@@ -9,19 +9,19 @@ public readonly record struct BalancePeriod(DateOnly Start, DateOnly End);
 // Pure period-end lookup: balances are read from transactions, never calculated.
 public static class PeriodBalances
 {
-    // Periods 1 to duration + 1 of a mortgage. Period 1 starts on the drawdown date and runs one payment
-    // interval; period k starts k - 1 intervals after the drawdown date. A period ends the day before the
+    // Periods 1 to duration + 1 of a mortgage. Period 1 starts on the disbursal date and runs one payment
+    // interval; period k starts k - 1 intervals after the disbursal date. A period ends the day before the
     // next starts, and the final row is the single day the mortgage's last interval ends. Stops early if a
     // date would pass 31 Dec 9999.
     public static IEnumerable<BalancePeriod> MortgagePeriods(
-        DateOnly drawdownDate,
+        DateOnly disbursalDate,
         int duration,
         PaymentFrequency frequency)
     {
-        var start = drawdownDate;
+        var start = disbursalDate;
         for (var period = 1; period <= duration; period++)
         {
-            if (RepaymentDates.FinalRepaymentDate(drawdownDate, period + 1L, frequency) is not { } next)
+            if (RepaymentDates.FinalRepaymentDate(disbursalDate, period + 1L, frequency) is not { } next)
             {
                 yield return new BalancePeriod(start, DateOnly.MaxValue);
                 yield break;

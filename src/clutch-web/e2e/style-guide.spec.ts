@@ -75,7 +75,7 @@ const mortgageFixture = (index: number) => ({
   name: index === 0 ? longMortgageName : `Mortgage ${index + 1}`,
   openingBalance: 500000.5,
   duration: 360,
-  drawdownDate: '2000-01-01',
+  disbursalDate: '2000-01-01',
   paymentFrequency: 'Monthly',
   interestRateChanges: [
     { newInterestRate: 5.25, effectiveDate: '2000-01-01' },
@@ -83,7 +83,7 @@ const mortgageFixture = (index: number) => ({
   ],
   version: 1,
 })
-// Mortgage 1 has one change, Mortgage 2 has 60 (monthly from the drawdown date).
+// Mortgage 1 has one change, Mortgage 2 has 60 (monthly from the disbursal date).
 const rateFixtures = () => [
   { ...mortgageFixture(1), name: 'One rate', interestRateChanges: [{ newInterestRate: 5.25, effectiveDate: '2000-01-01' }] },
   {
@@ -263,7 +263,7 @@ async function fillNewMortgage(page: Page) {
   await page.getByLabel('Name', { exact: true }).fill('Holiday house')
   await page.getByLabel('Opening Balance').fill('250000')
   await page.getByLabel('Duration').fill('120')
-  await page.getByLabel('Drawdown Date').fill('2020-01-01')
+  await page.getByLabel('Disbursal Date').fill('2020-01-01')
   await page.getByLabel('Payment Frequency').selectOption('Monthly')
   await page.getByRole('button', { name: 'Change Interest Rate' }).click()
   const dialog = page.getByRole('dialog', { name: 'Change Interest Rate' })

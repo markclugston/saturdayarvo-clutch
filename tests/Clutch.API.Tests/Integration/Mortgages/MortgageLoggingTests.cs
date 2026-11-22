@@ -58,7 +58,7 @@ public sealed class MortgageLoggingTests(SqlServerFixture fixture)
         await SeedTransactionAsync(fixture, accountId, new DateOnly(2026, 1, 10), 7654321.09m);
 
         using var response = await client.GetAsync(
-            $"/api/mortgages/period-balances?accountId={accountId}&drawdownDate=2026-01-01&frequency=Monthly&duration=3");
+            $"/api/mortgages/period-balances?accountId={accountId}&disbursalDate=2026-01-01&frequency=Monthly&duration=3");
         using var missing = await client.GetAsync($"/api/mortgages/period-balances?accountId={Guid.NewGuid()}");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

@@ -12,12 +12,12 @@
 
 ## Amortization Schedule (`AmortizationSchedule`)
 
-- Props: `accountId?`, plus saved mortgage `drawdownDate`, `paymentFrequency`, `duration` (unchanged when
+- Props: `accountId?`, plus saved mortgage `disbursalDate`, `paymentFrequency`, `duration` (unchanged when
   absent).
 - With an account: a fourth column immediately right of Bank Schedule, header = account description,
   cells formatted by `formatCurrencyAmount` in the account currency, read-only, blank when no value.
 - Without: layout and behaviour exactly as before (SC-003).
-- The balances request sends `drawdownDate`, `frequency` and `duration` all together only when the schedule can
+- The balances request sends `disbursalDate`, `frequency` and `duration` all together only when the schedule can
   be generated from the current Details; otherwise it sends none of them (never a partial or invalid mix, which
   the API rejects with 400).
 - Details incomplete (a new, unsaved mortgage) + account: monthly fallback rows with the full column set

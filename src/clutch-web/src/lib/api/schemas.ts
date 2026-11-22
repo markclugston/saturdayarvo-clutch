@@ -189,7 +189,7 @@ export const MortgageInputSchema = z.object({
   name: z.string().min(1).max(100),
   openingBalance: z.number().positive().max(999999999999.99),
   duration: z.number().int().min(1),
-  drawdownDate: z.iso.date(),
+  disbursalDate: z.iso.date(),
   paymentFrequency: PaymentFrequencySchema,
   interestRateChanges: z.array(InterestRateChangeSchema).max(60),
   /** The linked account, or null/absent for none. */

@@ -87,7 +87,7 @@ describe('API schemas', () => {
       name: 'Home loan',
       openingBalance: 500000.5,
       duration: 360,
-      drawdownDate: '2000-01-01',
+      disbursalDate: '2000-01-01',
       paymentFrequency: 'Monthly',
       interestRateChanges: [{ newInterestRate: 5.25, effectiveDate: '2000-01-01' }],
     }
@@ -103,7 +103,7 @@ describe('API schemas', () => {
 
     it('rejects an unknown frequency, bad date, and more than 60 changes', () => {
       expect(MortgageInputSchema.safeParse({ ...input, paymentFrequency: 'Daily' }).success).toBe(false)
-      expect(MortgageInputSchema.safeParse({ ...input, drawdownDate: '01/01/2000' }).success).toBe(false)
+      expect(MortgageInputSchema.safeParse({ ...input, disbursalDate: '01/01/2000' }).success).toBe(false)
       expect(InterestRateChangeSchema.safeParse({ newInterestRate: 101, effectiveDate: '2000-01-01' }).success)
         .toBe(false)
       const many = Array.from({ length: 61 }, () => ({ newInterestRate: 1, effectiveDate: '2000-01-01' }))

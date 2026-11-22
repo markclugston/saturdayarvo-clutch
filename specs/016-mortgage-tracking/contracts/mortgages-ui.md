@@ -23,8 +23,8 @@ Accessible names and roles that tests (Vitest, Playwright, axe) rely on.
 
 ## Details panel (styled like `AddCategoryForm`)
 
-- Region heading "Details". Floating-label fields: "Name", "Opening balance", "Drawdown date" (`type="date"`), "Duration", "Payment frequency" (select: Weekly, Fortnightly, Monthly).
-- Group "Interest rate changes": rows of "New interest rate" (%) and "Effective date" (`type="date"`), each with "Remove interest rate change {n}"; button "Add interest rate change" disabled with hint "Enter the drawdown date, duration and payment frequency first" until those are valid, and disabled at 60 rows.
+- Region heading "Details". Floating-label fields: "Name", "Opening balance", "Disbursal date" (`type="date"`), "Duration", "Payment frequency" (select: Weekly, Fortnightly, Monthly).
+- Group "Interest rate changes": rows of "New interest rate" (%) and "Effective date" (`type="date"`), each with "Remove interest rate change {n}"; button "Add interest rate change" disabled with hint "Enter the disbursal date, duration and payment frequency first" until those are valid, and disabled at 60 rows.
 - Buttons: "Save" (busy text "Saving…"), "Cancel". No Delete button.
 - Field errors under each field, linked by `aria-describedby`, `aria-invalid="true"`; a summary is announced via `role="alert"`. Errors without a field input (`mortgages`, set-level `interestRateChanges`) appear in that summary; set-level `interestRateChanges` also shows under the "Interest rate changes" group.
 - Conflict: `role="alert"` "This mortgage was changed elsewhere; reload to see the latest" + button "Reload".

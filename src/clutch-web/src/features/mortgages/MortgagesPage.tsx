@@ -175,7 +175,7 @@ export function MortgagesPage({ userId }: MortgagesPageProps) {
       />
       <LoanPayoffTimeline
         accountId={liveAccountId === '' ? undefined : liveAccountId}
-        drawdownDate={selectedMortgage?.drawdownDate}
+        disbursalDate={selectedMortgage?.disbursalDate}
         duration={selectedMortgage?.duration}
         paymentFrequency={selectedMortgage?.paymentFrequency}
         onSwitch={() => {

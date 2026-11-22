@@ -22,7 +22,7 @@ public sealed class Mortgage
 
     public int Duration { get; private set; }
 
-    public DateOnly DrawdownDate { get; private set; }
+    public DateOnly DisbursalDate { get; private set; }
 
     public PaymentFrequency PaymentFrequency { get; private set; }
 
@@ -40,7 +40,7 @@ public sealed class Mortgage
         string name,
         decimal openingBalance,
         int duration,
-        DateOnly drawdownDate,
+        DateOnly disbursalDate,
         PaymentFrequency paymentFrequency,
         IReadOnlyList<RateChangeValue> rateChanges,
         Guid? accountId,
@@ -54,7 +54,7 @@ public sealed class Mortgage
             Version = 1,
         };
         mortgage.Apply(
-            name, openingBalance, duration, drawdownDate, paymentFrequency, rateChanges, accountId);
+            name, openingBalance, duration, disbursalDate, paymentFrequency, rateChanges, accountId);
         return mortgage;
     }
 
@@ -63,12 +63,12 @@ public sealed class Mortgage
         string name,
         decimal openingBalance,
         int duration,
-        DateOnly drawdownDate,
+        DateOnly disbursalDate,
         PaymentFrequency paymentFrequency,
         IReadOnlyList<RateChangeValue> rateChanges,
         Guid? accountId)
     {
-        Apply(name, openingBalance, duration, drawdownDate, paymentFrequency, rateChanges, accountId);
+        Apply(name, openingBalance, duration, disbursalDate, paymentFrequency, rateChanges, accountId);
         Version++;
     }
 
@@ -84,7 +84,7 @@ public sealed class Mortgage
         string name,
         decimal openingBalance,
         int duration,
-        DateOnly drawdownDate,
+        DateOnly disbursalDate,
         PaymentFrequency paymentFrequency,
         IReadOnlyList<RateChangeValue> rateChanges,
         Guid? accountId)
@@ -93,7 +93,7 @@ public sealed class Mortgage
         AccountId = accountId;
         OpeningBalance = openingBalance;
         Duration = duration;
-        DrawdownDate = drawdownDate;
+        DisbursalDate = disbursalDate;
         PaymentFrequency = paymentFrequency;
         ReplaceRateChanges(rateChanges);
     }

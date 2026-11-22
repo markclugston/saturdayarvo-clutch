@@ -289,7 +289,7 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<DateOnly>("DrawdownDate")
+                    b.Property<DateOnly>("DisbursalDate")
                         .HasColumnType("date");
 
                     b.Property<int>("Duration")

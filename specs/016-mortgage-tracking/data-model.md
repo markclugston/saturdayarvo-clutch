@@ -9,7 +9,7 @@
 | Name | `nvarchar(100)`, collation `Latin1_General_100_CI_AS` | Trimmed; 1–100 chars; unique per owner ignoring case (index + check `LEN(LTRIM(RTRIM(Name))) > 0`) |
 | OpeningBalance | `decimal(19,2)` | > 0, ≤ 999,999,999,999.99, ≤ 2 dp |
 | Duration | `int` | ≥ 1; final repayment date ≤ 31 Dec 9999 |
-| DrawdownDate | `date` | Valid; ≤ today (R5) |
+| DisbursalDate | `date` | Valid; ≤ today (R5) |
 | PaymentFrequency | `varchar(20)` (enum as string; ASCII values, like the other enum columns) | `Weekly` \| `Fortnightly` \| `Monthly` |
 | CreatedAtUtc | `datetimeoffset` | Creation order for tabs (tie-break: Id) |
 | Version | `int`, concurrency token | Starts at 1; +1 on every update (R4) |
@@ -25,12 +25,12 @@ Limit: ≤ 20 per owner (checked in a serializable create transaction, R6).
 | Id | `uniqueidentifier` PK | |
 | MortgageId | FK → Mortgages, cascade delete | |
 | NewInterestRate | `decimal(5,2)` | 0–100, ≤ 2 dp |
-| EffectiveDate | `date` | Drawdown date ≤ date ≤ final repayment date; unique per mortgage |
+| EffectiveDate | `date` | Disbursal date ≤ date ≤ final repayment date; unique per mortgage |
 
 Indexes: unique `(MortgageId, EffectiveDate)`.
 
-Rules across the set: 1–60 rows; one row's EffectiveDate equals DrawdownDate (opening rate);
-rows only accepted when DrawdownDate, Duration and PaymentFrequency are valid.
+Rules across the set: 1–60 rows; one row's EffectiveDate equals DisbursalDate (opening rate);
+rows only accepted when DisbursalDate, Duration and PaymentFrequency are valid.
 Returned in EffectiveDate order. On update the set is replaced (owned collection; rows removed and
 added in the same `SaveChanges`).
 

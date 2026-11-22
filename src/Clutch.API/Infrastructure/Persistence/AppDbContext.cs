@@ -64,7 +64,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .IsRequired();
             entity.Property(mortgage => mortgage.OpeningBalance)
                 .HasColumnType("decimal(19,2)");
-            entity.Property(mortgage => mortgage.DrawdownDate)
+            entity.Property(mortgage => mortgage.DisbursalDate)
                 .HasColumnType("date");
             entity.Property(mortgage => mortgage.PaymentFrequency)
                 .HasConversion<string>()

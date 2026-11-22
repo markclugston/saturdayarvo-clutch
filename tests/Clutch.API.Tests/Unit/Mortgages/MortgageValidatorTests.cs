@@ -115,8 +115,8 @@ public sealed class MortgageValidatorTests
     [InlineData("01/01/2000")]
     [InlineData("")]
     [InlineData(null)]
-    public void Unreadable_drawdown_date_is_rejected(string? value) =>
-        Assert.Equal("Enter a valid date", Errors(Valid(first: value))["drawdownDate"]);
+    public void Unreadable_disbursal_date_is_rejected(string? value) =>
+        Assert.Equal("Enter a valid date", Errors(Valid(first: value))["disbursalDate"]);
 
     [Fact]
     public void Future_date_bound_is_the_latest_date_anywhere_in_the_world()
@@ -128,7 +128,7 @@ public sealed class MortgageValidatorTests
 
         Assert.Equal(
             "Enter a date that is not in the future",
-            MortgageValidator.Validate(candidate, early).Errors["drawdownDate"]);
+            MortgageValidator.Validate(candidate, early).Errors["disbursalDate"]);
         Assert.Empty(MortgageValidator.Validate(candidate, late).Errors);
     }
 
@@ -144,7 +144,7 @@ public sealed class MortgageValidatorTests
     [Fact]
     public void Opening_rate_is_required_including_when_there_are_no_rows()
     {
-        const string message = "Add the opening interest rate, effective on the drawdown date";
+        const string message = "Add the opening interest rate, effective on the disbursal date";
         Assert.Equal(
             message,
             Errors(Valid(rows: new RateChangeCandidate(5m, "2000-02-01")))["interestRateChanges"]);

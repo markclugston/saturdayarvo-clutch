@@ -75,10 +75,10 @@ describe('LoanDetailsForm (new mortgage)', () => {
   it('uses floating labels and native date inputs, and a Payment Frequency select', () => {
     renderForm()
 
-    for (const label of ['Name', 'Opening Balance', 'Drawdown Date', 'Duration', 'Payment Frequency']) {
+    for (const label of ['Name', 'Opening Balance', 'Disbursal Date', 'Duration', 'Payment Frequency']) {
       expect(screen.getByLabelText(label)).toBeInTheDocument()
     }
-    expect(screen.getByLabelText('Drawdown Date')).toHaveAttribute('type', 'date')
+    expect(screen.getByLabelText('Disbursal Date')).toHaveAttribute('type', 'date')
     expect(within(screen.getByLabelText('Payment Frequency')).getAllByRole('option').map((option) => option.textContent))
       .toEqual(['Choose…', 'Weekly', 'Fortnightly', 'Monthly'])
     expect(screen.getByRole('heading', { name: 'Details' })).toBeInTheDocument()
@@ -133,20 +133,20 @@ describe('LoanDetailsForm (new mortgage)', () => {
       expect(server.requests.filter((request) => request.method === 'POST')).toHaveLength(0)
     })
 
-    it('flags a missing or future Drawdown Date before any request is sent', async () => {
+    it('flags a missing or future Disbursal Date before any request is sent', async () => {
       const user = userEvent.setup()
       renderForm()
       await fillForm(user, validValues)
-      setDate('Drawdown Date', '')
+      setDate('Disbursal Date', '')
       await submit(user)
-      expect(screen.getByLabelText('Drawdown Date')).toHaveAccessibleDescription('Enter a valid date')
+      expect(screen.getByLabelText('Disbursal Date')).toHaveAccessibleDescription('Enter a valid date')
 
       const future = new Date()
       future.setDate(future.getDate() + 2)
       const iso = `${future.getFullYear()}-${String(future.getMonth() + 1).padStart(2, '0')}-${String(future.getDate()).padStart(2, '0')}`
-      setDate('Drawdown Date', iso)
+      setDate('Disbursal Date', iso)
       await submit(user)
-      expect(screen.getByLabelText('Drawdown Date')).toHaveAccessibleDescription('Enter a date that is not in the future')
+      expect(screen.getByLabelText('Disbursal Date')).toHaveAccessibleDescription('Enter a date that is not in the future')
       expect(server.requests.filter((request) => request.method === 'POST')).toHaveLength(0)
     })
 
@@ -221,16 +221,16 @@ describe('LoanDetailsForm (new mortgage)', () => {
       const user = userEvent.setup()
       renderForm()
       server.failNext('POST', problem(400, {
-        errors: { interestRateChanges: ['Add the opening interest rate, effective on the drawdown date'] },
+        errors: { interestRateChanges: ['Add the opening interest rate, effective on the disbursal date'] },
       }))
       await fillForm(user, validValues)
       await submit(user)
 
       const summary = await screen.findByRole('alert')
-      expect(summary).toHaveTextContent('Add the opening interest rate, effective on the drawdown date')
+      expect(summary).toHaveTextContent('Add the opening interest rate, effective on the disbursal date')
       expect(summary).not.toHaveTextContent('Correct')
       const dialog = await openDialog(user)
-      expect(within(dialog).getByRole('alert')).toHaveTextContent('Add the opening interest rate, effective on the drawdown date')
+      expect(within(dialog).getByRole('alert')).toHaveTextContent('Add the opening interest rate, effective on the disbursal date')
     })
     it.each([
       ['500', problem(500)],
@@ -458,20 +458,20 @@ describe('LoanDetailsForm (editing)', () => {
 
       expect(server.requests.filter((request) => request.method === 'PUT')).toHaveLength(0)
       const summary = screen.getByRole('alert')
-      expect(summary).toHaveTextContent('Add the opening interest rate, effective on the drawdown date')
+      expect(summary).toHaveTextContent('Add the opening interest rate, effective on the disbursal date')
       expect(summary).not.toHaveTextContent('Correct')
       const valueGroup = screen.getByRole('button', { name: 'Change Interest Rate' }).parentElement as HTMLElement
       expect(valueGroup).not.toHaveTextContent('Add the opening')
       dialog = await openDialog(user)
-      expect(within(dialog).getByRole('alert')).toHaveTextContent('Add the opening interest rate, effective on the drawdown date')
+      expect(within(dialog).getByRole('alert')).toHaveTextContent('Add the opening interest rate, effective on the disbursal date')
     })
 
-    it('moving Drawdown Date after the rates refuses Save and flags the out-of-range row in the dialog', async () => {
+    it('moving Disbursal Date after the rates refuses Save and flags the out-of-range row in the dialog', async () => {
       const mortgage = makeMortgage({ interestRateChanges: rates.slice(0, 2) })
       const server = installFakeApi([mortgage])
       const user = userEvent.setup()
       renderForm({ mortgage })
-      setDate('Drawdown Date', '2000-06-01')
+      setDate('Disbursal Date', '2000-06-01')
 
       await submit(user)
 
@@ -488,7 +488,7 @@ describe('LoanDetailsForm (editing)', () => {
       installFakeApi([mortgage])
       const user = userEvent.setup()
       renderForm({ mortgage })
-      setDate('Drawdown Date', '2000-06-01')
+      setDate('Disbursal Date', '2000-06-01')
       await user.clear(screen.getByLabelText('Name'))
 
       await submit(user)

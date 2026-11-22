@@ -24,7 +24,7 @@ public sealed class PeriodBalanceService(
     public async Task<PeriodBalancesResult> GetAsync(
         string ownerUserId,
         Guid accountId,
-        string? drawdownDate,
+        string? disbursalDate,
         string? frequency,
         string? duration,
         CancellationToken cancellationToken)
@@ -44,7 +44,7 @@ public sealed class PeriodBalanceService(
                     "The account does not exist or is not available to this user.");
             }
 
-            var schedule = ParseSchedule(drawdownDate, frequency, duration);
+            var schedule = ParseSchedule(disbursalDate, frequency, duration);
             mode = schedule is null ? "fallback" : "mortgage";
 
             var points = await dbContext.Transactions
@@ -62,7 +62,7 @@ public sealed class PeriodBalanceService(
             {
                 balances = PeriodBalances.Lookup(
                     points,
-                    PeriodBalances.MortgagePeriods(valid.DrawdownDate, valid.Duration, valid.Frequency));
+                    PeriodBalances.MortgagePeriods(valid.DisbursalDate, valid.Duration, valid.Frequency));
                 periodCount = valid.Duration + 1;
             }
             else
@@ -106,19 +106,19 @@ public sealed class PeriodBalanceService(
         }
     }
 
-    private static (DateOnly DrawdownDate, PaymentFrequency Frequency, int Duration)? ParseSchedule(
-        string? drawdownDate,
+    private static (DateOnly DisbursalDate, PaymentFrequency Frequency, int Duration)? ParseSchedule(
+        string? disbursalDate,
         string? frequency,
         string? duration)
     {
-        if (string.IsNullOrEmpty(drawdownDate) && string.IsNullOrEmpty(frequency) && string.IsNullOrEmpty(duration))
+        if (string.IsNullOrEmpty(disbursalDate) && string.IsNullOrEmpty(frequency) && string.IsNullOrEmpty(duration))
         {
             return null;
         }
 
         var errors = new Dictionary<string, string[]>(StringComparer.Ordinal);
         DateOnly? date = DateOnly.TryParseExact(
-            drawdownDate,
+            disbursalDate,
             DateFormat,
             CultureInfo.InvariantCulture,
             DateTimeStyles.None,
@@ -127,7 +127,7 @@ public sealed class PeriodBalanceService(
             : null;
         if (date is null)
         {
-            errors["drawdownDate"] = ["Enter a valid date"];
+            errors["disbursalDate"] = ["Enter a valid date"];
         }
 
         PaymentFrequency? parsedFrequency = frequency switch

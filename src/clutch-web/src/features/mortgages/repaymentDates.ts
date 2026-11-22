@@ -73,11 +73,11 @@ export function formatMessageDate(value: string): string {
 
 // Last repayment date as yyyy-MM-dd, or null when later than 31 Dec 9999 or the inputs are invalid.
 export function finalRepaymentDate(
-  drawdownDate: string,
+  disbursalDate: string,
   periods: number,
   frequency: PaymentFrequency,
 ): string | null {
-  const first = parseDate(drawdownDate)
+  const first = parseDate(disbursalDate)
   if (!first || !Number.isInteger(periods) || periods < 1) {
     return null
   }

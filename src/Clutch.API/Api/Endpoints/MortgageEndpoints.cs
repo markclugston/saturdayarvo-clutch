@@ -33,7 +33,7 @@ public static class MortgageEndpoints
 
         group.MapGet("/period-balances", async (
             string? accountId,
-            string? drawdownDate,
+            string? disbursalDate,
             string? frequency,
             string? duration,
             ClaimsPrincipal principal,
@@ -55,7 +55,7 @@ public static class MortgageEndpoints
             }
 
             var result = await service.GetAsync(
-                ownerUserId, id, drawdownDate, frequency, duration, cancellationToken);
+                ownerUserId, id, disbursalDate, frequency, duration, cancellationToken);
             return Results.Ok(result);
         });
 
@@ -137,7 +137,7 @@ public static class MortgageEndpoints
         string? Name,
         JsonElement? OpeningBalance,
         JsonElement? Duration,
-        string? DrawdownDate,
+        string? DisbursalDate,
         string? PaymentFrequency,
         List<RateChangeRequest?>? InterestRateChanges,
         int? Version,
@@ -148,7 +148,7 @@ public static class MortgageEndpoints
                 Name,
                 ToDecimal(OpeningBalance),
                 ToDecimal(Duration),
-                DrawdownDate,
+                DisbursalDate,
                 PaymentFrequency,
                 (InterestRateChanges ?? [])
                     .Select(change => change is null
@@ -189,7 +189,7 @@ public static class MortgageEndpoints
         string Name,
         decimal OpeningBalance,
         int Duration,
-        string DrawdownDate,
+        string DisbursalDate,
         string PaymentFrequency,
         List<InterestRateChangeResponse> InterestRateChanges,
         int Version,
@@ -201,7 +201,7 @@ public static class MortgageEndpoints
                 mortgage.Name,
                 mortgage.OpeningBalance,
                 mortgage.Duration,
-                FormatDate(mortgage.DrawdownDate),
+                FormatDate(mortgage.DisbursalDate),
                 mortgage.PaymentFrequency.ToString(),
                 mortgage.InterestRateChanges
                     .OrderBy(change => change.EffectiveDate)

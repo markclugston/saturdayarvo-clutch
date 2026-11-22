@@ -32,7 +32,7 @@ async function fillHeader(page: Page, name: string, balance: string, periods: st
   await page.getByLabel('Name', { exact: true }).fill(name)
   await page.getByLabel('Opening Balance').fill(balance)
   await page.getByLabel('Duration').fill(periods)
-  await page.getByLabel('Drawdown Date').fill('2000-01-01')
+  await page.getByLabel('Disbursal Date').fill('2000-01-01')
   await page.getByLabel('Payment Frequency').selectOption('Monthly')
 }
 
@@ -134,7 +134,7 @@ test('loan payoff timeline view is saved per user and shown on every load withou
         name: 'Home',
         openingBalance: 1000,
         duration: 12,
-        drawdownDate: '2000-01-01',
+        disbursalDate: '2000-01-01',
         paymentFrequency: 'Monthly',
         interestRateChanges: [{ newInterestRate: 4, effectiveDate: '2000-01-01' }],
       },
@@ -262,7 +262,7 @@ test('mortgages journey: add, reload, sign out and in, switch, rename, guard and
           name,
           openingBalance: 1000,
           duration: 12,
-          drawdownDate: '2000-01-01',
+          disbursalDate: '2000-01-01',
           paymentFrequency: 'Weekly',
           interestRateChanges: [{ newInterestRate: 4, effectiveDate: '2000-01-01' }],
         },

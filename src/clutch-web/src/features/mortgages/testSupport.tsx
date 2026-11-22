@@ -19,7 +19,7 @@ export function makeMortgage(overrides: Partial<Mortgage> = {}): Mortgage {
     name: `Mortgage ${counter}`,
     openingBalance: 500000,
     duration: 360,
-    drawdownDate: '2000-01-01',
+    disbursalDate: '2000-01-01',
     paymentFrequency: 'Monthly',
     interestRateChanges: [{ newInterestRate: 5.25, effectiveDate: '2000-01-01' }],
     version: 1,
@@ -251,7 +251,7 @@ export async function fillForm(user: ReturnType<typeof userEvent.setup>, values:
     await user.type(screen.getByLabelText('Duration'), values.periods)
   }
   if (values.first !== undefined) {
-    setDate('Drawdown Date', values.first)
+    setDate('Disbursal Date', values.first)
   }
   if (values.frequency !== undefined) {
     await user.selectOptions(screen.getByLabelText('Payment Frequency'), values.frequency)

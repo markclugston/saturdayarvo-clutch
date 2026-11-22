@@ -15,10 +15,10 @@ OpenTelemetry) is reused from the code (`docs/code-map.md`).
 
 ## R2: Where are period balances computed?
 
-- **Decision**: Server-side, new `GET /api/mortgages/period-balances`. Period 1 starts on the drawdown
-  date and runs one payment interval; period k starts on `RepaymentDates.FinalRepaymentDate(drawdown, k, frequency)`
-  (k = 1 is the drawdown date), so the end of period k is the start of period k + 1 minus one day, and the
-  last period (duration + 1) starts and ends on `FinalRepaymentDate(drawdown, duration + 1, ...)`, one interval
+- **Decision**: Server-side, new `GET /api/mortgages/period-balances`. Period 1 starts on the disbursal
+  date and runs one payment interval; period k starts on `RepaymentDates.FinalRepaymentDate(disbursal, k, frequency)`
+  (k = 1 is the disbursal date), so the end of period k is the start of period k + 1 minus one day, and the
+  last period (duration + 1) starts and ends on `FinalRepaymentDate(disbursal, duration + 1, ...)`, one interval
   after the last repayment. Weekly,
   fortnightly and month-end-clamped monthly rules stay in one place (ARC-001).
 - **Rationale**: Transactions are cursor-paged, so a client computation would page the whole history.

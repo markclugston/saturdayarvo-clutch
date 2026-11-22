@@ -15,11 +15,11 @@ Query:
 | Name | Rules |
 |---|---|
 | `accountId` | Required GUID; the caller's account, else 404 `Account not found.` |
-| `drawdownDate`, `frequency`, `duration` | All three or none. `yyyy-MM-dd`; `Weekly`/`Fortnightly`/`Monthly`; whole number ≥ 1. Any other mix or value: 400 with field keys `drawdownDate`, `frequency`, `duration` |
+| `disbursalDate`, `frequency`, `duration` | All three or none. `yyyy-MM-dd`; `Weekly`/`Fortnightly`/`Monthly`; whole number ≥ 1. Any other mix or value: 400 with field keys `disbursalDate`, `frequency`, `duration` |
 
 Mode:
 
-- With the three: periods 1..duration + 1 (period 1 starts on `drawdownDate`; it ends one payment interval
+- With the three: periods 1..duration + 1 (period 1 starts on `disbursalDate`; it ends one payment interval
   later; period k starts k - 1 intervals after it; the last period is the single day the last interval ends).
 - Without: monthly fallback (research R6).
 

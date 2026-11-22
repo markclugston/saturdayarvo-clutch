@@ -75,7 +75,7 @@ public sealed class MortgageService(
                     valid2.Name,
                     valid2.OpeningBalance,
                     valid2.Duration,
-                    valid2.DrawdownDate,
+                    valid2.DisbursalDate,
                     valid2.PaymentFrequency,
                     valid2.RateChanges,
                     valid2.AccountId,
@@ -166,7 +166,7 @@ public sealed class MortgageService(
                 update.Name,
                 update.OpeningBalance,
                 update.Duration,
-                update.DrawdownDate,
+                update.DisbursalDate,
                 update.PaymentFrequency,
                 update.RateChanges,
                 update.AccountId);
