@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { AmortizationSchedule } from './AmortizationSchedule'
 
 describe('AmortizationSchedule', () => {
@@ -26,10 +26,20 @@ describe('AmortizationSchedule', () => {
   })
 
   it('renders later rows after scrolling and keeps the header', () => {
-    render(<AmortizationSchedule duration={1000} />)
-    const scroller = screen.getByRole('table').parentElement as HTMLElement
+    // The content area scrolls (not the schedule): 500 rows have moved above its top edge.
+    render(
+      <div data-testid="scroller" style={{ overflowY: 'auto' }}>
+        <AmortizationSchedule duration={1000} />
+      </div>,
+    )
+    const scroller = screen.getByTestId('scroller')
+    const rect = (top: number) => ({ top }) as DOMRect
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function mock(this: HTMLElement) {
+      return this === scroller ? rect(0) : rect(-40 * 500)
+    })
 
-    fireEvent.scroll(scroller, { target: { scrollTop: 40 * 500 } })
+    fireEvent.scroll(scroller)
+    vi.restoreAllMocks()
 
     const rows = within(screen.getByRole('table')).getAllByRole('row')
     expect(rows[0]).toHaveAttribute('aria-rowindex', '1')

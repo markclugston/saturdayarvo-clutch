@@ -9,10 +9,10 @@ type ContentPanelProps = ComponentPropsWithoutRef<'main'> & {
 export function ContentPanel({ className, children, wide = false, ...props }: ContentPanelProps) {
   return (
     <main
-      className={cn('m-2 min-h-0 min-w-0 flex-1 overflow-y-auto rounded-panel bg-content p-4 lg:m-3 xl:p-6', className)}
+      className={cn('m-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto rounded-panel bg-content p-4 lg:m-3 xl:p-6', className)}
       {...props}
     >
-      <div className={cn('mx-auto w-full', !wide && 'max-w-5xl')}>{children}</div>
+      <div className={cn('mx-auto flex w-full flex-1 flex-col', !wide && 'max-w-5xl')}>{children}</div>
     </main>
   )
 }

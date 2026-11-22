@@ -129,7 +129,7 @@ export function MortgagesPage({ userId }: MortgagesPageProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-1 flex-col gap-4">
       <MortgageTabs
         mortgages={tabMortgages}
         onAdd={() => setSelectedId('new')}

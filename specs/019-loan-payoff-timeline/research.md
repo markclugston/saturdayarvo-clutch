@@ -96,6 +96,8 @@ preference (`NavigationPreferenceEndpoints.cs`, `NavigationPreferenceService.cs`
   as body content. Those two components lose their own card `section` and `h2` (content otherwise
   unchanged, FR-002). The two-column grid in `MortgagesPage.tsx` is removed (FR-001).
 
+- **Height (FR-013)**: `ContentPanel` and its inner wrapper become flex columns, `MortgagesPage`, the group and `BurnDownChart` use `flex-1`, and `AmortizationSchedule` windows its rows against the nearest scrolling ancestor (the content area) instead of its own `h-96` scroller.
+
 ## R8 Observability
 
 - **Decision**: Extend `PreferenceMetrics` with

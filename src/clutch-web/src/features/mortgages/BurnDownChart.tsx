@@ -12,12 +12,13 @@ const GUIDES = [60, 110, 160, 210]
 /** Skeleton of the balance-over-time chart. No values exist yet, so no line is drawn. */
 export function BurnDownChart({ saved }: BurnDownChartProps) {
   return (
-    <div className="min-w-0">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       {saved ? (
         <>
+          <div className="relative min-h-64 flex-1">
           <svg
             aria-label="Line chart of the mortgage balance over time for the Bank schedule. The values have not been calculated yet."
-            className="h-auto w-full text-fg-secondary"
+            className="absolute inset-0 size-full text-fg-secondary"
             role="img"
             viewBox="0 0 600 300"
           >
@@ -55,6 +56,7 @@ export function BurnDownChart({ saved }: BurnDownChartProps) {
               </text>
             </g>
           </svg>
+          </div>
           <p className="mt-2 text-sm text-fg-secondary">{NOT_CALCULATED_CHART_MESSAGE}</p>
         </>
       ) : (

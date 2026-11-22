@@ -23,6 +23,10 @@
 - Q: When the user switches the Loan Payoff Timeline view, should every switch be saved straight away, even when the user switches several times in a row? → A: Yes. Every switch starts a save straight away. No switch is skipped, delayed or merged, and if saves overlap the last view the user chose is the one that ends up saved.
 - Q: What should the switch button look like, and how should it tell users which view is showing? → A: A small icon-only button, the same size as the trash can (delete) icon buttons used across the app, showing the familiar circular arrows "switch" icon. Its accessible name and tooltip say which view it will show. It has no pressed state; a visually hidden status line tells screen readers which view is showing.
 
+### Session 2026-11-22 (convergence)
+
+- Q: The working tree makes the Loan Payoff Timeline group fill the page height (shared content area becomes a flex column; the schedule scrolls with the page instead of in its own box). Keep it? → A: Keep it, and record it as FR-013.
+
 ### Session 2026-11-22 (implementation review)
 
 - Q: Should a failed save of the view show the error toast? → A: No. Toasts are only for when the user saves data. A failed view save shows nothing; the chosen view stays for the visit.
@@ -91,6 +95,7 @@ As a signed-in user, the view I last chose is saved against my account, so every
 - **FR-010**: A failure to save MUST NOT block the screen and MUST NOT show a message (toasts are only for saving data); the chosen view MUST remain in effect for the current session.
 - **FR-011**: The saved preference MUST only accept the values Burndown or Schedule; any other value MUST be rejected.
 - **FR-012**: The switch button MUST change the view visibly within 500 milliseconds of activation, regardless of how long saving takes.
+- **FR-013**: The Loan Payoff Timeline group MUST grow to fill the height left in the content area below the Details group. The burndown chart fills the group; the amortization schedule scrolls with the content area (not in a separate scroll box) and keeps its header row, columns and rows unchanged (FR-002). The shared content area change MUST NOT alter the layout of other screens.
 
 ### Key Entities *(include if feature involves data)*
 
