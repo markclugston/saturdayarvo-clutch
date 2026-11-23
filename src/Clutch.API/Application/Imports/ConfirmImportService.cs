@@ -171,7 +171,7 @@ public sealed class ConfirmImportService(
             return await RollbackOutcomeAsync(transaction, AccountNotFound());
         }
 
-        var reviewRows = review.Rows.ToArray();
+        var reviewRows = review.Rows.OrderBy(row => row.SourceRowNumber).ToArray();
         if (reviewRows.Length == 0)
         {
             return await RollbackOutcomeAsync(transaction, InvalidStagedData());
@@ -179,18 +179,24 @@ public sealed class ConfirmImportService(
 
         var firstDate = reviewRows.Min(row => row.TransactionDate);
         var lastDate = reviewRows.Max(row => row.TransactionDate);
-        var existingTransactions = await dbContext.Transactions
+        var savedRows = await dbContext.Transactions
             .AsNoTracking()
             .Where(candidate =>
                 candidate.AccountId == account.Id
                 && candidate.TransactionDate >= firstDate
                 && candidate.TransactionDate <= lastDate)
-            .Select(candidate => new TransactionFingerprint(
-                candidate.TransactionDate,
-                candidate.Description,
-                candidate.Amount,
-                candidate.Direction))
+            .Select(candidate => new SavedRow(
+                new TransactionFingerprint(
+                    candidate.TransactionDate,
+                    candidate.Description,
+                    candidate.Amount,
+                    candidate.Direction),
+                candidate.Sequence))
             .ToListAsync(cancellationToken);
+        var existingTransactions = savedRows.Select(saved => saved.Fingerprint).ToList();
+        var maxSequenceByDate = savedRows
+            .GroupBy(saved => saved.Fingerprint.TransactionDate)
+            .ToDictionary(group => group.Key, group => group.Max(saved => saved.Sequence));
         var previouslyFlaggedRows = reviewRows
             .Where(row => row.IsPossibleDuplicate)
             .Select(row => row.SourceRowNumber)
@@ -220,24 +226,45 @@ public sealed class ConfirmImportService(
 
         var transactions = new List<Transaction>(reviewRows.Length);
         var now = timeProvider.GetUtcNow();
-        foreach (var row in reviewRows)
-        {
-            if (!Transaction.TryCreate(
-                account.Id,
+        // Each date's rows go in chronological order after that date's saved rows; saved rows are
+        // never renumbered (FR-002). Balances only decide the file direction.
+        var orderRows = reviewRows
+            .Select(row => new ImportOrderRow(
+                row.SourceRowNumber,
                 row.TransactionDate,
-                row.Description,
                 row.Amount,
                 row.Direction,
-                row.Balance,
-                currency,
-                now,
-                out var newTransaction)
-                || newTransaction is null)
+                row.Balance))
+            .ToArray();
+        var groups = ImportOrdering.ChronologicalGroups(
+            orderRows,
+            ImportOrdering.InferDirection(orderRows));
+        var rowsByNumber = reviewRows.ToDictionary(row => row.SourceRowNumber);
+        foreach (var (date, group) in groups.OrderBy(entry => entry.Key))
+        {
+            var sequence = maxSequenceByDate.GetValueOrDefault(date);
+            foreach (var orderedRow in group)
             {
-                return await RollbackOutcomeAsync(transaction, InvalidStagedData());
-            }
+                sequence++;
+                var row = rowsByNumber[orderedRow.SourceRowNumber];
+                if (!Transaction.TryCreate(
+                    account.Id,
+                    row.TransactionDate,
+                    row.Description,
+                    row.Amount,
+                    row.Direction,
+                    row.Balance,
+                    sequence,
+                    currency,
+                    now,
+                    out var newTransaction)
+                    || newTransaction is null)
+                {
+                    return await RollbackOutcomeAsync(transaction, InvalidStagedData());
+                }
 
-            transactions.Add(newTransaction);
+                transactions.Add(newTransaction);
+            }
         }
 
         if (transactions.Count == 0)
@@ -384,6 +411,8 @@ public sealed class ConfirmImportService(
             title,
             detail,
             new Dictionary<string, string[]> { ["code"] = [code] });
+
+    private sealed record SavedRow(TransactionFingerprint Fingerprint, int Sequence);
 
     private sealed record ConfirmOutcome(
         ConfirmImportResponse? Response,

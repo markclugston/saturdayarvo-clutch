@@ -64,7 +64,7 @@ public static class PeriodBalances
         return points.Select(point => point with { Balance = -point.Balance }).ToList();
     }
 
-    // points must be ordered by date then Id (the Transactions list order, reversed). A period holds the last
+    // points must be ordered by date then Sequence (the Transactions list order, reversed). A period holds the last
     // point on or before its end; periods before the first point are blank. Enumeration stops at the first
     // period that starts after the latest point (no carrying forward), and trailing blanks are dropped.
     public static IReadOnlyList<decimal?> Lookup(

@@ -46,18 +46,6 @@ public sealed class ImportCoordinationMigrationTests(SqlServerFixture fixture)
                 1,
                 """{"dateColumn":0}""",
                 DateTimeOffset.UtcNow));
-            var currency = Currency.All.Single(candidate => candidate.Code == "AUD");
-            Assert.True(Transaction.TryCreate(
-                account.Id,
-                new DateOnly(2025, 1, 15),
-                "Existing transaction",
-                42.50m,
-                TransactionDirection.Outgoing,
-                100.25m,
-                currency,
-                DateTimeOffset.UtcNow,
-                out var transaction));
-            dbContext.Transactions.Add(transaction!);
             var audit = new Audit(
                 ownerUserId,
                 DateTimeOffset.UtcNow,
@@ -68,6 +56,10 @@ public sealed class ImportCoordinationMigrationTests(SqlServerFixture fixture)
             var reviewId = Guid.NewGuid();
             Assert.True(account.TryAcquireImport(reviewId));
             await dbContext.SaveChangesAsync();
+            // Inserted with SQL because the current model has a column the preceding schema lacks.
+            var transactionId = Guid.NewGuid();
+            await dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"INSERT INTO Transactions (Id, AccountId, TransactionDate, Description, Amount, Direction, Balance, CreatedAtUtc) VALUES ({transactionId}, {account.Id}, {new DateOnly(2025, 1, 15)}, {"Existing transaction"}, {42.50m}, {"Outgoing"}, {100.25m}, {DateTimeOffset.UtcNow})");
             var createdAt = DateTimeOffset.UtcNow.AddMinutes(-1);
             var expiresAt = createdAt.AddMinutes(5);
             const string mappingJson = """{"dateColumn":0}""";
@@ -99,7 +91,7 @@ public sealed class ImportCoordinationMigrationTests(SqlServerFixture fixture)
                 .Select(settings => settings.SettingsJson)
                 .SingleAsync());
             var preservedTransaction = await dbContext.Transactions.SingleAsync(
-                candidate => candidate.Id == transaction!.Id);
+                candidate => candidate.Id == transactionId);
             Assert.Equal(100.25m, preservedTransaction.Balance);
             Assert.Equal(audit.Description, await dbContext.Audits
                 .Where(candidate => candidate.Id == audit.Id)

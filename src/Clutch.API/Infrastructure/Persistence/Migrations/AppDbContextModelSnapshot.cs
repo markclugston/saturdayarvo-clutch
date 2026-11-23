@@ -365,18 +365,24 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                         .IsUnicode(false)
                         .HasColumnType("varchar(16)");
 
+                    b.Property<int>("Sequence")
+                        .HasColumnType("int");
+
                     b.Property<DateOnly>("TransactionDate")
                         .HasColumnType("date");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AccountId", "TransactionDate");
+                    b.HasIndex("AccountId", "TransactionDate", "Sequence")
+                        .IsUnique();
 
                     b.ToTable("Transactions", null, t =>
                         {
                             t.HasCheckConstraint("CK_Transactions_NonBlankDescription", "LEN(LTRIM(RTRIM([Description]))) > 0");
 
                             t.HasCheckConstraint("CK_Transactions_NonNegativeAmount", "[Amount] >= 0");
+
+                            t.HasCheckConstraint("CK_Transactions_PositiveSequence", "[Sequence] >= 1");
 
                             t.HasCheckConstraint("CK_Transactions_ValidDirection", "[Direction] IN ('Incoming', 'Outgoing')");
                         });

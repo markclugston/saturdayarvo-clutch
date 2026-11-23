@@ -22,6 +22,7 @@ public sealed class Transaction
         decimal amount,
         TransactionDirection direction,
         decimal? balance,
+        int sequence,
         DateTimeOffset createdAtUtc)
     {
         Id = Guid.NewGuid();
@@ -31,6 +32,7 @@ public sealed class Transaction
         Amount = amount;
         Direction = direction;
         Balance = balance;
+        Sequence = sequence;
         CreatedAtUtc = createdAtUtc;
     }
 
@@ -48,6 +50,12 @@ public sealed class Transaction
 
     public decimal? Balance { get; private set; }
 
+    /// <summary>
+    /// Chronological position among the account's transactions on <see cref="TransactionDate"/>
+    /// (1 = earliest). Unique per account and date; gaps are allowed. Set only at creation.
+    /// </summary>
+    public int Sequence { get; private set; }
+
     public DateTimeOffset CreatedAtUtc { get; private set; }
 
     public static bool TryCreate(
@@ -57,6 +65,7 @@ public sealed class Transaction
         decimal amount,
         TransactionDirection direction,
         decimal? balance,
+        int sequence,
         Currency currency,
         DateTimeOffset createdAtUtc,
         out Transaction? transaction)
@@ -66,6 +75,7 @@ public sealed class Transaction
             || amount < 0
             || decimal.Round(amount, currency.MinorUnits) != amount
             || (balance is not null && decimal.Round(balance.Value, currency.MinorUnits) != balance.Value)
+            || sequence < 1
             || !Enum.IsDefined(direction))
         {
             transaction = null;
@@ -79,6 +89,7 @@ public sealed class Transaction
             amount,
             direction,
             balance,
+            sequence,
             createdAtUtc);
         return true;
     }

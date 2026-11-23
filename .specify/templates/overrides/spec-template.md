@@ -54,7 +54,7 @@ Tick each that applies, so plan can pick requirement IDs without rereading the s
 
 - [ ] Stores, changes or deletes data (DOT-002, OPS-001 migrations)
 - [ ] Creates or reads audit records (AUD-001)
-- [ ] Adds or changes endpoints, auth or input handling (SEC-001)
+- [ ] Adds or changes endpoints, auth or input handling (SEC-001, SEC-004)
 - [ ] Handles personal, payment or financial data (SEC-003)
 - [ ] Changes UI in clutch-web (WEB-001, style guide)
 

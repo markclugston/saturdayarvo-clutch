@@ -4,6 +4,7 @@ using System.Text.Json;
 using Clutch.API.Infrastructure.Persistence;
 using Clutch.API.Tests.Integration.Accounts;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Clutch.API.Tests.Integration.Mortgages;
@@ -125,6 +126,9 @@ internal static class MortgageTestSupport
         await using var scope = fixture.Factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         Assert.True(Clutch.API.Domain.Shared.Currency.TryGet("AUD", out var currency));
+        var nextSequence = (await db.Transactions
+            .Where(existing => existing.AccountId == accountId && existing.TransactionDate == date)
+            .MaxAsync(existing => (int?)existing.Sequence) ?? 0) + 1;
         Assert.True(Clutch.API.Domain.Transactions.Transaction.TryCreate(
             accountId,
             date,
@@ -132,6 +136,7 @@ internal static class MortgageTestSupport
             1m,
             Clutch.API.Domain.Transactions.TransactionDirection.Incoming,
             balance,
+            nextSequence,
             currency!,
             DateTimeOffset.UtcNow,
             out var transaction));

@@ -15,6 +15,7 @@ public sealed class TransactionService(
 {
     private const int DefaultPageSize = 50;
     private const int MaximumPageSize = 100;
+    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private static readonly TimeSpan DeleteTimeout = TimeSpan.FromSeconds(8);
 
     public async Task<TransactionPageResponse> GetPageAsync(
@@ -40,10 +41,12 @@ public sealed class TransactionService(
         var size = pageSize ?? DefaultPageSize;
         if (size is < 1 or > MaximumPageSize)
         {
+            var message = $"Page size must be between 1 and {MaximumPageSize}.";
             throw new ApiProblemException(
                 StatusCodes.Status400BadRequest,
                 "The page size is invalid.",
-                $"Page size must be between 1 and {MaximumPageSize}.");
+                message,
+                new Dictionary<string, string[]> { ["pageSize"] = [message] });
         }
 
         var query = dbContext.Transactions
@@ -55,16 +58,17 @@ public sealed class TransactionService(
             query = query.Where(transaction =>
                 transaction.TransactionDate < parsedCursor.TransactionDate
                 || transaction.TransactionDate == parsedCursor.TransactionDate
-                    && transaction.Id.CompareTo(parsedCursor.Id) < 0);
+                    && transaction.Sequence < parsedCursor.Sequence);
         }
 
         var values = await query
             .OrderByDescending(transaction => transaction.TransactionDate)
-            .ThenByDescending(transaction => transaction.Id)
+            .ThenByDescending(transaction => transaction.Sequence)
             .Take(size + 1)
             .Select(transaction => new TransactionProjection(
                 transaction.Id,
                 transaction.TransactionDate,
+                transaction.Sequence,
                 transaction.Description,
                 transaction.Amount,
                 transaction.Direction,
@@ -77,7 +81,7 @@ public sealed class TransactionService(
         }
 
         var nextCursor = hasMore && values.Count > 0
-            ? EncodeCursor(values[^1].TransactionDate, values[^1].Id)
+            ? EncodeCursor(values[^1].TransactionDate, values[^1].Sequence)
             : null;
         return new TransactionPageResponse(
             values.Select(value => new TransactionListItem(
@@ -160,9 +164,9 @@ public sealed class TransactionService(
         }
     }
 
-    private static string EncodeCursor(DateOnly date, Guid id)
+    private static string EncodeCursor(DateOnly date, int sequence)
     {
-        var value = $"{date:yyyy-MM-dd}|{id:N}";
+        var value = string.Create(CultureInfo.InvariantCulture, $"{date:yyyy-MM-dd}|{sequence}");
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(value))
             .TrimEnd('=')
             .Replace('+', '-')
@@ -171,7 +175,7 @@ public sealed class TransactionService(
 
     private static TransactionCursor DecodeCursor(string cursor)
     {
-        if (cursor.Length > 128)
+        if (cursor.Length > 128 || !cursor.All(IsBase64UrlCharacter))
         {
             throw InvalidCursor();
         }
@@ -180,7 +184,8 @@ public sealed class TransactionService(
         {
             var normalized = cursor.Replace('-', '+').Replace('_', '/');
             normalized = normalized.PadRight(normalized.Length + (4 - normalized.Length % 4) % 4, '=');
-            var value = Encoding.UTF8.GetString(Convert.FromBase64String(normalized));
+            var bytes = Convert.FromBase64String(normalized);
+            var value = StrictUtf8.GetString(bytes);
             var pieces = value.Split('|', StringSplitOptions.None);
             if (pieces.Length == 2
                 && DateOnly.TryParseExact(
@@ -189,12 +194,23 @@ public sealed class TransactionService(
                     CultureInfo.InvariantCulture,
                     DateTimeStyles.None,
                     out var date)
-                && Guid.TryParseExact(pieces[1], "N", out var id))
+                && pieces[1].All(char.IsAsciiDigit)
+                && int.TryParse(
+                    pieces[1],
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out var sequence)
+                && sequence >= 1)
             {
-                return new TransactionCursor(date, id);
+                var parsed = new TransactionCursor(date, sequence);
+                // Only cursors this service issues are accepted: re-encoding must give the same text.
+                if (EncodeCursor(parsed.TransactionDate, parsed.Sequence) == cursor)
+                {
+                    return parsed;
+                }
             }
         }
-        catch (FormatException)
+        catch (Exception exception) when (exception is FormatException or ArgumentException)
         {
             // Invalid opaque cursors return a generic validation response.
         }
@@ -202,17 +218,25 @@ public sealed class TransactionService(
         throw InvalidCursor();
     }
 
+    private static bool IsBase64UrlCharacter(char value) =>
+        char.IsAsciiLetterOrDigit(value) || value is '-' or '_';
+
     private static ApiProblemException InvalidCursor() =>
         new(
             StatusCodes.Status400BadRequest,
             "The transaction cursor is invalid.",
-            "Request a page without a cursor and try again.");
+            "Request a page without a cursor and try again.",
+            new Dictionary<string, string[]>
+            {
+                ["cursor"] = ["The page cursor is not valid. Request the first page without a cursor."],
+            });
 
-    private sealed record TransactionCursor(DateOnly TransactionDate, Guid Id);
+    private sealed record TransactionCursor(DateOnly TransactionDate, int Sequence);
 
     private sealed record TransactionProjection(
         Guid Id,
         DateOnly TransactionDate,
+        int Sequence,
         string Description,
         decimal Amount,
         TransactionDirection Direction,

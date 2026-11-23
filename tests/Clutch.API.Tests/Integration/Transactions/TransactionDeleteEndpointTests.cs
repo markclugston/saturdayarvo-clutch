@@ -297,6 +297,9 @@ public sealed class TransactionDeleteEndpointTests(SqlServerFixture fixture)
         await using var scope = fixture.Factory.Services.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         Assert.True(Currency.TryGet("AUD", out var currency));
+        var nextSequence = (await dbContext.Transactions
+            .Where(existing => existing.AccountId == accountId && existing.TransactionDate == new DateOnly(2026, 2, 1))
+            .MaxAsync(existing => (int?)existing.Sequence) ?? 0) + 1;
         Assert.True(Transaction.TryCreate(
             accountId,
             new DateOnly(2026, 2, 1),
@@ -304,6 +307,7 @@ public sealed class TransactionDeleteEndpointTests(SqlServerFixture fixture)
             5.55m,
             TransactionDirection.Outgoing,
             50m,
+            nextSequence,
             currency!,
             DateTimeOffset.UtcNow,
             out var transaction));

@@ -322,8 +322,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 table.HasCheckConstraint(
                     "CK_Transactions_NonBlankDescription",
                     "LEN(LTRIM(RTRIM([Description]))) > 0");
+                table.HasCheckConstraint(
+                    "CK_Transactions_PositiveSequence",
+                    "[Sequence] >= 1");
             });
             entity.HasKey(transaction => transaction.Id);
+            entity.Property(transaction => transaction.Sequence)
+                .IsRequired();
             entity.Property(transaction => transaction.TransactionDate)
                 .HasColumnType("date");
             entity.Property(transaction => transaction.Description)
@@ -344,7 +349,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             {
                 transaction.AccountId,
                 transaction.TransactionDate,
-            });
+                transaction.Sequence,
+            }).IsUnique();
             entity.HasOne<Account>()
                 .WithMany()
                 .HasForeignKey(transaction => transaction.AccountId)

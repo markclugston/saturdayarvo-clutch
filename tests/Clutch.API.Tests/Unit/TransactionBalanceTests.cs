@@ -27,7 +27,27 @@ public sealed class TransactionBalanceTests
         Assert.Null(transaction);
     }
 
-    private static bool Create(decimal? balance, out Transaction? transaction)
+    [Theory]
+    [InlineData(1)]
+    [InlineData(7)]
+    [InlineData(int.MaxValue)]
+    public void TryCreate_accepts_a_sequence_of_one_or_more(int sequence)
+    {
+        Assert.True(Create(null, out var transaction, sequence));
+        Assert.Equal(sequence, transaction!.Sequence);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(int.MinValue)]
+    public void TryCreate_rejects_a_sequence_below_one(int sequence)
+    {
+        Assert.False(Create(null, out var transaction, sequence));
+        Assert.Null(transaction);
+    }
+
+    private static bool Create(decimal? balance, out Transaction? transaction, int sequence = 1)
     {
         var currency = new Currency("AUD", "Australian dollar", 2);
         return Transaction.TryCreate(
@@ -37,6 +57,7 @@ public sealed class TransactionBalanceTests
             10.00m,
             TransactionDirection.Outgoing,
             balance,
+            sequence,
             currency,
             DateTimeOffset.UtcNow,
             out transaction);

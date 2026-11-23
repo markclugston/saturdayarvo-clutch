@@ -39,6 +39,7 @@ describe('ImportReviewTable', () => {
 
     const headers = screen.getAllByRole('columnheader').map((header) => header.textContent)
     expect(headers.slice(-3)).toEqual(['Amount', 'Balance', 'Warning'])
+    expect(headers).not.toContain('Row')
     expect(screen.getByRole('columnheader', { name: 'Amount' })).toHaveClass('text-right')
     expect(screen.getByRole('columnheader', { name: 'Balance' })).toHaveClass('text-right')
     const cells = within(screen.getAllByRole('row')[1]!).getAllByRole('cell')

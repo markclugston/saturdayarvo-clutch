@@ -754,7 +754,7 @@ public sealed class ImportReviewService(
             review.Rows.Count,
             review.DuplicateConfirmationRequired,
             review.ExpiresAtUtc,
-            review.Rows.Select(row => new ImportReviewRowResponse(
+            review.Rows.OrderBy(row => row.SourceRowNumber).Select(row => new ImportReviewRowResponse(
                 row.SourceRowNumber,
                 row.TransactionDate,
                 row.Description,

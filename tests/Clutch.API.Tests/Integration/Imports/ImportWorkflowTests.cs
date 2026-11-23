@@ -285,6 +285,28 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
             items.Select(item => item.TransactionDate));
     }
 
+    [Theory]
+    [Trait("Category", "SqlServer")]
+    [InlineData(0)]
+    [InlineData(101)]
+    public async Task Invalid_transaction_page_size_returns_field_level_error(int pageSize)
+    {
+        using var client = CreateClient();
+        await RegisterAndSignInAsync(client);
+        var account = await CreateAccountAsync(client, "Page size account", "AUD");
+
+        using var response = await client.GetAsync(
+            $"/api/accounts/{account.Id}/transactions?pageSize={pageSize}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("The page size is invalid.", json.RootElement.GetProperty("title").GetString());
+        Assert.Equal(
+            ["Page size must be between 1 and 100."],
+            json.RootElement.GetProperty("errors").GetProperty("pageSize")
+                .EnumerateArray().Select(value => value.GetString()));
+    }
+
     [Fact]
     [Trait("Category", "SqlServer")]
     public async Task Merchant_reference_is_preserved_in_review_and_saved_transaction()

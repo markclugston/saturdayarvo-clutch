@@ -204,6 +204,7 @@ public sealed class TransactionServiceDeleteTests(SqlServerFixture fixture)
             12.34m,
             TransactionDirection.Outgoing,
             100m,
+            1,
             currency!,
             DateTimeOffset.UtcNow,
             out var transaction));

@@ -51,7 +51,7 @@ public sealed class PeriodBalanceService(
                 .AsNoTracking()
                 .Where(transaction => transaction.AccountId == accountId && transaction.Balance != null)
                 .OrderBy(transaction => transaction.TransactionDate)
-                .ThenBy(transaction => transaction.Id)
+                .ThenBy(transaction => transaction.Sequence)
                 .Select(transaction => new BalancePoint(transaction.TransactionDate, transaction.Balance!.Value))
                 .ToListAsync(cancellationToken);
             points = PeriodBalances.Orient(points).ToList();

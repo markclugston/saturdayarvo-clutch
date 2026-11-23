@@ -9,6 +9,7 @@ namespace Clutch.API.Tests.Integration.Persistence;
 public sealed class MortgageAccountLinkMigrationTests(SqlServerFixture fixture)
 {
     private const string PrecedingMigration = "20261121222202_AddLoanPayoffTimelinePreferences";
+    private const string AccountLinkMigration = "20261122041510_MortgageAccountLink";
 
     [Fact]
     [Trait("Category", "SqlServer")]
@@ -34,7 +35,7 @@ public sealed class MortgageAccountLinkMigrationTests(SqlServerFixture fixture)
             var accountColumnsBefore = await ColumnNamesAsync(dbContext, "Accounts");
             var transactionColumnsBefore = await ColumnNamesAsync(dbContext, "Transactions");
 
-            await dbContext.Database.MigrateAsync();
+            await dbContext.Database.MigrateAsync(AccountLinkMigration);
 
             Assert.Equal(1, await dbContext.Database.SqlQuery<int>(
                 $"SELECT COUNT(*) AS [Value] FROM sys.columns WHERE [object_id] = OBJECT_ID(N'dbo.Mortgages') AND [name] = 'AccountId' AND is_nullable = 1")

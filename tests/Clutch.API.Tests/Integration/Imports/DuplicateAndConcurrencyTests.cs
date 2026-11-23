@@ -378,6 +378,11 @@ public sealed class DuplicateAndConcurrencyTests(SqlServerFixture fixture)
     {
         Assert.True(Currency.TryGet("AUD", out var currency));
         Assert.NotNull(currency);
+        await using var scope = fixture.Factory.Services.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var nextSequence = (await dbContext.Transactions
+            .Where(existing => existing.AccountId == accountId && existing.TransactionDate == new DateOnly(2025, 1, 15))
+            .MaxAsync(existing => (int?)existing.Sequence) ?? 0) + 1;
         Assert.True(Transaction.TryCreate(
             accountId,
             new DateOnly(2025, 1, 15),
@@ -385,13 +390,12 @@ public sealed class DuplicateAndConcurrencyTests(SqlServerFixture fixture)
             amount,
             direction,
             null,
+            nextSequence,
             currency,
             DateTimeOffset.UtcNow,
             out var transaction));
         Assert.NotNull(transaction);
 
-        await using var scope = fixture.Factory.Services.CreateAsyncScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         dbContext.Transactions.Add(transaction);
         await dbContext.SaveChangesAsync();
     }

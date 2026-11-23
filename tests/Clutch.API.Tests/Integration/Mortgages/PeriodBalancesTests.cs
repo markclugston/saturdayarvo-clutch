@@ -5,6 +5,7 @@ using Clutch.API.Infrastructure.Persistence;
 using Clutch.API.Tests.Integration.Accounts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using static Clutch.API.Tests.Integration.Imports.ImportOrderTestSupport;
 using static Clutch.API.Tests.Integration.Mortgages.MortgageTestSupport;
 
 namespace Clutch.API.Tests.Integration.Mortgages;
@@ -38,6 +39,69 @@ public sealed class PeriodBalancesTests(SqlServerFixture fixture)
         Assert.Equal(7, body.PeriodCount);
         // Period 1 = January; period 2 = February; later periods omitted.
         Assert.Equal<string?>(["1000.00", "800.00"], body.Balances);
+    }
+
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task The_period_end_balance_is_the_chronologically_last_transaction_of_the_day()
+    {
+        using var client = await SignedInClientAsync(fixture.Factory);
+        var accountId = await CreateAccountAsync(client);
+        var day = new DateOnly(2026, 1, 31);
+        await SeedTransactionAsync(fixture, accountId, day, 1000m);
+        await SeedTransactionAsync(fixture, accountId, day, 900m);
+        await SeedTransactionAsync(fixture, accountId, day, 800m);
+        // Ids that sort against the sequence, so an Id tiebreak would pick the wrong row.
+        await using (var scope = fixture.Factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var rows = await db.Transactions
+                .AsNoTracking()
+                .Where(transaction => transaction.AccountId == accountId)
+                .OrderBy(transaction => transaction.Sequence)
+                .Select(transaction => transaction.Id)
+                .ToListAsync();
+            var targets = new[]
+            {
+                Guid.Parse("ffffffff-ffff-ffff-ffff-ffffffffffff"),
+                Guid.Parse("80000000-0000-0000-0000-000000000000"),
+                Guid.Parse("00000000-0000-0000-0000-000000000001"),
+            };
+            for (var index = 0; index < rows.Count; index++)
+            {
+                var current = rows[index];
+                var target = targets[index];
+                await db.Database.ExecuteSqlInterpolatedAsync(
+                    $"UPDATE Transactions SET Id = {target} WHERE Id = {current}");
+            }
+        }
+
+        using var response = await GetAsync(client, $"accountId={accountId}&{Schedule()}");
+
+        var body = (await response.Content.ReadFromJsonAsync<BalancesDto>())!;
+        Assert.Equal<string?>(["800.00"], body.Balances);
+    }
+
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task A_newest_first_import_shows_the_chronologically_last_balance_at_period_end()
+    {
+        using var client = await SignedInClientAsync(fixture.Factory);
+        var accountId = await CreateAccountAsync(client);
+
+        // Top to bottom 800, 900, 1,000: the file runs newest first, so 800 is the day's last.
+        await ImportAsync(
+            client,
+            accountId,
+            Csv(
+                ("2026-01-31", "r1", "1", "800"),
+                ("2026-01-31", "r2", "1", "900"),
+                ("2026-01-31", "r3", "1", "1000")));
+
+        using var response = await GetAsync(client, $"accountId={accountId}&{Schedule()}");
+
+        var body = (await response.Content.ReadFromJsonAsync<BalancesDto>())!;
+        Assert.Equal<string?>(["800.00"], body.Balances);
     }
 
     [Fact]
@@ -178,7 +242,7 @@ public sealed class PeriodBalancesTests(SqlServerFixture fixture)
 
     [Fact]
     [Trait("Category", "SqlServer")]
-    public async Task Same_day_transactions_use_the_last_by_id_like_the_transactions_list()
+    public async Task Same_day_transactions_use_the_last_by_sequence_like_the_transactions_list()
     {
         using var client = await SignedInClientAsync(fixture.Factory);
         var accountId = await CreateAccountAsync(client);
@@ -190,7 +254,7 @@ public sealed class PeriodBalancesTests(SqlServerFixture fixture)
         var expected = await db.Transactions
             .Where(transaction => transaction.AccountId == accountId)
             .OrderByDescending(transaction => transaction.TransactionDate)
-            .ThenByDescending(transaction => transaction.Id)
+            .ThenByDescending(transaction => transaction.Sequence)
             .Select(transaction => transaction.Balance)
             .FirstAsync();
 
@@ -220,6 +284,7 @@ public sealed class PeriodBalancesTests(SqlServerFixture fixture)
                     1m,
                     Clutch.API.Domain.Transactions.TransactionDirection.Incoming,
                     100000m - index,
+                    1,
                     currency!,
                     DateTimeOffset.UtcNow,
                     out var transaction));
