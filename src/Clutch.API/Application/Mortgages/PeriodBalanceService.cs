@@ -63,7 +63,7 @@ public sealed class PeriodBalanceService(
                 balances = PeriodBalances.Lookup(
                     points,
                     PeriodBalances.MortgagePeriods(valid.DisbursalDate, valid.Duration, valid.Frequency));
-                periodCount = valid.Duration + 1;
+                periodCount = valid.Duration;
             }
             else
             {

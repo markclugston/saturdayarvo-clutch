@@ -5,7 +5,8 @@ import { ErrorMessage } from '@/components/ui/error-message'
 import { FloatingField } from '@/components/ui/floating-field'
 import { useUnsavedChanges } from '@/components/unsaved-changes/UnsavedChangesProvider'
 import { getAccounts } from '@/features/accounts/api'
-import type { Mortgage, PaymentFrequency } from '@/lib/api/schemas'
+import type { Mortgage } from '@/lib/api/schemas'
+import type { PaymentFrequency } from './repaymentDates'
 import {
   MortgageChangedError,
   MortgageGoneError,
@@ -315,7 +316,11 @@ export function LoanDetailsForm({
           change({ rows })
           // The "add the opening interest rate" message goes as soon as that rate exists.
           if (openingRowKey({ ...draft, rows }) !== undefined) {
-            setErrors(({ interestRateChanges: _cleared, ...rest }) => rest)
+            setErrors((current) => {
+              const rest = { ...current }
+              delete rest.interestRateChanges
+              return rest
+            })
           }
         }}
         saving={saving}

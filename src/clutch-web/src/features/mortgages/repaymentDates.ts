@@ -71,7 +71,9 @@ export function formatMessageDate(value: string): string {
   return `${parts.day} ${MONTH_NAMES[parts.month - 1] ?? ''} ${pad(parts.year, 4)}`
 }
 
-// Last repayment date as yyyy-MM-dd, or null when later than 31 Dec 9999 or the inputs are invalid.
+// Date of repayment `periods` (the last of `periods` repayments) as yyyy-MM-dd: the disbursal date plus
+// `periods` payment intervals, so repayment 1 is one interval after disbursal. Null when later than
+// 31 Dec 9999 or the inputs are invalid. Monthly dates are anchored on the disbursal day, clamped to month end.
 export function finalRepaymentDate(
   disbursalDate: string,
   periods: number,
@@ -82,7 +84,7 @@ export function finalRepaymentDate(
     return null
   }
 
-  const steps = periods - 1
+  const steps = periods
   if (frequency === 'Monthly') {
     const maxMonthIndex = MAX_YEAR * 12 + 11
     const firstMonthIndex = first.year * 12 + (first.month - 1)

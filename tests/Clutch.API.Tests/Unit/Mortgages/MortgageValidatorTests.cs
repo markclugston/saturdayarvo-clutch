@@ -219,6 +219,44 @@ public sealed class MortgageValidatorTests
     }
 
     [Fact]
+    public void Duration_limit_is_the_last_payment_on_or_before_31_Dec_9999()
+    {
+        // Payment N is the disbursal date plus N intervals (022 FR-007): 9999-12-10 + 3 weeks = 9999-12-31.
+        var lateClock = new FixedTimeProvider(new DateTimeOffset(9999, 12, 20, 0, 0, 0, TimeSpan.Zero));
+        MortgageCandidate Weekly(decimal periods) =>
+            Valid(periods: periods, first: "9999-12-10", frequency: "Weekly", rows: new RateChangeCandidate(5m, "9999-12-10"));
+
+        Assert.Empty(MortgageValidator.Validate(Weekly(3m), lateClock).Errors);
+        Assert.Equal(
+            "The final repayment date would be later than 31 Dec 9999",
+            MortgageValidator.Validate(Weekly(4m), lateClock).Errors["duration"]);
+    }
+
+    [Theory]
+    [InlineData("2029-12-31", true)]
+    [InlineData("2030-01-01", true)]
+    [InlineData("2030-01-02", false)]
+    public void Effective_date_range_ends_on_the_final_repayment_date(string effectiveDate, bool accepted)
+    {
+        var errors = Errors(Valid(rows:
+        [
+            new RateChangeCandidate(5m, "2000-01-01"),
+            new RateChangeCandidate(4m, effectiveDate),
+        ]));
+
+        if (accepted)
+        {
+            Assert.Empty(errors);
+        }
+        else
+        {
+            Assert.Equal(
+                "Choose a date from 1 Jan 2000 to 1 Jan 2030",
+                errors["interestRateChanges[1].effectiveDate"]);
+        }
+    }
+
+    [Fact]
     public void Out_of_range_dates_use_the_invariant_formatted_range_message()
     {
         var previous = CultureInfo.CurrentCulture;
@@ -231,10 +269,10 @@ public sealed class MortgageValidatorTests
                 1m,
                 "0001-01-01",
                 "Monthly",
-                [new RateChangeCandidate(5m, "0001-01-01"), new RateChangeCandidate(5m, "0001-02-01")]));
+                [new RateChangeCandidate(5m, "0001-01-01"), new RateChangeCandidate(5m, "0001-02-02")]));
 
             Assert.Equal(
-                "Choose a date from 1 Jan 0001 to 1 Jan 0001",
+                "Choose a date from 1 Jan 0001 to 1 Feb 0001",
                 errors["interestRateChanges[1].effectiveDate"]);
         }
         finally
@@ -243,11 +281,11 @@ public sealed class MortgageValidatorTests
         }
 
         Assert.Equal(
-            "Choose a date from 1 Jan 2000 to 1 Dec 2029",
+            "Choose a date from 1 Jan 2000 to 1 Jan 2030",
             Errors(Valid(rows:
             [
                 new RateChangeCandidate(5m, "2000-01-01"),
-                new RateChangeCandidate(5m, "2029-12-02"),
+                new RateChangeCandidate(5m, "2030-01-02"),
             ]))["interestRateChanges[1].effectiveDate"]);
     }
 

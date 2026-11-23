@@ -1,17 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import { finalRepaymentDate, formatMessageDate, parseDate } from './repaymentDates'
 
+// Payment N is the disbursal date plus N intervals (022 FR-007).
 describe('finalRepaymentDate (shared vectors with the API)', () => {
   it.each([
-    ['2000-01-01', 360, 'Monthly', '2029-12-01'],
-    ['2001-01-31', 2, 'Monthly', '2001-02-28'],
-    ['2001-01-31', 3, 'Monthly', '2001-03-31'],
-    ['2000-01-01', 3, 'Weekly', '2000-01-15'],
-    ['2000-01-01', 3, 'Fortnightly', '2000-01-29'],
-    ['0001-01-01', 1, 'Monthly', '0001-01-01'],
-    ['0004-02-29', 13, 'Monthly', '0005-02-28'],
-    ['0050-01-01', 2, 'Weekly', '0050-01-08'],
-    ['9999-12-31', 1, 'Monthly', '9999-12-31'],
+    ['2023-11-29', 1, 'Monthly', '2023-12-29'],
+    ['2023-11-29', 360, 'Monthly', '2053-11-29'],
+    ['2000-01-01', 360, 'Monthly', '2030-01-01'],
+    ['2024-01-31', 1, 'Monthly', '2024-02-29'],
+    ['2024-01-31', 2, 'Monthly', '2024-03-31'],
+    ['2024-01-31', 3, 'Monthly', '2024-04-30'],
+    ['2000-01-01', 3, 'Weekly', '2000-01-22'],
+    ['2000-01-01', 3, 'Fortnightly', '2000-02-12'],
+    ['0001-01-01', 1, 'Monthly', '0001-02-01'],
+    ['0004-02-29', 12, 'Monthly', '0005-02-28'],
+    ['0050-01-01', 1, 'Weekly', '0050-01-08'],
+    ['9999-10-31', 2, 'Monthly', '9999-12-31'],
   ] as const)('%s x %i %s -> %s', (first, periods, frequency, expected) => {
     expect(finalRepaymentDate(first, periods, frequency)).toBe(expected)
   })
@@ -24,8 +28,14 @@ describe('finalRepaymentDate (shared vectors with the API)', () => {
   )
 
   it('accepts a weekly schedule ending exactly on 31 Dec 9999 and rejects one more period', () => {
-    expect(finalRepaymentDate('9999-12-17', 3, 'Weekly')).toBe('9999-12-31')
-    expect(finalRepaymentDate('9999-12-17', 4, 'Weekly')).toBeNull()
+    expect(finalRepaymentDate('9999-12-10', 3, 'Weekly')).toBe('9999-12-31')
+    expect(finalRepaymentDate('9999-12-10', 4, 'Weekly')).toBeNull()
+    expect(finalRepaymentDate('9999-12-17', 3, 'Weekly')).toBeNull()
+  })
+
+  it('returns null one month past December 9999', () => {
+    expect(finalRepaymentDate('9999-12-01', 1, 'Monthly')).toBeNull()
+    expect(finalRepaymentDate('9999-10-31', 3, 'Monthly')).toBeNull()
   })
 
   it('returns null for unreadable input', () => {
