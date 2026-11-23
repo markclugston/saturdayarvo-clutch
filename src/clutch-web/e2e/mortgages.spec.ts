@@ -219,13 +219,16 @@ test('mortgages journey: add, reload, sign out and in, switch, rename, guard and
     // The schedule's row count is checked below; the view is saved, so it stays after reloads.
     await switchView(page, 'Show Amortization Schedule')
 
-    // Add a mortgage with two rate changes entered latest-first (US2-AS6).
+    // Add a mortgage with two rate changes. Since 021 the first one added is the opening rate, dated on
+    // the Disbursal Date, so it is entered first.
     await fillHeader(page, 'Home loan', '500000.50', '360')
-    await addRates(page, [['6', '2005-06-01'], ['5.25', '2000-01-01']])
+    await addRates(page, [['5.25', '2000-01-01'], ['6', '2005-06-01']])
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByRole('status').filter({ hasText: 'Mortgage saved' })).toBeVisible()
     await expect(tab(page, 'Home loan')).toHaveAttribute('aria-current', 'true')
-    await expect(page.getByRole('table')).toHaveAttribute('aria-rowcount', '362')
+    // Duration rows; period 1 is one month after the 1 Jan 2000 Disbursal Date (022 FR-001, FR-002).
+    await expect(page.getByRole('table')).toHaveAttribute('aria-rowcount', '361')
+    await expect(page.getByRole('row').nth(1).getByRole('cell')).toHaveText(['1', '1 Feb 2000', 'Not yet calculated'])
 
     // Reload: persisted, and the rate changes come back in effective-date order.
     await page.reload()
@@ -252,9 +255,9 @@ test('mortgages journey: add, reload, sign out and in, switch, rename, guard and
     await expect(tab(page, 'Car loan')).toHaveAttribute('aria-current', 'true')
     await tab(page, 'Home loan').click()
     await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Home loan')
-    await expect(page.getByRole('table')).toHaveAttribute('aria-rowcount', '362')
+    await expect(page.getByRole('table')).toHaveAttribute('aria-rowcount', '361')
     await tab(page, 'Car loan').click()
-    await expect(page.getByRole('table')).toHaveAttribute('aria-rowcount', '50')
+    await expect(page.getByRole('table')).toHaveAttribute('aria-rowcount', '49')
 
     // With five mortgages a tab switch shows the details within one second (SC-003).
     const freshToken = await (await context.request.get('/api/security/csrf-token')).json() as { requestToken: string }
@@ -284,6 +287,10 @@ test('mortgages journey: add, reload, sign out and in, switch, rename, guard and
     await tab(page, 'Home loan').click()
     await page.getByRole('button', { name: 'Interest Rates' }).click()
     await rateDialog(page).getByLabel('New Interest Rate').fill('6.5')
+    // The range ends on the final repayment: 1 Jan 2000 plus 360 months (022 FR-007).
+    await rateDialog(page).getByLabel('Effective Date').fill('2030-01-02')
+    await rateDialog(page).getByRole('button', { name: 'Add', exact: true }).click()
+    await expect(rateDialog(page).getByText('Choose a date from 1 Jan 2000 to 1 Jan 2030')).toBeVisible()
     await rateDialog(page).getByLabel('Effective Date').fill('2010-01-01')
     await rateDialog(page).getByRole('button', { name: 'Add', exact: true }).click()
     await rateDialog(page).getByRole('button', { name: 'Remove 6.00% from 1 Jun 2005' }).click()
