@@ -83,6 +83,15 @@ const mortgageFixture = (index: number) => ({
   ],
   version: 1,
 })
+// 024: 360 balances following the schedule with a wave on top; every 50th is blank and the last is below $0.
+const actualBalancesFixture = () => ({
+  currencyCode: 'AUD',
+  periodCount: 360,
+  balances: Array.from({ length: 360 }, (_, index) => {
+    const period = index + 1
+    return period % 50 === 0 ? null : (500000 - period * 1388.89 + 8000 * Math.sin(period / 20)).toFixed(2)
+  }),
+})
 // Mortgage 1 has one change, Mortgage 2 has 60 (monthly from the disbursal date).
 const rateFixtures = () => [
   { ...mortgageFixture(1), name: 'One rate', interestRateChanges: [{ newInterestRate: 5.25, effectiveDate: '2000-01-01' }] },
@@ -105,6 +114,8 @@ type Mock = {
   mortgages: MortgagesMode
   /** The saved Loan Payoff Timeline view, or 'delay' to answer only after 5 s. */
   loanPayoffTimeline: 'Burndown' | 'Schedule' | 'delay'
+  /** Link the first mortgage to an account whose balances (some blank, the last below $0) are plotted (024). */
+  actualBalances: boolean
   /** When the mocked route received the saved-view request (ms since epoch). */
   loanPayoffTimelineRequestedAt?: number
 }
@@ -118,6 +129,7 @@ async function mockApi(page: Page, options: Partial<Mock> = {}): Promise<Mock> {
     ended: false,
     mortgages: 'ok',
     loanPayoffTimeline: 'Burndown',
+    actualBalances: false,
     ...options,
   }
   await page.route((url) => url.pathname.startsWith('/api/'), async (route) => {
@@ -155,7 +167,11 @@ async function mockApi(page: Page, options: Partial<Mock> = {}): Promise<Mock> {
       if (mock.mortgages === 'error') return route.fulfill({ status: 500, json: { title: 'Server error' } })
       if (mock.mortgages === 'rates') return route.fulfill({ json: rateFixtures() })
       const count = mock.mortgages === 'empty' ? 0 : mock.mortgages === 'many' ? 10 : 3
-      return route.fulfill({ json: Array.from({ length: count }, (_, index) => mortgageFixture(index)) })
+      return route.fulfill({
+        json: Array.from({ length: count }, (_, index) => (
+          mock.actualBalances && index === 0 ? { ...mortgageFixture(index), accountId: otherAccountId } : mortgageFixture(index)
+        )),
+      })
     }
     if (path === '/api/mortgages' && method === 'POST' && !mock.failWrites) {
       const body = request.postDataJSON() as Record<string, unknown>
@@ -172,6 +188,7 @@ async function mockApi(page: Page, options: Partial<Mock> = {}): Promise<Mock> {
       if (method === 'PUT' && path === '/api/admin/import-limits') return route.fulfill({ json: limits })
       return route.fulfill({ status: 204 })
     }
+    if (path === '/api/mortgages/period-balances') return route.fulfill({ json: actualBalancesFixture() })
     if (path === '/api/accounts') return route.fulfill({ json: accounts })
     if (path === '/api/currencies') return route.fulfill({ json: [currency] })
     if (path === `/api/accounts/${accountId}`) return route.fulfill({ json: accounts[0] })
@@ -537,6 +554,15 @@ const states: StateDef[] = [
     },
   },
   {
+    name: 'mortgages-burndown-actual', mock: { ...signedIn, actualBalances: true },
+    reach: async (page) => {
+      await openMortgages(page)
+      const chart = timelineGroup(page).getByRole('img', { name: /Actual Balance/ })
+      await expect(chart).toBeVisible()
+      await expect(chart.locator('polyline.text-chart-navy')).toBeVisible()
+    },
+  },
+  {
     name: 'mortgages-timeline-schedule', mock: { ...signedIn, loanPayoffTimeline: 'Schedule' },
     reach: async (page) => {
       await openMortgages(page)
@@ -770,6 +796,29 @@ for (const theme of ['Light', 'Dark'] as const) {
     await expect(chart.locator('polyline')).toBeVisible()
     await settle(page)
     await expect(chart).toHaveScreenshot(`mortgages-burndown-line-${theme}.png`)
+  })
+}
+
+// 024: the two-line chart (dashed Actual Balance over Bank Schedule, axis below $0), on the chart itself and at 320 px.
+for (const theme of ['Light', 'Dark'] as const) {
+  test(`mortgages burndown actual balance line [${theme}]`, async ({ page }) => {
+    await reachState(page, states.find((state) => state.name === 'mortgages-burndown-actual')!, theme)
+    const chart = timelineGroup(page).getByRole('img', { name: /Actual Balance/ })
+    await chart.scrollIntoViewIfNeeded()
+    await settle(page)
+    await expect(chart).toHaveScreenshot(`mortgages-burndown-actual-${theme}.png`)
+  })
+
+  test(`mortgages burndown actual balance line at 320 px has no sideways scroll [${theme}]`, async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 800 })
+    await reachState(page, states.find((state) => state.name === 'mortgages-burndown-actual')!, theme)
+    const chart = timelineGroup(page).getByRole('img', { name: /Actual Balance/ })
+    await chart.scrollIntoViewIfNeeded()
+    await settle(page)
+    await expectNoHorizontalScroll(page)
+    await expect(chart).toHaveScreenshot(`mortgages-burndown-actual-${theme}-320.png`)
+    const results = await new AxeBuilder({ page }).withTags(axeTags).analyze()
+    expect(results.violations).toEqual([])
   })
 }
 

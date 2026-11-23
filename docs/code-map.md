@@ -31,6 +31,7 @@ contains what's described, search for the concern and update the pointer.
 | Style lint rule (`clutch/style-tokens`) and its tests | `src/clutch-web/eslint-rules/clutch-style.js`, `clutch-style.test.js` |
 | Numeric right-alignment lint rule (`clutch/numeric-align`) and its tests | `src/clutch-web/eslint-rules/clutch-numeric-align.js`, `clutch-numeric-align.test.js` |
 | Percentage and currency entry fields; display formatting of amounts | `src/clutch-web/src/features/mortgages/FormattedNumberField.tsx`; `src/clutch-web/src/lib/formatCurrencyAmount.ts` |
+| Mortgage Actual Balance values shared by the schedule column and the Burndown chart | `src/clutch-web/src/features/mortgages/actualBalances.ts` |
 | Style-guide browser states (axe, focus, surfaces, screenshots) | `src/clutch-web/e2e/style-guide.spec.ts`, `playwright.style-guide.config.ts` |
 | Component test helpers | `src/clutch-web/src/test/` |
 | Browser test setup: mocked-API config, real-API config and its user provisioning | `src/clutch-web/playwright.config.ts`, `playwright.integration.config.ts`, `e2e/integration-setup.ts`, `e2e/fixtures.ts` |

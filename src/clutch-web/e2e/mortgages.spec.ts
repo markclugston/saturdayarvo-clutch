@@ -405,6 +405,19 @@ test('mortgage account: linking shows a balance column right of Bank Schedule an
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page.getByText('Mortgage saved')).toBeVisible()
 
+    // 024: the Burndown plots the Actual Balance over the Bank Schedule and names both in the legend.
+    const chart = timeline(page).getByRole('img', { name: /balance over time/i })
+    await expect(chart).toContainText('Actual Balance')
+    await expect(chart.locator('polyline.text-chart-primary')).toHaveCount(1)
+    await expect(chart.locator('polyline.text-chart-navy, circle.text-chart-navy')).toHaveCount(1)
+    // Without an account only the Bank Schedule is drawn.
+    await page.getByLabel('Mortgage Account').selectOption({ label: 'None' })
+    await expect(chart).not.toContainText('Actual Balance')
+    await expect(chart.locator('polyline.text-chart-navy, circle.text-chart-navy')).toHaveCount(0)
+    await expect(chart.locator('polyline.text-chart-primary')).toHaveCount(1)
+    await page.getByLabel('Mortgage Account').selectOption({ label: 'Offset Journey' })
+    await expect(chart).toContainText('Actual Balance')
+
     await timeline(page).getByRole('button', { name: 'Show Amortization Schedule' }).click()
     const headers = timeline(page).getByRole('columnheader')
     await expect(headers).toHaveText(['Period', 'Date', 'Bank Schedule', 'Actual Balance'])

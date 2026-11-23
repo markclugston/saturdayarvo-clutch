@@ -15,6 +15,7 @@ import {
   validValues,
   type FakeServer,
 } from './testSupport'
+import { periodBalancesQueryKey } from './api'
 import { MortgagesPage } from './MortgagesPage'
 
 /** Unmounts and remounts its children, like leaving Mortgages and returning. */
@@ -802,5 +803,66 @@ describe('MortgagesPage Bank Schedule values', () => {
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^Remove 9/ }))
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }))
     await waitFor(() => expect(bankCell(8)).toBe(before))
+  })
+})
+
+describe('MortgagesPage Actual Balance line', () => {
+  const accountA = { id: '11111111-1111-4111-8111-111111111111', description: 'Offset A', currencyCode: 'AUD' }
+  const accountB = { id: '22222222-2222-4222-8222-222222222222', description: 'Offset B', currencyCode: 'AUD' }
+  const chart = () => within(timeline()).getByRole('img', { name: /balance over time/i })
+  const actualLine = () => chart().querySelector('polyline.text-chart-navy')
+  const lastActualY = () => (actualLine()?.getAttribute('points') ?? '').split(' ').map((pair) => Number(pair.split(',')[1])).at(-1)
+
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  async function renderWithAccount() {
+    const server = installFakeApi([makeMortgage({ name: 'Home', openingBalance: 100000, duration: 12, accountId: accountA.id })])
+    server.accounts = [accountA, accountB]
+    server.balances = { currencyCode: 'AUD', periodCount: 12, balances: ['90000.00', '80000.00'] }
+    const { queryClient } = renderWithProviders(<MortgagesPage userId="user-1" />)
+    await waitFor(() => expect(actualLine()).not.toBeNull())
+    return { server, queryClient }
+  }
+
+  it('redraws for another account and removes the line and legend entry for None', async () => {
+    const { server } = await renderWithAccount()
+    const user = userEvent.setup()
+    const before = actualLine()?.getAttribute('points')
+
+    server.balances = { currencyCode: 'AUD', periodCount: 12, balances: ['70000.00', '60000.00'] }
+    await user.selectOptions(screen.getByLabelText('Mortgage Account'), accountB.id)
+    await waitFor(() => expect(actualLine()?.getAttribute('points')).not.toBe(before))
+
+    await user.selectOptions(screen.getByLabelText('Mortgage Account'), '')
+    await waitFor(() => expect(actualLine()).toBeNull())
+    expect(chart()).not.toHaveTextContent('Actual Balance')
+  })
+
+  it('updates the line without a reload when the period balances are invalidated', async () => {
+    const { server, queryClient } = await renderWithAccount()
+    const before = lastActualY()
+
+    server.balances = { currencyCode: 'AUD', periodCount: 12, balances: ['90000.00', '50000.00'] }
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: periodBalancesQueryKey })
+    })
+
+    await waitFor(() => expect(lastActualY()).not.toBe(before))
+  })
+
+  it('redraws both lines when a Detail is edited', async () => {
+    await renderWithAccount()
+    const user = userEvent.setup()
+    const bank = () => chart().querySelector('polyline.text-chart-primary')?.getAttribute('points')
+    const before = bank()
+    const actualBefore = actualLine()?.getAttribute('points')
+
+    await user.clear(screen.getByLabelText('Opening Balance'))
+    await user.type(screen.getByLabelText('Opening Balance'), '200000')
+
+    await waitFor(() => expect(bank()).not.toBe(before))
+    await waitFor(() => expect(actualLine()?.getAttribute('points')).not.toBe(actualBefore))
   })
 })

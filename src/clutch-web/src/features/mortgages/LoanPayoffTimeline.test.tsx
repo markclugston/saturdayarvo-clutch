@@ -1,7 +1,13 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LoanPayoffTimeline } from './LoanPayoffTimeline'
+import { installFakeApi, renderWithProviders } from './testSupport'
+
+vi.mock('@/lib/api/client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api/client')>()),
+  apiRequest: vi.fn(),
+}))
 
 describe('LoanPayoffTimeline', () => {
   it('is a section labelled by its Loan Payoff Timeline heading', () => {
@@ -120,5 +126,37 @@ describe('LoanPayoffTimeline calculation', () => {
     expect(points().split(' ')).toHaveLength(13)
     expect(points()).not.toBe(before)
     expect(screen.queryByText('The burn down will appear once the schedule is calculated.')).not.toBeInTheDocument()
+  })
+})
+
+describe('LoanPayoffTimeline Actual Balance', () => {
+  const account = { id: '11111111-1111-4111-8111-111111111111', description: 'Offset Account', currencyCode: 'AUD' }
+  const calculation = {
+    openingBalanceCents: 50000000,
+    disbursalDate: '2023-11-29',
+    duration: 12,
+    paymentFrequency: 'Monthly' as const,
+    rateChanges: [{ annualRatePercent: 6, effectiveDate: '2023-11-29' }],
+  }
+
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('gives the chart the account and the calculation, and draws the Actual Balance line', async () => {
+    const server = installFakeApi([])
+    server.accounts = [account]
+    server.balances = { currencyCode: 'AUD', periodCount: 12, balances: ['480000.00', '470000.00'] }
+    renderWithProviders(
+      <LoanPayoffTimeline accountId={account.id} calculation={calculation} onSwitch={vi.fn()} saved view="Burndown" />,
+    )
+
+    await waitFor(() => expect(screen.getByRole('img').querySelectorAll('polyline')).toHaveLength(2))
+    expect(screen.getByRole('img')).toHaveTextContent('Actual Balance')
+    const params = new URLSearchParams(server.balanceRequests[0])
+    expect(params.get('accountId')).toBe(account.id)
+    expect(params.get('disbursalDate')).toBe('2023-11-29')
+    expect(params.get('frequency')).toBe('Monthly')
+    expect(params.get('duration')).toBe('12')
   })
 })

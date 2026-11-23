@@ -1,7 +1,10 @@
+import { useMemo } from 'react'
+import { formatCurrencyAmount } from '@/lib/formatCurrencyAmount'
+import { actualBalancePoints, useActualBalances, type ActualBalancePoint } from './actualBalances'
 import { ENTER_DETAILS_MESSAGE } from './AmortizationSchedule'
 import { formatCurrency } from './FormattedNumberField'
 import { formatDisplayDate } from './loanDraft'
-import { daysBetween } from './repaymentDates'
+import { daysBetween, type PaymentFrequency } from './repaymentDates'
 import type { ScheduledPeriod } from './scheduleCalculation'
 
 export const NOT_CALCULATED_CHART_MESSAGE = 'The burn down will appear once the schedule is calculated.'
@@ -13,7 +16,24 @@ type BurnDownChartProps = {
   schedule?: ScheduledPeriod[]
   openingBalanceCents?: number
   disbursalDate?: string
+  /** With the Disbursal Date, build the same balances request as the schedule table. */
+  paymentFrequency?: PaymentFrequency
+  duration?: number
+  /** The Mortgage Account selection, saved or not; its Actual Balances are plotted when there is a schedule. */
+  accountId?: string
 }
+
+/** What the chart knows about the Actual Balance series. */
+type Actual = {
+  /** The account resolves: the legend lists Actual Balance. */
+  selected: boolean
+  /** Ready balances with a schedule row each; empty while loading, after a failure or with none. */
+  ready: boolean
+  points: ActualBalancePoint[]
+  currencyCode: string
+}
+
+const NO_ACTUAL: Actual = { selected: false, ready: false, points: [], currencyCode: '' }
 
 const GUIDES = [60, 110, 160, 210]
 const PLOT_LEFT = 70
@@ -34,10 +54,43 @@ function dollars(cents: number): string {
   return formatCurrency(`${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, '0')}`)
 }
 
-function Frame() {
+/** "$125K", or "-$125K" below zero. */
+function tickLabel(value: number): string {
+  return value < 0 ? `-$${compactDollars.format(-value)}` : `$${compactDollars.format(value)}`
+}
+
+type BalanceAxis = {
+  upper: number
+  lower: number
+  ticks: number[]
+  /** Y of a balance in dollars. */
+  y: (value: number) => number
+  /** Horizontal guide positions: the fixed four, or one per tick once the axis goes below $0. */
+  guides: number[]
+}
+
+/** The balance axis in dollars: $0 to a nice maximum, extended below $0 for negative Actual Balances. */
+function balanceAxis(openingBalanceCents: number, points: ActualBalancePoint[]): BalanceAxis {
+  let largest = openingBalanceCents / 100
+  let smallest = 0
+  for (const point of points) {
+    largest = Math.max(largest, point.value)
+    smallest = Math.min(smallest, point.value)
+  }
+  const upper = niceMaximum(largest)
+  const step = upper / Y_INTERVALS
+  const below = smallest < 0 ? Math.ceil(-smallest / step) : 0
+  const lower = -below * step
+  const ticks = Array.from({ length: Y_INTERVALS + below + 1 }, (_, index) =>
+    below === 0 ? (upper * index) / Y_INTERVALS : (index - below) * step)
+  const y = (value: number) => PLOT_BOTTOM - ((PLOT_BOTTOM - PLOT_TOP) * (value - lower)) / (upper - lower)
+  return { upper, lower, ticks, y, guides: below === 0 ? GUIDES : ticks.map(y) }
+}
+
+function Frame({ guides, withActual }: { guides: number[], withActual: boolean }) {
   return (
     <>
-      {GUIDES.map((y) => (
+      {guides.map((y) => (
         <line className="opacity-30" key={y} stroke="currentColor" strokeWidth="1" x1="70" x2="580" y1={y} y2={y} />
       ))}
       <line stroke="currentColor" strokeWidth="1.5" x1="70" x2="580" y1="260" y2="260" />
@@ -48,12 +101,20 @@ function Frame() {
       <text fill="currentColor" fontSize="12" textAnchor="middle" x="325" y="294">
         Repayment Date
       </text>
-      <g className="text-primary">
-        <line stroke="currentColor" strokeWidth="3" x1="400" x2="424" y1="15" y2="15" />
-        <text className="text-fg-secondary" fill="currentColor" fontSize="12" x="430" y="19">
+      <g className="text-chart-primary">
+        <line stroke="currentColor" strokeWidth="3" x1={withActual ? 270 : 400} x2={withActual ? 294 : 424} y1="15" y2="15" />
+        <text className="text-fg-secondary" fill="currentColor" fontSize="12" x={withActual ? 300 : 430} y="19">
           Bank Schedule
         </text>
       </g>
+      {withActual && (
+        <g className="text-chart-navy">
+          <line stroke="currentColor" strokeDasharray="6 4" strokeWidth="3" x1="400" x2="424" y1="15" y2="15" />
+          <text className="text-fg-secondary" fill="currentColor" fontSize="12" x="430" y="19">
+            Actual Balance
+          </text>
+        </g>
+      )}
     </>
   )
 }
@@ -62,20 +123,27 @@ function PlottedLine({
   schedule,
   openingBalanceCents,
   disbursalDate,
-}: { schedule: ScheduledPeriod[], openingBalanceCents: number, disbursalDate: string }) {
+  axis,
+  points: actualPoints,
+}: {
+  schedule: ScheduledPeriod[]
+  openingBalanceCents: number
+  disbursalDate: string
+  axis: BalanceAxis
+  points: ActualBalancePoint[]
+}) {
   const finalDate = schedule[schedule.length - 1]?.date ?? disbursalDate
   const totalDays = Math.max(1, daysBetween(disbursalDate, finalDate))
-  const maximum = niceMaximum(openingBalanceCents / 100)
   const x = (date: string) => PLOT_LEFT + ((PLOT_RIGHT - PLOT_LEFT) * daysBetween(disbursalDate, date)) / totalDays
-  const y = (cents: number) => PLOT_BOTTOM - ((PLOT_BOTTOM - PLOT_TOP) * (cents / 100)) / maximum
+  const { y } = axis
 
   const points = [
-    `${x(disbursalDate)},${y(openingBalanceCents)}`,
-    ...schedule.map((period) => `${x(period.date)},${y(period.closingCents)}`),
+    `${x(disbursalDate)},${y(openingBalanceCents / 100)}`,
+    ...schedule.map((period) => `${x(period.date)},${y(period.closingCents / 100)}`),
   ].join(' ')
+  const actual = actualPoints.map((point) => `${x(point.date)},${y(point.value)}`)
 
   const dates = [disbursalDate, ...schedule.map((period) => period.date)]
-  const yTicks = Array.from({ length: Y_INTERVALS + 1 }, (_, index) => (maximum * index) / Y_INTERVALS)
   const xTicks: { date: string, year: string }[] = []
   for (let index = 0; index < X_TICKS; index += 1) {
     const date = dates[Math.round((index * (dates.length - 1)) / (X_TICKS - 1))] ?? disbursalDate
@@ -84,19 +152,20 @@ function PlottedLine({
       xTicks.push({ date, year })
     }
   }
+  const [single] = actualPoints
 
   return (
     <>
-      {yTicks.map((value) => (
+      {axis.ticks.map((value) => (
         <text
           fill="currentColor"
           fontSize="11"
           key={value}
           textAnchor="end"
           x={PLOT_LEFT - 6}
-          y={PLOT_BOTTOM - ((PLOT_BOTTOM - PLOT_TOP) * value) / maximum + 4}
+          y={y(value) + 4}
         >
-          {`$${compactDollars.format(value)}`}
+          {tickLabel(value)}
         </text>
       ))}
       {xTicks.map((tick) => (
@@ -105,22 +174,88 @@ function PlottedLine({
         </text>
       ))}
       <polyline
-        className="text-primary"
+        className="text-chart-primary"
         fill="none"
         points={points}
         stroke="currentColor"
         strokeLinejoin="round"
         strokeWidth="2"
       />
+      {actualPoints.length >= 2 && (
+        <polyline
+          className="text-chart-navy"
+          fill="none"
+          points={actual.join(' ')}
+          stroke="currentColor"
+          strokeDasharray="6 4"
+          strokeLinejoin="round"
+          strokeWidth="2"
+        />
+      )}
+      {single && actualPoints.length === 1 && (
+        <circle className="text-chart-navy" cx={x(single.date)} cy={y(single.value)} fill="currentColor" r="3" />
+      )}
     </>
   )
 }
 
+/** Text alternative sentence for the Actual Balance series; '' when nothing is to be said. */
+function actualDescription({ ready, points, currencyCode }: Actual): string {
+  const first = points[0]
+  const last = points[points.length - 1]
+  if (!ready) {
+    return ''
+  }
+  if (!first || !last) {
+    return ' Actual Balance: there are no actual balances to plot.'
+  }
+  const amount = (value: string) => formatCurrencyAmount(value, currencyCode)
+  return first === last
+    ? ` Actual Balance: ${amount(first.amount)} on ${formatDisplayDate(first.date)}.`
+    : ` Actual Balance: from ${amount(first.amount)} on ${formatDisplayDate(first.date)} to ${amount(last.amount)} on ${formatDisplayDate(last.date)}.`
+}
+
 /** Balance-over-time chart: the Bank Schedule line when calculated, otherwise the empty frame. */
-export function BurnDownChart({ saved, schedule, openingBalanceCents, disbursalDate }: BurnDownChartProps) {
+export function BurnDownChart(props: BurnDownChartProps) {
+  return props.accountId === undefined
+    ? <Chart {...props} actual={NO_ACTUAL} />
+    : <AccountChart {...props} accountId={props.accountId} />
+}
+
+/** Reads the account's balances through the schedule table's own request, then draws the chart. */
+function AccountChart({ accountId, ...props }: BurnDownChartProps & { accountId: string }) {
+  const { schedule, duration, disbursalDate, paymentFrequency } = props
+  const balances = useActualBalances(accountId, { duration, disbursalDate, paymentFrequency })
+  const plotted = schedule !== undefined && schedule.length > 0
+    && props.openingBalanceCents !== undefined && disbursalDate !== undefined
+  const points = useMemo(
+    () => (balances.status === 'ready' && schedule ? actualBalancePoints(balances.balances, schedule) : []),
+    [balances.status, balances.balances, schedule],
+  )
+  const actual: Actual = {
+    // The Bank Schedule must be plotted for Actual Balance to appear (FR-005).
+    selected: plotted && balances.status !== 'none',
+    ready: plotted && balances.status === 'ready',
+    points: plotted ? points : [],
+    currencyCode: balances.currencyCode ?? '',
+  }
+  return <Chart {...props} actual={actual} />
+}
+
+function Chart({
+  saved,
+  schedule,
+  openingBalanceCents,
+  disbursalDate,
+  actual,
+}: BurnDownChartProps & { actual: Actual }) {
   const plotted = schedule !== undefined && schedule.length > 0
     && openingBalanceCents !== undefined && disbursalDate !== undefined
   const finalDate = schedule?.[schedule.length - 1]?.date
+  const axis = useMemo(
+    () => (openingBalanceCents === undefined ? null : balanceAxis(openingBalanceCents, actual.points)),
+    [openingBalanceCents, actual.points],
+  )
 
   if (!saved && !plotted) {
     return (
@@ -131,18 +266,20 @@ export function BurnDownChart({ saved, schedule, openingBalanceCents, disbursalD
   }
 
   const label = plotted
-    ? `Line chart of the mortgage balance over time for the Bank Schedule, falling from ${dollars(openingBalanceCents)} on ${formatDisplayDate(disbursalDate)} to $0.00 on ${formatDisplayDate(finalDate ?? disbursalDate)}.`
+    ? `Line chart of the mortgage balance over time for the Bank Schedule, falling from ${dollars(openingBalanceCents)} on ${formatDisplayDate(disbursalDate)} to $0.00 on ${formatDisplayDate(finalDate ?? disbursalDate)}.${actualDescription(actual)}`
     : 'Line chart of the mortgage balance over time for the Bank schedule. The values have not been calculated yet.'
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="relative min-h-64 flex-1">
         <svg aria-label={label} className="absolute inset-0 size-full text-fg-secondary" role="img" viewBox="0 0 600 300">
-          <Frame />
-          {plotted && (
+          <Frame guides={plotted && axis ? axis.guides : GUIDES} withActual={actual.selected} />
+          {plotted && axis && (
             <PlottedLine
+              axis={axis}
               disbursalDate={disbursalDate}
               openingBalanceCents={openingBalanceCents}
+              points={actual.points}
               schedule={schedule}
             />
           )}

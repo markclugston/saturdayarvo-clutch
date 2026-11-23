@@ -66,8 +66,11 @@ export function LoanPayoffTimeline({
       {view === 'Burndown'
         ? (
           <BurnDownChart
+            accountId={accountId}
             disbursalDate={calculation?.disbursalDate}
+            duration={calculation?.duration}
             openingBalanceCents={calculation?.openingBalanceCents}
+            paymentFrequency={calculation?.paymentFrequency}
             saved={saved}
             schedule={schedule}
           />

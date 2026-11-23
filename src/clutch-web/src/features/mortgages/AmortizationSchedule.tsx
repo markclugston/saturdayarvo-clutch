@@ -1,9 +1,7 @@
-import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { ErrorMessage } from '@/components/ui/error-message'
-import { getAccounts } from '@/features/accounts/api'
 import { formatCurrencyAmount } from '@/lib/formatCurrencyAmount'
-import { usePeriodBalances, type PeriodBalanceRequest } from './api'
+import { useActualBalances } from './actualBalances'
 import { formatCurrency } from './FormattedNumberField'
 import { formatDisplayDate } from './loanDraft'
 import { finalRepaymentDate, type PaymentFrequency } from './repaymentDates'
@@ -90,21 +88,10 @@ function AccountSchedule({
   paymentFrequency,
   schedule,
 }: AmortizationScheduleProps & { accountId: string }) {
-  const accountsQuery = useQuery({ queryKey: ['accounts'], queryFn: getAccounts })
-  // An account missing from the list (deleted elsewhere) behaves as none.
-  const account = accountsQuery.data?.find((item) => item.id === accountId)
+  const actual = useActualBalances(accountId, { duration, disbursalDate, paymentFrequency })
   const complete = duration !== undefined && disbursalDate !== undefined && paymentFrequency !== undefined
-  const request: PeriodBalanceRequest | null = account
-    ? {
-        accountId,
-        schedule: complete
-          ? { disbursalDate, frequency: paymentFrequency, duration }
-          : undefined,
-      }
-    : null
-  const balances = usePeriodBalances(request)
 
-  if (!account) {
+  if (actual.status === 'none') {
     return (
       <PlainSchedule
         disbursalDate={disbursalDate}
@@ -115,22 +102,21 @@ function AccountSchedule({
     )
   }
 
-  const loading = balances.isPending
-  const failed = balances.isError
-  const values = balances.data?.balances ?? []
+  const loading = actual.status === 'loading'
+  const failed = actual.status === 'failed'
   const column: BalanceColumn = {
     header: 'Actual Balance',
     loading,
     cell: (period) => {
-      const value = values[period - 1]
+      const value = actual.balances[period - 1]
       return value === null || value === undefined
         ? ''
-        : formatCurrencyAmount(value, balances.data?.currencyCode ?? account.currencyCode)
+        : formatCurrencyAmount(value, actual.currencyCode ?? '')
     },
   }
 
   // Details complete: the mortgage's own rows. Incomplete (new, unsaved): monthly rows from the account.
-  const rowCount = complete ? duration : (balances.data?.periodCount ?? 0)
+  const rowCount = complete ? duration : (actual.periodCount ?? 0)
   return (
     <>
       {failed && <ErrorMessage>{BALANCES_FAILED_MESSAGE}</ErrorMessage>}
