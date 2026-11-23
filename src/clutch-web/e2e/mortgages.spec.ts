@@ -406,7 +406,7 @@ test('mortgage account: linking shows a balance column right of Bank Schedule an
 
     await timeline(page).getByRole('button', { name: 'Show Amortization Schedule' }).click()
     const headers = timeline(page).getByRole('columnheader')
-    await expect(headers).toHaveText(['Period', 'Date', 'Bank Schedule', 'Offset Journey Balance'])
+    await expect(headers).toHaveText(['Period', 'Date', 'Bank Schedule', 'Actual Balance'])
     await expect(timeline(page).getByRole('cell', { name: '$1,020.00' }).first()).toBeVisible()
 
     for (const mode of ['Light', 'Dark']) {

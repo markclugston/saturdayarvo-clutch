@@ -26,10 +26,10 @@ describe('AmortizationSchedule with a Mortgage Account', () => {
     server.balances = { currencyCode: 'AUD', periodCount: 4, balances: [null, '1000.50', '980.00'] }
     renderWithProviders(<AmortizationSchedule accountId={account.id} duration={4} {...saved} />)
 
-    expect(await screen.findByRole('columnheader', { name: 'Offset Account Balance' })).toBeInTheDocument()
+    expect(await screen.findByRole('columnheader', { name: 'Actual Balance' })).toBeInTheDocument()
     const table = screen.getByRole('table')
     expect(within(table).getAllByRole('columnheader').map((header) => header.textContent))
-      .toEqual(['Period', 'Date', 'Bank Schedule', 'Offset Account Balance'])
+      .toEqual(['Period', 'Date', 'Bank Schedule', 'Actual Balance'])
     await waitFor(() => expect(within(table).getAllByRole('row')[2]).toHaveTextContent('$1,000.50'))
     const rows = within(table).getAllByRole('row').slice(1)
     expect(rows).toHaveLength(4)
@@ -44,7 +44,7 @@ describe('AmortizationSchedule with a Mortgage Account', () => {
     server.balances = { currencyCode: 'AUD', periodCount: 3, balances: ['1000.00', '990.00', '980.00'] }
     renderWithProviders(<AmortizationSchedule accountId={account.id} duration={3} {...saved} />)
 
-    expect(await screen.findByRole('columnheader', { name: 'Offset Account Balance' })).toBeInTheDocument()
+    expect(await screen.findByRole('columnheader', { name: 'Actual Balance' })).toBeInTheDocument()
     const table = screen.getByRole('table')
     await waitFor(() => expect(within(table).getAllByRole('row')[3]).toHaveTextContent('$980.00'))
     expect(table).toHaveAttribute('aria-rowcount', '4')

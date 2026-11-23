@@ -95,7 +95,7 @@ function AccountSchedule({
   const failed = balances.isError
   const values = balances.data?.balances ?? []
   const column: BalanceColumn = {
-    header: `${account.description} Balance`,
+    header: 'Actual Balance',
     loading,
     cell: (period) => {
       const value = values[period - 1]
