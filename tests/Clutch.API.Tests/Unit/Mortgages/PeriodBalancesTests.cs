@@ -8,20 +8,38 @@ public sealed class PeriodBalancesTests
 
     private static BalancePoint P(DateOnly date, decimal balance) => new(date, balance);
 
+    // 022: period k ends on its date D(k) = disbursal + k intervals and starts the day after D(k - 1).
     [Fact]
-    public void Period_1_starts_on_the_disbursal_date_and_ends_one_payment_interval_later()
+    public void Each_period_ends_on_its_repayment_date_and_period_1_is_open_at_the_start()
     {
-        var periods = PeriodBalances.MortgagePeriods(D(2026, 1, 31), 3, PaymentFrequency.Monthly).ToList();
+        var periods = PeriodBalances.MortgagePeriods(D(2024, 1, 31), 3, PaymentFrequency.Monthly).ToList();
 
-        Assert.Equal(4, periods.Count);
-        Assert.Equal(D(2026, 1, 31), periods[0].Start);
-        Assert.Equal(D(2026, 2, 27), periods[0].End); // clamped 28 Feb minus one day
-        Assert.Equal(D(2026, 2, 28), periods[1].Start);
-        Assert.Equal(D(2026, 3, 30), periods[1].End);
-        Assert.Equal(D(2026, 3, 31), periods[2].Start);
-        Assert.Equal(D(2026, 4, 29), periods[2].End);
-        Assert.Equal(D(2026, 4, 30), periods[3].Start);
-        Assert.Equal(D(2026, 4, 30), periods[3].End); // final row is a single day
+        Assert.Equal(
+            [
+                new BalancePeriod(DateOnly.MinValue, D(2024, 2, 29)),
+                new BalancePeriod(D(2024, 3, 1), D(2024, 3, 31)),
+                new BalancePeriod(D(2024, 4, 1), D(2024, 4, 30)),
+            ],
+            periods);
+    }
+
+    [Fact]
+    public void Duration_360_monthly_from_29_Nov_2023_gives_360_windows_ending_on_each_period_date()
+    {
+        var disbursal = D(2023, 11, 29);
+
+        var periods = PeriodBalances.MortgagePeriods(disbursal, 360, PaymentFrequency.Monthly).ToList();
+
+        Assert.Equal(360, periods.Count);
+        Assert.Equal(DateOnly.MinValue, periods[0].Start);
+        Assert.Equal(D(2023, 12, 29), periods[0].End);
+        Assert.Equal(D(2023, 12, 30), periods[1].Start);
+        Assert.Equal(D(2024, 1, 29), periods[1].End);
+        Assert.Equal(D(2053, 11, 29), periods[^1].End);
+        for (var k = 1; k <= 360; k++)
+        {
+            Assert.Equal(RepaymentDates.FinalRepaymentDate(disbursal, k, PaymentFrequency.Monthly), periods[k - 1].End);
+        }
     }
 
     [Theory]
@@ -29,14 +47,94 @@ public sealed class PeriodBalancesTests
     [InlineData(PaymentFrequency.Fortnightly, 14)]
     public void Weekly_and_fortnightly_periods_step_by_whole_weeks(PaymentFrequency frequency, int days)
     {
-        var start = D(2026, 1, 5);
+        var disbursal = D(2026, 1, 5);
 
-        var periods = PeriodBalances.MortgagePeriods(start, 2, frequency).ToList();
+        var periods = PeriodBalances.MortgagePeriods(disbursal, 2, frequency).ToList();
 
-        Assert.Equal(start, periods[0].Start);
-        Assert.Equal(start.AddDays(days - 1), periods[0].End);
-        Assert.Equal(start.AddDays(2 * days), periods[2].Start);
-        Assert.Equal(periods[2].Start, periods[2].End);
+        Assert.Equal(
+            [
+                new BalancePeriod(DateOnly.MinValue, disbursal.AddDays(days)),
+                new BalancePeriod(disbursal.AddDays(days + 1), disbursal.AddDays(2 * days)),
+            ],
+            periods);
+    }
+
+    [Fact]
+    public void Mortgage_periods_stop_before_a_date_past_31_Dec_9999()
+    {
+        // Saved under the old rule: 9999-12-10 + 4 weeks passes 31 Dec 9999 (unreachable for validated input).
+        var periods = PeriodBalances.MortgagePeriods(D(9999, 12, 10), 4, PaymentFrequency.Weekly).ToList();
+
+        Assert.Equal(3, periods.Count);
+        Assert.Equal(D(9999, 12, 31), periods[^1].End);
+    }
+
+    [Fact]
+    public void Transactions_on_a_period_date_give_its_end_of_day_balance_the_last_by_order()
+    {
+        var points = new[]
+        {
+            P(D(2023, 12, 28), 300m),
+            P(D(2023, 12, 29), 200m),
+            P(D(2023, 12, 29), 150m),
+            P(D(2024, 1, 29), 100m),
+        };
+
+        var balances = PeriodBalances.Lookup(
+            points, PeriodBalances.MortgagePeriods(D(2023, 11, 29), 3, PaymentFrequency.Monthly));
+
+        Assert.Equal<decimal?>([150m, 100m], balances);
+    }
+
+    [Fact]
+    public void With_no_transaction_on_the_date_the_previous_balance_is_used_and_the_next_day_is_ignored()
+    {
+        var points = new[]
+        {
+            P(D(2023, 12, 20), 300m),
+            P(D(2023, 12, 30), 250m), // the day after period 1's date
+            P(D(2024, 2, 1), 200m),
+        };
+
+        var balances = PeriodBalances.Lookup(
+            points, PeriodBalances.MortgagePeriods(D(2023, 11, 29), 6, PaymentFrequency.Monthly));
+
+        // Period 1 (29 Dec): 300. Period 2 (29 Jan): 250. Period 3 (29 Feb): 200; later periods omitted.
+        Assert.Equal<decimal?>([300m, 250m, 200m], balances);
+    }
+
+    [Fact]
+    public void Periods_dated_before_the_first_transaction_are_blank()
+    {
+        var points = new[] { P(D(2024, 2, 10), 50m) };
+
+        var balances = PeriodBalances.Lookup(
+            points, PeriodBalances.MortgagePeriods(D(2023, 11, 29), 6, PaymentFrequency.Monthly));
+
+        Assert.Equal<decimal?>([null, null, 50m], balances);
+    }
+
+    [Fact]
+    public void The_latest_transaction_between_periods_3_and_4_shows_in_period_4_and_later_periods_are_omitted()
+    {
+        var points = new[] { P(D(2023, 12, 1), 500m), P(D(2024, 3, 10), 400m) };
+
+        var balances = PeriodBalances.Lookup(
+            points, PeriodBalances.MortgagePeriods(D(2023, 11, 29), 12, PaymentFrequency.Monthly));
+
+        // Dates: 29 Dec, 29 Jan, 29 Feb, 29 Mar. 10 Mar falls between periods 3 and 4.
+        Assert.Equal<decimal?>([500m, 500m, 500m, 400m], balances);
+    }
+
+    [Fact]
+    public void The_latest_transaction_before_period_1s_date_shows_in_period_1()
+    {
+        var points = new[] { P(D(2023, 11, 1), 700m), P(D(2023, 12, 5), 650m) };
+
+        var balances = PeriodBalances.Lookup(
+            points, PeriodBalances.MortgagePeriods(D(2023, 11, 29), 12, PaymentFrequency.Monthly));
+
+        Assert.Equal<decimal?>([650m], balances);
     }
 
     [Fact]
@@ -74,7 +172,7 @@ public sealed class PeriodBalancesTests
 
         var balances = PeriodBalances.Lookup(points, periods);
 
-        // Period 1 [1 Jan, 31 Jan] holds the point; period 2 starts after it.
+        // Period 1 [.., 1 Feb] holds the point; period 2 starts after it.
         Assert.Equal<decimal?>([50m], balances);
     }
 
@@ -154,6 +252,26 @@ public sealed class PeriodBalancesTests
         var balances = PeriodBalances.Lookup(points, PeriodBalances.MonthlyPeriods(D(2026, 1, 31)));
 
         Assert.Equal<decimal?>([10m, 30m], balances);
+    }
+
+    // 022 shifted the repayment date rule by one interval; the 020 fallback windows must not move.
+    [Fact]
+    public void Monthly_fallback_windows_are_unchanged_by_the_022_repayment_date_rule()
+    {
+        Assert.Equal(
+            [
+                new BalancePeriod(D(2026, 1, 31), D(2026, 2, 27)),
+                new BalancePeriod(D(2026, 2, 28), D(2026, 3, 30)),
+                new BalancePeriod(D(2026, 3, 31), D(2026, 4, 29)),
+                new BalancePeriod(D(2026, 4, 30), D(2026, 5, 30)),
+            ],
+            PeriodBalances.MonthlyPeriods(D(2026, 1, 31)).Take(4));
+        Assert.Equal(
+            [
+                new BalancePeriod(D(2026, 1, 1), D(2026, 1, 31)),
+                new BalancePeriod(D(2026, 2, 1), D(2026, 2, 28)),
+            ],
+            PeriodBalances.MonthlyPeriods(D(2026, 1, 1)).Take(2));
     }
 
     [Fact]

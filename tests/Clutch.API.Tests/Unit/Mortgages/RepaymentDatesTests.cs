@@ -2,33 +2,50 @@ using Clutch.API.Domain.Mortgages;
 
 namespace Clutch.API.Tests.Unit.Mortgages;
 
+// Payment N is the disbursal date plus N intervals (022 FR-007). Shared vectors with repaymentDates.test.ts.
 public sealed class RepaymentDatesTests
 {
     [Fact]
-    public void Monthly_360_periods_from_1_Jan_2000_ends_1_Dec_2029()
+    public void Monthly_one_period_is_one_month_after_disbursal()
+    {
+        var result = RepaymentDates.FinalRepaymentDate(
+            new DateOnly(2023, 11, 29), 1, PaymentFrequency.Monthly);
+
+        Assert.Equal(new DateOnly(2023, 12, 29), result);
+    }
+
+    [Fact]
+    public void Monthly_360_periods_from_29_Nov_2023_ends_29_Nov_2053()
+    {
+        var result = RepaymentDates.FinalRepaymentDate(
+            new DateOnly(2023, 11, 29), 360, PaymentFrequency.Monthly);
+
+        Assert.Equal(new DateOnly(2053, 11, 29), result);
+    }
+
+    [Fact]
+    public void Monthly_360_periods_from_1_Jan_2000_ends_1_Jan_2030()
     {
         var result = RepaymentDates.FinalRepaymentDate(
             new DateOnly(2000, 1, 1), 360, PaymentFrequency.Monthly);
 
-        Assert.Equal(new DateOnly(2029, 12, 1), result);
+        Assert.Equal(new DateOnly(2030, 1, 1), result);
     }
 
-    [Fact]
-    public void Monthly_from_31_Jan_clamps_to_month_end()
+    [Theory]
+    [InlineData(1, 2024, 2, 29)]
+    [InlineData(2, 2024, 3, 31)]
+    [InlineData(3, 2024, 4, 30)]
+    public void Monthly_from_31_Jan_anchors_on_the_disbursal_day_and_clamps_to_month_end(
+        long periods,
+        int year,
+        int month,
+        int day)
     {
         var result = RepaymentDates.FinalRepaymentDate(
-            new DateOnly(2001, 1, 31), 2, PaymentFrequency.Monthly);
+            new DateOnly(2024, 1, 31), periods, PaymentFrequency.Monthly);
 
-        Assert.Equal(new DateOnly(2001, 2, 28), result);
-    }
-
-    [Fact]
-    public void Monthly_anchors_on_the_first_date_not_the_previous_clamped_date()
-    {
-        var result = RepaymentDates.FinalRepaymentDate(
-            new DateOnly(2001, 1, 31), 3, PaymentFrequency.Monthly);
-
-        Assert.Equal(new DateOnly(2001, 3, 31), result);
+        Assert.Equal(new DateOnly(year, month, day), result);
     }
 
     [Fact]
@@ -37,7 +54,7 @@ public sealed class RepaymentDatesTests
         var result = RepaymentDates.FinalRepaymentDate(
             new DateOnly(2000, 1, 1), 3, PaymentFrequency.Weekly);
 
-        Assert.Equal(new DateOnly(2000, 1, 15), result);
+        Assert.Equal(new DateOnly(2000, 1, 22), result);
     }
 
     [Fact]
@@ -46,18 +63,16 @@ public sealed class RepaymentDatesTests
         var result = RepaymentDates.FinalRepaymentDate(
             new DateOnly(2000, 1, 1), 3, PaymentFrequency.Fortnightly);
 
-        Assert.Equal(new DateOnly(2000, 1, 29), result);
+        Assert.Equal(new DateOnly(2000, 2, 12), result);
     }
 
     [Theory]
     [InlineData(PaymentFrequency.Weekly)]
     [InlineData(PaymentFrequency.Fortnightly)]
     [InlineData(PaymentFrequency.Monthly)]
-    public void One_period_ends_on_the_first_date(PaymentFrequency frequency)
+    public void Zero_periods_is_null(PaymentFrequency frequency)
     {
-        var first = new DateOnly(2000, 6, 15);
-
-        Assert.Equal(first, RepaymentDates.FinalRepaymentDate(first, 1, frequency));
+        Assert.Null(RepaymentDates.FinalRepaymentDate(new DateOnly(2000, 6, 15), 0, frequency));
     }
 
     [Theory]
@@ -75,16 +90,17 @@ public sealed class RepaymentDatesTests
     public void Monthly_ending_exactly_on_31_Dec_9999_is_accepted()
     {
         var result = RepaymentDates.FinalRepaymentDate(
-            new DateOnly(9999, 12, 31), 1, PaymentFrequency.Monthly);
+            new DateOnly(9999, 10, 31), 2, PaymentFrequency.Monthly);
 
         Assert.Equal(new DateOnly(9999, 12, 31), result);
+        Assert.Null(RepaymentDates.FinalRepaymentDate(new DateOnly(9999, 10, 31), 3, PaymentFrequency.Monthly));
     }
 
     [Fact]
     public void Monthly_one_period_past_December_9999_is_null()
     {
         Assert.Null(RepaymentDates.FinalRepaymentDate(
-            new DateOnly(9999, 12, 1), 2, PaymentFrequency.Monthly));
+            new DateOnly(9999, 12, 1), 1, PaymentFrequency.Monthly));
     }
 
     [Fact]
@@ -93,14 +109,14 @@ public sealed class RepaymentDatesTests
         var result = RepaymentDates.FinalRepaymentDate(
             new DateOnly(1, 1, 1), 1, PaymentFrequency.Monthly);
 
-        Assert.Equal(new DateOnly(1, 1, 1), result);
+        Assert.Equal(new DateOnly(1, 2, 1), result);
     }
 
     [Fact]
     public void Leap_day_plus_twelve_months_clamps_to_28_Feb()
     {
         var result = RepaymentDates.FinalRepaymentDate(
-            new DateOnly(4, 2, 29), 13, PaymentFrequency.Monthly);
+            new DateOnly(4, 2, 29), 12, PaymentFrequency.Monthly);
 
         Assert.Equal(new DateOnly(5, 2, 28), result);
     }
@@ -109,7 +125,7 @@ public sealed class RepaymentDatesTests
     public void Weekly_in_year_50_adds_seven_days()
     {
         var result = RepaymentDates.FinalRepaymentDate(
-            new DateOnly(50, 1, 1), 2, PaymentFrequency.Weekly);
+            new DateOnly(50, 1, 1), 1, PaymentFrequency.Weekly);
 
         Assert.Equal(new DateOnly(50, 1, 8), result);
     }
@@ -117,11 +133,10 @@ public sealed class RepaymentDatesTests
     [Fact]
     public void Weekly_reaching_exactly_31_Dec_9999_is_accepted()
     {
-        var first = new DateOnly(9999, 12, 31).AddDays(-14);
-
         Assert.Equal(
             new DateOnly(9999, 12, 31),
-            RepaymentDates.FinalRepaymentDate(first, 3, PaymentFrequency.Weekly));
-        Assert.Null(RepaymentDates.FinalRepaymentDate(first, 4, PaymentFrequency.Weekly));
+            RepaymentDates.FinalRepaymentDate(new DateOnly(9999, 12, 10), 3, PaymentFrequency.Weekly));
+        Assert.Null(RepaymentDates.FinalRepaymentDate(new DateOnly(9999, 12, 10), 4, PaymentFrequency.Weekly));
+        Assert.Null(RepaymentDates.FinalRepaymentDate(new DateOnly(9999, 12, 17), 3, PaymentFrequency.Weekly));
     }
 }

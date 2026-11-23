@@ -22,12 +22,13 @@ public sealed class PeriodBalancesTests(SqlServerFixture fixture)
 
     [Fact]
     [Trait("Category", "SqlServer")]
-    public async Task Balances_are_end_of_period_values_in_minor_units()
+    public async Task Balances_are_end_of_day_values_on_each_period_date_in_minor_units()
     {
         using var client = await SignedInClientAsync(fixture.Factory);
         var accountId = await CreateAccountAsync(client);
         await SeedTransactionAsync(fixture, accountId, new DateOnly(2026, 1, 10), 1000m);
-        await SeedTransactionAsync(fixture, accountId, new DateOnly(2026, 2, 5), 900.5m);
+        await SeedTransactionAsync(fixture, accountId, new DateOnly(2026, 2, 1), 950m);
+        await SeedTransactionAsync(fixture, accountId, new DateOnly(2026, 2, 2), 900.5m);
         await SeedTransactionAsync(fixture, accountId, new DateOnly(2026, 2, 6), 800m);
 
         using var response = await GetAsync(client, $"accountId={accountId}&{Schedule()}");
@@ -35,9 +36,59 @@ public sealed class PeriodBalancesTests(SqlServerFixture fixture)
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = (await response.Content.ReadFromJsonAsync<BalancesDto>())!;
         Assert.Equal("AUD", body.CurrencyCode);
-        Assert.Equal(7, body.PeriodCount);
-        // Period 1 = January; period 2 = February; later periods omitted.
-        Assert.Equal<string?>(["1000.00", "800.00"], body.Balances);
+        Assert.Equal(6, body.PeriodCount);
+        // Period 1 is dated 1 Feb (end of that day: 950; 2 Feb is ignored); period 2 is 1 Mar: 800.
+        // The latest transaction (6 Feb) is shown in period 2; later periods omitted.
+        Assert.Equal<string?>(["950.00", "800.00"], body.Balances);
+    }
+
+    // Payment N is the disbursal date plus N intervals (022 FR-007): 9999-12-10 + 3 weeks = 9999-12-31.
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task The_duration_limit_accepts_the_last_payment_on_31_Dec_9999_and_refuses_one_more()
+    {
+        using var client = await SignedInClientAsync(fixture.Factory);
+        var accountId = await CreateAccountAsync(client);
+
+        using var accepted = await GetAsync(client, $"accountId={accountId}&{Schedule("9999-12-10", "Weekly", 3)}");
+        using var refused = await GetAsync(client, $"accountId={accountId}&{Schedule("9999-12-10", "Weekly", 4)}");
+
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+        Assert.Equal(3, (await accepted.Content.ReadFromJsonAsync<BalancesDto>())!.PeriodCount);
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+        Assert.Equal(
+            "The final repayment date would be later than 31 Dec 9999",
+            (await ProblemAsync(refused)).Errors!["duration"][0]);
+    }
+
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task A_mortgage_saved_under_the_old_rule_past_31_Dec_9999_is_refused_with_the_duration_message()
+    {
+        using var late = fixture.Factory.WithWebHostBuilder(
+            builder => MortgageCreateTests.UseClock(builder, MortgageCreateTests.LateClock));
+        using var client = await SignedInClientAsync(late);
+        var accountId = await CreateAccountAsync(client);
+        var created = await CreateAsync(client, MortgageCreateTests.LateWeeklyBody("Old rule loan", duration: 3));
+        await using (var scope = fixture.Factory.Services.CreateAsyncScope())
+        {
+            // Duration 4 was valid under the old rule (9999-12-10 + 3 weeks); seeded past validation.
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.Mortgages
+                .Where(mortgage => mortgage.Id == created.Id)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(mortgage => mortgage.Duration, 4));
+        }
+
+        var saved = Assert.Single(await ListAsync(client));
+        using var response = await GetAsync(
+            client,
+            $"accountId={accountId}&{Schedule(saved.DisbursalDate, saved.PaymentFrequency, saved.Duration)}");
+
+        Assert.Equal(4, saved.Duration);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(
+            "The final repayment date would be later than 31 Dec 9999",
+            (await ProblemAsync(response)).Errors!["duration"][0]);
     }
 
     [Fact]
@@ -85,7 +136,7 @@ public sealed class PeriodBalancesTests(SqlServerFixture fixture)
 
         var body = (await response.Content.ReadFromJsonAsync<BalancesDto>())!;
         Assert.Empty(body.Balances);
-        Assert.Equal(7, body.PeriodCount);
+        Assert.Equal(6, body.PeriodCount);
     }
 
     [Theory]
@@ -128,7 +179,7 @@ public sealed class PeriodBalancesTests(SqlServerFixture fixture)
         using var response = await GetAsync(client, $"accountId={accountId}&{Schedule(frequency: "Weekly", duration: 100000)}");
 
         var body = (await response.Content.ReadFromJsonAsync<BalancesDto>())!;
-        Assert.Equal(100001, body.PeriodCount);
+        Assert.Equal(100000, body.PeriodCount);
         Assert.True(body.Balances.Count <= 3);
     }
 
@@ -236,6 +287,6 @@ public sealed class PeriodBalancesTests(SqlServerFixture fixture)
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(2), $"Took {stopwatch.Elapsed.TotalMilliseconds:F0} ms.");
         var body = (await response.Content.ReadFromJsonAsync<BalancesDto>())!;
-        Assert.Equal(361, body.PeriodCount);
+        Assert.Equal(360, body.PeriodCount);
     }
 }

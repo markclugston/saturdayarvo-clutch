@@ -10,6 +10,7 @@ import {
   newRow,
   canEditDisbursalDate,
   openingRowKey,
+  validateDraft,
   validateNewRateChange,
   type LoanDraft,
 } from './loanDraft'
@@ -70,8 +71,8 @@ describe('validateNewRateChange', () => {
     ['missing rate', '', '2001-01-01', { newInterestRate: 'Enter an interest rate' }],
     ['invalid date', '5', '', { effectiveDate: 'Enter a valid date' }],
     ['both empty', '', '', { newInterestRate: 'Enter an interest rate', effectiveDate: 'Enter a valid date' }],
-    ['date before disbursal', '5', '1999-12-01', { effectiveDate: 'Choose a date from 1 Jan 2000 to 1 Dec 2009' }],
-    ['date after final repayment', '5', '2010-01-01', { effectiveDate: 'Choose a date from 1 Jan 2000 to 1 Dec 2009' }],
+    ['date before disbursal', '5', '1999-12-01', { effectiveDate: 'Choose a date from 1 Jan 2000 to 1 Jan 2010' }],
+    ['date after final repayment', '5', '2010-01-02', { effectiveDate: 'Choose a date from 1 Jan 2000 to 1 Jan 2010' }],
     ['duplicate date', '6', '2000-01-01', { effectiveDate: 'This effective date is already used' }],
   ])('%s is refused with the 016 message', (_label, rate, date, expected) => {
     expect(validateNewRateChange(draft(), rate, date, today)).toEqual(expected)
@@ -87,6 +88,39 @@ describe('validateNewRateChange', () => {
 
   it('ignores problems on existing rows', () => {
     expect(validateNewRateChange(draft([newRow('101', '2000-01-01')]), '6', '2001-01-01', today)).toEqual({})
+  })
+})
+
+// Same vectors as MortgageValidatorTests and the integration tests (022 FR-007, SC-006).
+describe('final repayment date boundary (disbursal date plus Duration intervals)', () => {
+  function header(overrides: Partial<LoanDraft>): LoanDraft {
+    return {
+      ...emptyDraft(),
+      name: 'Home',
+      openingBalance: '500000',
+      duration: '360',
+      disbursalDate: '2000-01-01',
+      paymentFrequency: 'Monthly',
+      rows: [newRow('5', overrides.disbursalDate ?? '2000-01-01')],
+      ...overrides,
+    }
+  }
+
+  it('accepts the Duration whose last payment is 31 Dec 9999 and refuses the next', () => {
+    const lateToday = '9999-12-20'
+    const weekly = { disbursalDate: '9999-12-10', paymentFrequency: 'Weekly' as const }
+
+    expect(validateDraft(header({ ...weekly, duration: '3' }), lateToday)).toEqual({})
+    expect(validateDraft(header({ ...weekly, duration: '4' }), lateToday).duration)
+      .toBe('The final repayment date would be later than 31 Dec 9999')
+  })
+
+  it.each([
+    ['2029-12-31', {}],
+    ['2030-01-01', {}],
+    ['2030-01-02', { effectiveDate: 'Choose a date from 1 Jan 2000 to 1 Jan 2030' }],
+  ])('Effective Date %s against a 360 Monthly final repayment of 1 Jan 2030', (date, expected) => {
+    expect(validateNewRateChange(header({}), '4', date, today)).toEqual(expected)
   })
 })
 

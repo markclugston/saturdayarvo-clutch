@@ -203,7 +203,66 @@ public sealed class MortgageCreateTests(SqlServerFixture fixture)
         Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
     }
 
-    private static void UseClock(IWebHostBuilder builder, TimeProvider clock) =>
+    // Payment N is the disbursal date plus N intervals (022 FR-007): 9999-12-10 + 3 weeks = 9999-12-31.
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task Duration_limit_accepts_the_last_payment_on_31_Dec_9999_and_refuses_one_more()
+    {
+        using var late = fixture.Factory.WithWebHostBuilder(builder => UseClock(builder, LateClock));
+        using var client = await SignedInClientAsync(late);
+
+        await CreateAsync(client, LateWeeklyBody("Last payment on 31 Dec 9999", duration: 3));
+        using var refused = await SendAsync(
+            client, HttpMethod.Post, "/api/mortgages", LateWeeklyBody("One payment too many", duration: 4));
+
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+        Assert.Equal(
+            "The final repayment date would be later than 31 Dec 9999",
+            (await ProblemAsync(refused)).Errors!["duration"][0]);
+    }
+
+    [Theory]
+    [InlineData("2029-12-31", true)]
+    [InlineData("2030-01-01", true)]
+    [InlineData("2030-01-02", false)]
+    [Trait("Category", "SqlServer")]
+    public async Task Effective_date_range_ends_on_the_final_repayment_date(string effectiveDate, bool accepted)
+    {
+        using var client = await SignedInClientAsync(fixture.Factory);
+        var body = Body(rates: new[]
+        {
+            new { newInterestRate = 5m, effectiveDate = "2000-01-01" },
+            new { newInterestRate = 4m, effectiveDate },
+        });
+
+        using var response = await SendAsync(client, HttpMethod.Post, "/api/mortgages", body);
+
+        if (accepted)
+        {
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        }
+        else
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            Assert.Equal(
+                "Choose a date from 1 Jan 2000 to 1 Jan 2030",
+                (await ProblemAsync(response)).Errors!["interestRateChanges[1].effectiveDate"][0]);
+        }
+    }
+
+    internal static readonly TimeProvider LateClock =
+        new FixedTimeProvider(new DateTimeOffset(9999, 12, 20, 0, 0, 0, TimeSpan.Zero));
+
+    internal static object LateWeeklyBody(string name, int duration, int? version = null) =>
+        Body(
+            name,
+            duration: duration,
+            disbursalDate: "9999-12-10",
+            paymentFrequency: "Weekly",
+            rates: new[] { new { newInterestRate = 5m, effectiveDate = "9999-12-10" } },
+            version: version);
+
+    internal static void UseClock(IWebHostBuilder builder, TimeProvider clock) =>
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<TimeProvider>();

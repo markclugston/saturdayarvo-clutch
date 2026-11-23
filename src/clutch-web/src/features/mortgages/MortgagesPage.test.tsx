@@ -352,7 +352,7 @@ describe('MortgagesPage', () => {
 
       await fillForm(user, { periods: '360', first: '2024-01-01', frequency: 'Monthly' })
 
-      await waitFor(() => expect(within(timeline()).getByRole('table')).toHaveAttribute('aria-rowcount', '362'))
+      await waitFor(() => expect(within(timeline()).getByRole('table')).toHaveAttribute('aria-rowcount', '361'))
     })
 
     it('shows the prompt again when the Duration becomes invalid', async () => {

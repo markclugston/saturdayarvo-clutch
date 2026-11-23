@@ -24,7 +24,7 @@ describe('AmortizationSchedule with a Mortgage Account', () => {
 
   it('adds a balance column right of Bank Schedule headed with the account description', async () => {
     server.balances = { currencyCode: 'AUD', periodCount: 4, balances: [null, '1000.50', '980.00'] }
-    renderWithProviders(<AmortizationSchedule accountId={account.id} duration={3} {...saved} />)
+    renderWithProviders(<AmortizationSchedule accountId={account.id} duration={4} {...saved} />)
 
     expect(await screen.findByRole('columnheader', { name: 'Offset Account Balance' })).toBeInTheDocument()
     const table = screen.getByRole('table')
@@ -35,8 +35,47 @@ describe('AmortizationSchedule with a Mortgage Account', () => {
     expect(rows).toHaveLength(4)
     expect(within(rows[0] as HTMLElement).getAllByRole('cell')[3]).toHaveTextContent('')
     expect(within(rows[2] as HTMLElement).getAllByRole('cell')[3]).toHaveTextContent('$980.00')
+    // Rows after the last returned balance are blank (FR-005).
     expect(within(rows[3] as HTMLElement).getAllByRole('cell')[3]).toHaveTextContent('')
     expect(table.querySelectorAll('input, select, textarea')).toHaveLength(0)
+  })
+
+  it('shows Duration rows with each period date beside its balance, mapping balances[k - 1] to period k', async () => {
+    server.balances = { currencyCode: 'AUD', periodCount: 3, balances: ['1000.00', '990.00', '980.00'] }
+    renderWithProviders(<AmortizationSchedule accountId={account.id} duration={3} {...saved} />)
+
+    expect(await screen.findByRole('columnheader', { name: 'Offset Account Balance' })).toBeInTheDocument()
+    const table = screen.getByRole('table')
+    await waitFor(() => expect(within(table).getAllByRole('row')[3]).toHaveTextContent('$980.00'))
+    expect(table).toHaveAttribute('aria-rowcount', '4')
+    const rows = within(table).getAllByRole('row').slice(1)
+      .map((row) => within(row).getAllByRole('cell').map((cell) => cell.textContent))
+    expect(rows).toEqual([
+      ['1', '1 Feb 2026', 'Not yet calculated', '$1,000.00'],
+      ['2', '1 Mar 2026', 'Not yet calculated', '$990.00'],
+      ['3', '1 Apr 2026', 'Not yet calculated', '$980.00'],
+    ])
+  })
+
+  it('keeps the dates and shows the balance error when the request is refused for a mortgage past 31 Dec 9999', async () => {
+    server.balancesError = problem(400, {
+      errors: { duration: ['The final repayment date would be later than 31 Dec 9999'] },
+    })
+    renderWithProviders(
+      <AmortizationSchedule
+        accountId={account.id}
+        disbursalDate="9999-12-10"
+        duration={4}
+        paymentFrequency="Weekly"
+      />,
+    )
+
+    expect(await screen.findByText(BALANCES_FAILED_MESSAGE)).toBeInTheDocument()
+    const rows = within(screen.getByRole('table')).getAllByRole('row').slice(1)
+      .map((row) => within(row).getAllByRole('cell').map((cell) => cell.textContent))
+    expect(rows[0]?.slice(0, 2)).toEqual(['1', '17 Dec 9999'])
+    expect(rows[2]?.slice(0, 2)).toEqual(['3', '31 Dec 9999'])
+    expect(rows[3]?.slice(0, 2)).toEqual(['4', ''])
   })
 
   it('sends all three of disbursal date, frequency and duration', async () => {
@@ -50,10 +89,12 @@ describe('AmortizationSchedule with a Mortgage Account', () => {
     expect(params.get('duration')).toBe('3')
   })
 
-  it('has no column and no balances request without an account', () => {
+  it('has no column and no balances request without an account, and still shows dates and Duration rows', () => {
     renderWithProviders(<AmortizationSchedule duration={3} {...saved} />)
 
     expect(screen.getAllByRole('columnheader')).toHaveLength(3)
+    expect(screen.getByRole('table')).toHaveAttribute('aria-rowcount', '4')
+    expect(within(screen.getAllByRole('row')[1] as HTMLElement).getAllByRole('cell')[1]).toHaveTextContent('1 Feb 2026')
     expect(server.balanceRequests).toHaveLength(0)
   })
 
@@ -73,7 +114,7 @@ describe('AmortizationSchedule with a Mortgage Account', () => {
 
     await waitFor(() => expect(screen.getByRole('table')).toHaveAttribute('aria-busy', 'true'))
     expect(screen.getByRole('status')).toHaveTextContent('Loading account balances')
-    expect(screen.getByRole('table')).toHaveAttribute('aria-rowcount', '5')
+    expect(screen.getByRole('table')).toHaveAttribute('aria-rowcount', '4')
     await act(async () => release())
     await waitFor(() => expect(screen.getByRole('table')).not.toHaveAttribute('aria-busy'))
   })
@@ -84,7 +125,7 @@ describe('AmortizationSchedule with a Mortgage Account', () => {
 
     expect(await screen.findByText(BALANCES_FAILED_MESSAGE)).toBeInTheDocument()
     expect(screen.queryByText(/secret server detail/)).not.toBeInTheDocument()
-    expect(screen.getByRole('table')).toHaveAttribute('aria-rowcount', '5')
+    expect(screen.getByRole('table')).toHaveAttribute('aria-rowcount', '4')
   })
 
   it('shows monthly fallback rows with only Period and the balance filled when details are incomplete', async () => {
@@ -128,7 +169,9 @@ describe('AmortizationSchedule with a Mortgage Account', () => {
     server.balances = { currencyCode: 'AUD', periodCount: 4, balances: [null, '1.00'] }
     await userEvent.click(screen.getByRole('button', { name: 'Save details' }))
 
-    await waitFor(() => expect(screen.getByRole('table')).toHaveAttribute('aria-rowcount', '5'))
-    expect(within(screen.getByRole('table')).getAllByRole('row')[1]).toHaveTextContent('Not yet calculated')
+    await waitFor(() => expect(screen.getByRole('table')).toHaveAttribute('aria-rowcount', '4'))
+    const firstRow = within(screen.getByRole('table')).getAllByRole('row')[1] as HTMLElement
+    expect(within(firstRow).getAllByRole('cell').map((cell) => cell.textContent).slice(0, 3))
+      .toEqual(['1', '1 Feb 2026', 'Not yet calculated'])
   })
 })

@@ -2,8 +2,9 @@ namespace Clutch.API.Domain.Mortgages;
 
 public static class RepaymentDates
 {
-    // Date of the last of `periods` repayments, or null when it would be later than 31 Dec 9999.
-    // Monthly dates are anchored on the first date and clamp to the end of the month.
+    // Date of repayment `periods` (the last of `periods` repayments): the disbursal date plus `periods` payment
+    // intervals, so repayment 1 is one interval after disbursal. Null when it would be later than 31 Dec 9999
+    // or `periods` is below 1. Monthly dates are anchored on the disbursal day and clamp to the end of the month.
     public static DateOnly? FinalRepaymentDate(
         DateOnly disbursalDate,
         long periods,
@@ -14,7 +15,7 @@ public static class RepaymentDates
             return null;
         }
 
-        var steps = periods - 1;
+        var steps = periods;
         if (frequency == PaymentFrequency.Monthly)
         {
             var maxMonthIndex = (DateOnly.MaxValue.Year * 12L) + (DateOnly.MaxValue.Month - 1);
