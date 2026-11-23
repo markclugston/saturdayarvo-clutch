@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip } from '@/components/ui/tooltip'
@@ -5,6 +6,7 @@ import type { LoanPayoffTimelineView } from '@/lib/api/schemas'
 import { AmortizationSchedule } from './AmortizationSchedule'
 import { BurnDownChart } from './BurnDownChart'
 import type { PaymentFrequency } from './repaymentDates'
+import { calculateSchedule, type ScheduleInputs } from './scheduleCalculation'
 
 const SWITCH_LABEL: Record<LoanPayoffTimelineView, string> = {
   Burndown: 'Show Amortization Schedule',
@@ -29,6 +31,8 @@ type LoanPayoffTimelineProps = {
   paymentFrequency?: PaymentFrequency
   /** The Mortgage Account drop-down's current selection; none when undefined. */
   accountId?: string
+  /** The form's valid calculation inputs; the Bank Schedule is calculated from them. */
+  calculation?: ScheduleInputs
 }
 
 /** One card showing the burndown chart or the amortization schedule, with a switch at its top right. */
@@ -40,7 +44,12 @@ export function LoanPayoffTimeline({
   disbursalDate,
   paymentFrequency,
   accountId,
+  calculation,
 }: LoanPayoffTimelineProps) {
+  const schedule = useMemo(
+    () => (calculation ? calculateSchedule(calculation) ?? undefined : undefined),
+    [calculation],
+  )
   const label = SWITCH_LABEL[view]
 
   return (
@@ -55,13 +64,21 @@ export function LoanPayoffTimeline({
       </div>
       <p className="sr-only" role="status">{SHOWING[view]}</p>
       {view === 'Burndown'
-        ? <BurnDownChart saved={saved} />
+        ? (
+          <BurnDownChart
+            disbursalDate={calculation?.disbursalDate}
+            openingBalanceCents={calculation?.openingBalanceCents}
+            saved={saved}
+            schedule={schedule}
+          />
+        )
         : (
           <AmortizationSchedule
             accountId={accountId}
             disbursalDate={disbursalDate}
             duration={duration}
             paymentFrequency={paymentFrequency}
+            schedule={schedule}
           />
         )}
     </section>

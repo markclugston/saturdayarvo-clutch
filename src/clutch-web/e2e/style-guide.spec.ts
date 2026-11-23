@@ -532,6 +532,8 @@ const states: StateDef[] = [
     reach: async (page) => {
       await openMortgages(page)
       await expect(timelineGroup(page).getByRole('img', { name: /balance over time/i })).toBeVisible()
+      // 023: the Bank Schedule line is plotted.
+      await expect(timelineGroup(page).locator('polyline')).toBeVisible()
     },
   },
   {
@@ -757,6 +759,18 @@ for (const theme of ['Light', 'Dark'] as const) {
       await runChecks(page, state.name, theme)
     })
   }
+}
+
+// 023: the Bank Schedule line, framed on the chart itself (the page screenshots clip it below the fold).
+for (const theme of ['Light', 'Dark'] as const) {
+  test(`mortgages burndown line [${theme}]`, async ({ page }) => {
+    await reachState(page, states.find((state) => state.name === 'mortgages-timeline-burndown')!, theme)
+    const chart = timelineGroup(page).getByRole('img', { name: /falling from/i })
+    await chart.scrollIntoViewIfNeeded()
+    await expect(chart.locator('polyline')).toBeVisible()
+    await settle(page)
+    await expect(chart).toHaveScreenshot(`mortgages-burndown-line-${theme}.png`)
+  })
 }
 
 for (const theme of ['Light', 'Dark'] as const) {

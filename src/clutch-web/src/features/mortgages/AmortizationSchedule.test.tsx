@@ -136,3 +136,30 @@ describe('AmortizationSchedule', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
   })
 })
+
+describe('AmortizationSchedule Bank Schedule values', () => {
+  const schedule = [
+    { period: 1, date: '2023-12-29', openingCents: 50000000, interestCents: 250000, repaymentCents: 299775, closingCents: 49950225 },
+    { period: 2, date: '2024-01-29', openingCents: 49950225, interestCents: 249751, repaymentCents: 299775, closingCents: 49900201 },
+    { period: 3, date: '2024-02-29', openingCents: 49900201, interestCents: 0, repaymentCents: 49900201, closingCents: 0 },
+  ]
+
+  it('shows each period closing balance, right aligned in the default text colour', () => {
+    render(<AmortizationSchedule duration={3} schedule={schedule} {...monthly} />)
+
+    expect(cells(1)).toEqual(['1', '29 Dec 2023', '$499,502.25'])
+    expect(cells(2)[2]).toBe('$499,002.01')
+    expect(cells(3)[2]).toBe('$0.00')
+    const cell = screen.getByText('$499,502.25')
+    expect(cell).toHaveClass('text-right', 'tabular-nums')
+    expect(cell).not.toHaveClass('text-fg-secondary')
+    expect(screen.getByRole('table')).toHaveAttribute('aria-rowcount', '4')
+  })
+
+  it('shows Not yet calculated without a schedule', () => {
+    render(<AmortizationSchedule duration={3} {...monthly} />)
+
+    expect(cells(1)[2]).toBe('Not yet calculated')
+    expect(screen.getAllByText('Not yet calculated', { selector: '[role="cell"]' })[0]).toHaveClass('text-fg-secondary')
+  })
+})

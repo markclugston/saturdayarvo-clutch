@@ -13,6 +13,7 @@ import {
 import type { LoanPayoffTimelineView, Mortgage } from '@/lib/api/schemas'
 import { LoanDetailsForm, type DraftSchedule } from './LoanDetailsForm'
 import { LoanPayoffTimeline } from './LoanPayoffTimeline'
+import type { ScheduleInputs } from './scheduleCalculation'
 import { MortgageTabs } from './MortgageTabs'
 import {
   MortgageUnauthorizedError,
@@ -48,6 +49,9 @@ export function MortgagesPage({ userId }: MortgagesPageProps) {
   const [liveAccountId, setLiveAccountId] = useState('')
   // The form's valid Duration, Disbursal Date and Payment Frequency; sizes the schedule of an unsaved mortgage.
   const [draftSchedule, setDraftSchedule] = useState<DraftSchedule | undefined>(undefined)
+
+  // The form's calculation inputs while all are valid; drives the Bank Schedule values.
+  const [calculation, setCalculation] = useState<ScheduleInputs | undefined>(undefined)
 
   const mortgages = query.data
   // The default (first) mortgage is pinned by id so a refetch cannot silently change what is selected.
@@ -150,6 +154,7 @@ export function MortgagesPage({ userId }: MortgagesPageProps) {
           void queryClient.invalidateQueries({ queryKey: mortgagesQueryKey })
         }}
         onAccountChange={setLiveAccountId}
+        onCalculationInputsChange={setCalculation}
         onScheduleChange={setDraftSchedule}
         onGone={() => handleGone(selectedMortgage?.id ?? '')}
         onReloadAll={async () => {
@@ -178,9 +183,12 @@ export function MortgagesPage({ userId }: MortgagesPageProps) {
       />
       <LoanPayoffTimeline
         accountId={liveAccountId === '' ? undefined : liveAccountId}
-        disbursalDate={selectedMortgage?.disbursalDate ?? draftSchedule?.disbursalDate}
-        duration={selectedMortgage?.duration ?? draftSchedule?.duration}
-        paymentFrequency={selectedMortgage?.paymentFrequency ?? draftSchedule?.paymentFrequency}
+        calculation={calculation}
+        disbursalDate={calculation?.disbursalDate ?? selectedMortgage?.disbursalDate ?? draftSchedule?.disbursalDate}
+        duration={calculation?.duration ?? selectedMortgage?.duration ?? draftSchedule?.duration}
+        paymentFrequency={calculation?.paymentFrequency
+          ?? selectedMortgage?.paymentFrequency
+          ?? draftSchedule?.paymentFrequency}
         onSwitch={() => {
           const next: LoanPayoffTimelineView = view === 'Burndown' ? 'Schedule' : 'Burndown'
           // The cache is the shown view: set it first, so the switch never waits on the save.

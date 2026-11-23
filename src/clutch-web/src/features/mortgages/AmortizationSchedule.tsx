@@ -4,8 +4,10 @@ import { ErrorMessage } from '@/components/ui/error-message'
 import { getAccounts } from '@/features/accounts/api'
 import { formatCurrencyAmount } from '@/lib/formatCurrencyAmount'
 import { usePeriodBalances, type PeriodBalanceRequest } from './api'
+import { formatCurrency } from './FormattedNumberField'
 import { formatDisplayDate } from './loanDraft'
 import { finalRepaymentDate, type PaymentFrequency } from './repaymentDates'
+import type { ScheduledPeriod } from './scheduleCalculation'
 
 function findScrollParent(element: HTMLElement): HTMLElement | null {
   for (let parent = element.parentElement; parent; parent = parent.parentElement) {
@@ -34,6 +36,8 @@ type AmortizationScheduleProps = {
   paymentFrequency?: PaymentFrequency
   /** The Mortgage Account selection; with one, a balance column follows Bank Schedule. */
   accountId?: string
+  /** The calculated Bank Schedule; absent shows "Not yet calculated". */
+  schedule?: ScheduledPeriod[]
 }
 
 /** What the schedule table needs to add the account balance column. */
@@ -61,10 +65,22 @@ export function AmortizationSchedule(props: AmortizationScheduleProps) {
   )
 }
 
-function PlainSchedule({ duration, disbursalDate, paymentFrequency }: PeriodDates & { duration?: number }) {
+function PlainSchedule({
+  duration,
+  disbursalDate,
+  paymentFrequency,
+  schedule,
+}: PeriodDates & { duration?: number, schedule?: ScheduledPeriod[] }) {
   return duration === undefined
     ? <p className="text-sm text-fg-secondary">{ENTER_DETAILS_MESSAGE}</p>
-    : <ScheduleTable disbursalDate={disbursalDate} paymentFrequency={paymentFrequency} rowCount={duration} />
+    : (
+        <ScheduleTable
+          disbursalDate={disbursalDate}
+          paymentFrequency={paymentFrequency}
+          rowCount={duration}
+          schedule={schedule}
+        />
+      )
 }
 
 function AccountSchedule({
@@ -72,6 +88,7 @@ function AccountSchedule({
   duration,
   disbursalDate,
   paymentFrequency,
+  schedule,
 }: AmortizationScheduleProps & { accountId: string }) {
   const accountsQuery = useQuery({ queryKey: ['accounts'], queryFn: getAccounts })
   // An account missing from the list (deleted elsewhere) behaves as none.
@@ -88,7 +105,14 @@ function AccountSchedule({
   const balances = usePeriodBalances(request)
 
   if (!account) {
-    return <PlainSchedule disbursalDate={disbursalDate} duration={duration} paymentFrequency={paymentFrequency} />
+    return (
+      <PlainSchedule
+        disbursalDate={disbursalDate}
+        duration={duration}
+        paymentFrequency={paymentFrequency}
+        schedule={schedule}
+      />
+    )
   }
 
   const loading = balances.isPending
@@ -119,6 +143,7 @@ function AccountSchedule({
               disbursalDate={disbursalDate}
               paymentFrequency={paymentFrequency}
               rowCount={rowCount}
+              schedule={schedule}
             />
           )}
     </>
@@ -130,6 +155,14 @@ type ScheduleTableProps = PeriodDates & {
   balanceColumn?: BalanceColumn
   /** False for the fallback view: only Period and the balance are filled. */
   calculated?: boolean
+  schedule?: ScheduledPeriod[]
+}
+
+/** 49950225 cents -> "$499,502.25". */
+function closingBalance(period: ScheduledPeriod): string {
+  const whole = Math.floor(period.closingCents / 100)
+  const cents = String(period.closingCents % 100).padStart(2, '0')
+  return formatCurrency(`${whole}.${cents}`)
 }
 
 /** "29 Dec 2023" for period k, or '' without a disbursal date and frequency or past 31 Dec 9999. */
@@ -145,6 +178,7 @@ function ScheduleTable({
   rowCount,
   balanceColumn,
   calculated = true,
+  schedule,
   disbursalDate,
   paymentFrequency,
 }: ScheduleTableProps) {
@@ -178,6 +212,15 @@ function ScheduleTable({
       window.removeEventListener('resize', measure)
     }
   }, [])
+
+  // The calculated closing balance; "Not yet calculated" without a schedule; blank in the fallback view.
+  function bankScheduleCell(period: number): string {
+    const scheduled = calculated ? schedule?.[period - 1] : undefined
+    if (scheduled) {
+      return closingBalance(scheduled)
+    }
+    return calculated ? NOT_CALCULATED : ''
+  }
 
   const columns = balanceColumn ? 'grid-cols-[5rem_1fr_1fr_1fr]' : 'grid-cols-[5rem_1fr_1fr]'
   const first = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN)
@@ -223,7 +266,12 @@ function ScheduleTable({
               <div className="flex items-center px-3" role="cell">
                 {calculated ? periodDate(period, { disbursalDate, paymentFrequency }) : ''}
               </div>
-              <div className="flex items-center justify-end px-3 text-right text-fg-secondary tabular-nums" role="cell">{calculated ? NOT_CALCULATED : ''}</div>
+              <div
+                className={`flex items-center justify-end px-3 text-right tabular-nums ${bankScheduleCell(period) === NOT_CALCULATED ? 'text-fg-secondary' : ''}`}
+                role="cell"
+              >
+                {bankScheduleCell(period)}
+              </div>
               {balanceColumn && (
                 <div className="flex items-center justify-end px-3 text-right tabular-nums" role="cell">{balanceColumn.cell(period)}</div>
               )}

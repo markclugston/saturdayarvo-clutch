@@ -1,4 +1,5 @@
 import type { Mortgage, MortgageInput } from '@/lib/api/schemas'
+import type { ScheduleInputs } from './scheduleCalculation'
 import {
   finalRepaymentDate,
   formatMessageDate,
@@ -293,4 +294,33 @@ export function validateNewRateChange(
     result.effectiveDate = dateError
   }
   return result
+}
+
+/** Opening Balance text (at most 2 dp, already validated) as whole cents, without float multiplication. */
+function toCents(value: string): number {
+  const [whole = '0', fraction = ''] = value.trim().split('.')
+  return Number(whole === '' ? '0' : whole) * 100 + Number(fraction.padEnd(2, '0').slice(0, 2))
+}
+
+/**
+ * The calculation inputs of the draft; null when any of them is invalid. The Name is not a calculation
+ * input, so an invalid Name alone still yields inputs.
+ */
+export function scheduleInputs(draft: LoanDraft, today: string): ScheduleInputs | null {
+  const errors = validateDraft(draft, today)
+  delete errors.name
+  if (Object.keys(errors).length > 0 || draft.paymentFrequency === '') {
+    return null
+  }
+  const rateChanges = draft.rows
+    .filter((row) => !isEmptyRow(row))
+    .map((row) => ({ annualRatePercent: Number(row.rate.trim()), effectiveDate: row.date }))
+    .sort((left, right) => left.effectiveDate.localeCompare(right.effectiveDate))
+  return {
+    openingBalanceCents: toCents(draft.openingBalance),
+    disbursalDate: draft.disbursalDate,
+    duration: Number(draft.duration.trim()),
+    paymentFrequency: draft.paymentFrequency,
+    rateChanges,
+  }
 }

@@ -74,3 +74,51 @@ describe('LoanPayoffTimeline', () => {
     expect(screen.getByRole('button', { name: 'Show Burndown Chart' })).toBeEnabled()
   })
 })
+
+describe('LoanPayoffTimeline calculation', () => {
+  const calculation = {
+    openingBalanceCents: 50000000,
+    disbursalDate: '2023-11-29',
+    duration: 360,
+    paymentFrequency: 'Monthly' as const,
+    rateChanges: [{ annualRatePercent: 6, effectiveDate: '2023-11-29' }],
+  }
+
+  it('shows the calculated balances in the table', () => {
+    render(
+      <LoanPayoffTimeline
+        calculation={calculation}
+        disbursalDate="2023-11-29"
+        duration={360}
+        onSwitch={vi.fn()}
+        paymentFrequency="Monthly"
+        saved
+        view="Schedule"
+      />,
+    )
+
+    expect(screen.getByText('$499,502.25')).toBeInTheDocument()
+    expect(screen.getByText('$499,002.01')).toBeInTheDocument()
+  })
+
+  it('shows Not yet calculated for the table and the existing message for the chart without inputs', () => {
+    const { rerender } = render(<LoanPayoffTimeline duration={12} onSwitch={vi.fn()} saved view="Schedule" />)
+    expect(screen.getAllByText('Not yet calculated').length).toBeGreaterThan(0)
+
+    rerender(<LoanPayoffTimeline duration={12} onSwitch={vi.fn()} saved view="Burndown" />)
+    expect(screen.getByText('The burn down will appear once the schedule is calculated.')).toBeInTheDocument()
+  })
+
+  it('draws the same schedule on the chart and redraws when the inputs change', () => {
+    const { rerender } = render(<LoanPayoffTimeline calculation={calculation} onSwitch={vi.fn()} saved view="Burndown" />)
+    const points = () => screen.getByRole('img').querySelector('polyline')?.getAttribute('points') ?? ''
+    expect(points().split(' ')).toHaveLength(361)
+    const before = points()
+
+    rerender(<LoanPayoffTimeline calculation={{ ...calculation, duration: 12 }} onSwitch={vi.fn()} saved view="Burndown" />)
+
+    expect(points().split(' ')).toHaveLength(13)
+    expect(points()).not.toBe(before)
+    expect(screen.queryByText('The burn down will appear once the schedule is calculated.')).not.toBeInTheDocument()
+  })
+})

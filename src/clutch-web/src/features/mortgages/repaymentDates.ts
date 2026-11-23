@@ -106,3 +106,13 @@ export function finalRepaymentDate(
   }
   return toIso(fromUtcMilliseconds(startMs + steps * daysPerPeriod * DAY_MS))
 }
+
+// Whole UTC calendar days from `from` to `to` (negative when `to` is earlier); NaN for an unreadable date.
+export function daysBetween(from: string, to: string): number {
+  const start = parseDate(from)
+  const end = parseDate(to)
+  if (!start || !end) {
+    return Number.NaN
+  }
+  return Math.round((utcMilliseconds(end) - utcMilliseconds(start)) / DAY_MS)
+}

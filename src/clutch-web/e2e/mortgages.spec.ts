@@ -228,7 +228,8 @@ test('mortgages journey: add, reload, sign out and in, switch, rename, guard and
     await expect(tab(page, 'Home loan')).toHaveAttribute('aria-current', 'true')
     // Duration rows; period 1 is one month after the 1 Jan 2000 Disbursal Date (022 FR-001, FR-002).
     await expect(page.getByRole('table')).toHaveAttribute('aria-rowcount', '361')
-    await expect(page.getByRole('row').nth(1).getByRole('cell')).toHaveText(['1', '1 Feb 2000', 'Not yet calculated'])
+    // 023: Bank Schedule is calculated ($500,000.50 at 5.25% for 360 months, first repayment on 1 Feb 2000).
+    await expect(page.getByRole('row').nth(1).getByRole('cell')).toHaveText(['1', '1 Feb 2000', '$499,426.98'])
 
     // Reload: persisted, and the rate changes come back in effective-date order.
     await page.reload()
@@ -432,6 +433,58 @@ test('mortgage account: linking shows a balance column right of Bank Schedule an
     await page.reload()
     await openMortgages(page)
     await expect(page.getByLabel('Mortgage Account')).toHaveValue('')
+  } finally {
+    await context.close()
+  }
+})
+
+test('calculated bank schedule: values, rate change, invalid edit and burndown line', async ({ browser }) => {
+  const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:5173'
+  const context = await browser.newContext({ baseURL })
+
+  try {
+    await registerAndSignIn(context, `calculated-${randomUUID()}@example.test`)
+    const token = await (await context.request.get('/api/security/csrf-token')).json() as { requestToken: string }
+    const created = await context.request.post('/api/mortgages', {
+      headers: { 'X-CSRF-TOKEN': token.requestToken },
+      data: {
+        name: 'Calculated Home',
+        openingBalance: 500000,
+        duration: 360,
+        disbursalDate: '2023-11-29',
+        paymentFrequency: 'Monthly',
+        interestRateChanges: [{ newInterestRate: 6, effectiveDate: '2023-11-29' }],
+      },
+    })
+    expect(created.status(), await created.text()).toBe(201)
+
+    const page = await context.newPage()
+    await page.goto('/')
+    await openMortgages(page)
+
+    // Burndown: a plotted line with a value-describing text alternative.
+    const chart = timeline(page).getByRole('img', { name: /balance over time/i })
+    await expect(chart).toHaveAccessibleName(/falling from \$500,000\.00 on 29 Nov 2023 to \$0\.00 on 29 Nov 2053/)
+    await expect(chart.locator('polyline')).toHaveCount(1)
+
+    // Schedule: calculated balances, never saved.
+    await switchView(page, 'Show Amortization Schedule')
+    await expect(timeline(page).getByRole('cell', { name: '$499,502.25' })).toBeVisible()
+    await expect(timeline(page).getByRole('cell', { name: '$499,002.01' })).toBeVisible()
+
+    // A rate change edit updates the values without saving.
+    const before = await timeline(page).getByRole('row').nth(8).textContent()
+    await addRates(page, [['5.5', '2024-03-29']])
+    await expect(timeline(page).getByRole('row').nth(8)).not.toHaveText(before ?? '')
+
+    // An invalid edit shows "Not yet calculated" (no saved fallback).
+    await page.getByLabel('Duration').fill('')
+    await expect(timeline(page).getByRole('cell', { name: 'Not yet calculated' }).first()).toBeVisible()
+
+    const accessibility = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+      .analyze()
+    expect(accessibility.violations).toEqual([])
   } finally {
     await context.close()
   }

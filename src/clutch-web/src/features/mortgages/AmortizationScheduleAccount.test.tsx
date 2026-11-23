@@ -175,3 +175,35 @@ describe('AmortizationSchedule with a Mortgage Account', () => {
       .toEqual(['1', '1 Feb 2026', 'Not yet calculated'])
   })
 })
+
+describe('AmortizationSchedule with a Mortgage Account and a calculated schedule', () => {
+  it('shows Bank Schedule and Actual Balance side by side', async () => {
+    const account = { id: '11111111-1111-4111-8111-111111111111', description: 'Offset Account', currencyCode: 'AUD' }
+    vi.resetAllMocks()
+    const server = installFakeApi([])
+    server.accounts = [account]
+    server.balances = { currencyCode: 'AUD', periodCount: 2, balances: ['1000.50', '980.00'] }
+    const schedule = [
+      { period: 1, date: '2026-02-01', openingCents: 100000, interestCents: 500, repaymentCents: 50500, closingCents: 50000 },
+      { period: 2, date: '2026-03-01', openingCents: 50000, interestCents: 250, repaymentCents: 50250, closingCents: 0 },
+    ]
+    renderWithProviders(
+      <AmortizationSchedule
+        accountId={account.id}
+        disbursalDate="2026-01-01"
+        duration={2}
+        paymentFrequency="Monthly"
+        schedule={schedule}
+      />,
+    )
+
+    await screen.findByRole('columnheader', { name: 'Actual Balance' })
+    await screen.findByText('$980.00')
+    const table = screen.getByRole('table')
+    const rows = within(table).getAllByRole('row').slice(1)
+    expect(within(rows[0] as HTMLElement).getAllByRole('cell').map((cell) => cell.textContent))
+      .toEqual(['1', '1 Feb 2026', '$500.00', '$1,000.50'])
+    expect(within(rows[1] as HTMLElement).getAllByRole('cell').map((cell) => cell.textContent))
+      .toEqual(['2', '1 Mar 2026', '$0.00', '$980.00'])
+  })
+})

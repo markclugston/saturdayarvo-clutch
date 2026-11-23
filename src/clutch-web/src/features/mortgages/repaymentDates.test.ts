@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { finalRepaymentDate, formatMessageDate, parseDate } from './repaymentDates'
+import { daysBetween, finalRepaymentDate, formatMessageDate, parseDate } from './repaymentDates'
 
 // Payment N is the disbursal date plus N intervals (022 FR-007).
 describe('finalRepaymentDate (shared vectors with the API)', () => {
@@ -63,5 +63,18 @@ describe('parseDate', () => {
     expect(parseDate('2001-02-29')).toBeNull()
     expect(parseDate('0000-01-01')).toBeNull()
     expect(parseDate('2000-02-29')).toEqual({ year: 2000, month: 2, day: 29 })
+  })
+})
+
+describe('daysBetween', () => {
+  it.each([
+    ['2023-12-29', '2024-01-29', 31],
+    ['2024-02-28', '2024-03-01', 2],
+    ['2023-02-28', '2023-03-01', 1],
+    ['2024-05-05', '2024-05-05', 0],
+    ['0050-01-01', '0050-01-08', 7],
+    ['2024-01-08', '2024-01-01', -7],
+  ])('%s to %s is %i days', (from, to, expected) => {
+    expect(daysBetween(from, to)).toBe(expected)
   })
 })

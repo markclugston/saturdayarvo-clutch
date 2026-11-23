@@ -7,6 +7,7 @@ import { useUnsavedChanges } from '@/components/unsaved-changes/UnsavedChangesPr
 import { getAccounts } from '@/features/accounts/api'
 import type { Mortgage } from '@/lib/api/schemas'
 import type { PaymentFrequency } from './repaymentDates'
+import type { ScheduleInputs } from './scheduleCalculation'
 import {
   MortgageChangedError,
   MortgageGoneError,
@@ -26,6 +27,7 @@ import {
   headerIsValid,
   localToday,
   openingRowKey,
+  scheduleInputs,
   mapServerErrors,
   mortgageToDraft,
   validateDraft,
@@ -56,6 +58,8 @@ type LoanDetailsFormProps = {
   onAccountChange?: (accountId: string) => void
   /** The draft's Duration, Disbursal Date and Payment Frequency while all are valid; undefined otherwise. */
   onScheduleChange?: (schedule: DraftSchedule | undefined) => void
+  /** The draft's calculation inputs while all are valid (the Name is ignored); undefined otherwise. */
+  onCalculationInputsChange?: (inputs: ScheduleInputs | undefined) => void
 }
 
 export type DraftSchedule = { duration: number; disbursalDate: string; paymentFrequency: PaymentFrequency }
@@ -75,6 +79,7 @@ export function LoanDetailsForm({
   onReload,
   onAccountChange,
   onScheduleChange,
+  onCalculationInputsChange,
 }: LoanDetailsFormProps) {
   const idPrefix = useId()
   const { isDirty: guardDirty, setDirty, run } = useUnsavedChanges()
@@ -133,6 +138,11 @@ export function LoanDetailsForm({
         }
       : undefined)
   }, [headerValid, draft.duration, draft.disbursalDate, draft.paymentFrequency, onScheduleChange])
+
+  const calculationInputs = useMemo(() => scheduleInputs(draft, today) ?? undefined, [draft, today])
+  useEffect(() => {
+    onCalculationInputsChange?.(calculationInputs)
+  }, [calculationInputs, onCalculationInputsChange])
 
   function change(patch: Partial<LoanDraft>) {
     setDraft((current) => ({ ...current, ...patch }))

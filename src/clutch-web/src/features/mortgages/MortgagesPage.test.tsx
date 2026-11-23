@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { useState, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  addRates,
   conflictError,
   fillForm,
   installFakeApi,
@@ -732,5 +733,74 @@ describe('MortgagesPage', () => {
     await screen.findByRole('heading', { name: 'Details' })
     setDate('Disbursal Date', '2000-01-01')
     expect(screen.getByLabelText('Disbursal Date')).toHaveValue('2000-01-01')
+  })
+})
+
+describe('MortgagesPage Bank Schedule values', () => {
+  const bankCell = (row: number) => {
+    const rows = within(timeline()).getAllByRole('row')
+    return within(rows[row] as HTMLElement).getAllByRole('cell')[2]?.textContent ?? ''
+  }
+
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('shows calculated balances for a saved mortgage, updates them on edit without saving, hides them when invalid', async () => {
+    const server = installFakeApi([makeMortgage({ name: 'Home', openingBalance: 100000, duration: 12 })], 'Schedule')
+    const user = userEvent.setup()
+    renderWithProviders(<MortgagesPage userId="user-1" />)
+
+    await screen.findByRole('table')
+    await waitFor(() => expect(bankCell(1)).toMatch(/^\$\d{2},\d{3}\.\d{2}$/))
+    const first = bankCell(1)
+    expect(bankCell(12)).toBe('$0.00')
+
+    await user.clear(screen.getByLabelText('Opening Balance'))
+    await user.type(screen.getByLabelText('Opening Balance'), '200000')
+    await waitFor(() => expect(bankCell(1)).not.toBe(first))
+    expect(bankCell(1)).toMatch(/^\$1\d{2},\d{3}\.\d{2}$/)
+    expect(server.requests.some((request) => request.method === 'PUT')).toBe(false)
+
+    await user.clear(screen.getByLabelText('Duration'))
+    await waitFor(() => expect(bankCell(1)).toBe('Not yet calculated'))
+
+    await user.type(screen.getByLabelText('Duration'), '24')
+    await waitFor(() => expect(bankCell(1)).toMatch(/^\$/))
+    expect(within(timeline()).getByRole('table')).toHaveAttribute('aria-rowcount', '25')
+
+    // An invalid Name alone keeps the values.
+    await user.clear(screen.getByLabelText('Name'))
+    expect(bankCell(1)).toMatch(/^\$/)
+  })
+
+  it('shows values for a valid unsaved form', async () => {
+    installFakeApi([], 'Schedule')
+    const user = userEvent.setup()
+    renderWithProviders(<MortgagesPage userId="user-1" />)
+
+    await screen.findByRole('heading', { name: 'Details' })
+    await fillForm(user, { balance: '120000', periods: '12', first: '2000-01-01', frequency: 'Monthly', rates: [['0', '2000-01-01']] })
+
+    await waitFor(() => expect(bankCell(1)).toBe('$110,000.00'))
+  })
+
+  it('updates the values when a rate change is added, edited and removed, without saving', async () => {
+    const server = installFakeApi([makeMortgage({ name: 'Home', openingBalance: 100000, duration: 12 })], 'Schedule')
+    const user = userEvent.setup()
+    renderWithProviders(<MortgagesPage userId="user-1" />)
+    await screen.findByRole('table')
+    await waitFor(() => expect(bankCell(12)).toBe('$0.00'))
+    const before = bankCell(8)
+
+    await addRates(user, [['9', '2000-04-01']])
+    await waitFor(() => expect(bankCell(8)).not.toBe(before))
+    expect(bankCell(12)).toBe('$0.00')
+    expect(server.requests.some((request) => request.method === 'PUT')).toBe(false)
+
+    await user.click(screen.getByRole('button', { name: 'Interest Rates' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^Remove 9/ }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(bankCell(8)).toBe(before))
   })
 })

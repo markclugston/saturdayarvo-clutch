@@ -650,3 +650,60 @@ describe('LoanDetailsForm Mortgage Account', () => {
     expect(await screen.findByText('Choose one of your accounts')).toBeInTheDocument()
   })
 })
+
+describe('LoanDetailsForm calculation inputs', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    installFakeApi([])
+  })
+
+  function renderEmitting(mortgage?: Mortgage) {
+    const onCalculationInputsChange = vi.fn()
+    renderWithProviders(
+      <LoanDetailsForm
+        mortgage={mortgage}
+        onCalculationInputsChange={onCalculationInputsChange}
+        onDeleted={() => {}}
+        onGone={() => {}}
+        onReload={async () => null}
+        onReloadAll={async () => {}}
+        onSaved={() => {}}
+        onUnauthorized={() => {}}
+      />,
+    )
+    return onCalculationInputsChange
+  }
+
+  it('emits the saved values of a clean saved mortgage', async () => {
+    const emit = renderEmitting(makeMortgage({ openingBalance: 250000.5, duration: 120 }))
+
+    await waitFor(() => expect(emit).toHaveBeenLastCalledWith({
+      openingBalanceCents: 25000050,
+      disbursalDate: '2000-01-01',
+      duration: 120,
+      paymentFrequency: 'Monthly',
+      rateChanges: [{ annualRatePercent: 5.25, effectiveDate: '2000-01-01' }],
+    }))
+  })
+
+  it('emits undefined while a calculation input is invalid, and inputs when only the Name is invalid', async () => {
+    const user = userEvent.setup()
+    const emit = renderEmitting(makeMortgage())
+    await waitFor(() => expect(emit).toHaveBeenLastCalledWith(expect.objectContaining({ duration: 360 })))
+
+    await user.clear(screen.getByLabelText('Duration'))
+    await waitFor(() => expect(emit).toHaveBeenLastCalledWith(undefined))
+
+    await user.type(screen.getByLabelText('Duration'), '12')
+    await waitFor(() => expect(emit).toHaveBeenLastCalledWith(expect.objectContaining({ duration: 12 })))
+
+    await user.clear(screen.getByLabelText('Name'))
+    await waitFor(() => expect(emit).toHaveBeenLastCalledWith(expect.objectContaining({ duration: 12 })))
+  })
+
+  it('emits undefined for an empty new mortgage', async () => {
+    const emit = renderEmitting()
+
+    await waitFor(() => expect(emit).toHaveBeenCalledWith(undefined))
+  })
+})

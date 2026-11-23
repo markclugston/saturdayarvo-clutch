@@ -10,6 +10,7 @@ import {
   newRow,
   canEditDisbursalDate,
   openingRowKey,
+  scheduleInputs,
   validateDraft,
   validateNewRateChange,
   type LoanDraft,
@@ -184,5 +185,50 @@ describe('canEditDisbursalDate', () => {
   it('is true only when there are no rows', () => {
     expect(canEditDisbursalDate(emptyDraft())).toBe(true)
     expect(canEditDisbursalDate({ ...emptyDraft(), rows: [newRow('5', '2020-01-01')] })).toBe(false)
+  })
+})
+
+describe('scheduleInputs', () => {
+  const valid = (): LoanDraft => ({
+    ...emptyDraft(),
+    name: 'Home',
+    openingBalance: '500000.10',
+    duration: '360',
+    disbursalDate: '2024-01-01',
+    paymentFrequency: 'Monthly',
+    rows: [newRow('5.5', '2025-01-01'), newRow('6', '2024-01-01'), newRow('', '')],
+  })
+
+  it('builds inputs with cents parsed from the decimal string and rate changes sorted by date', () => {
+    expect(scheduleInputs(valid(), today)).toEqual({
+      openingBalanceCents: 50000010,
+      disbursalDate: '2024-01-01',
+      duration: 360,
+      paymentFrequency: 'Monthly',
+      rateChanges: [
+        { annualRatePercent: 6, effectiveDate: '2024-01-01' },
+        { annualRatePercent: 5.5, effectiveDate: '2025-01-01' },
+      ],
+    })
+  })
+
+  it.each([
+    ['openingBalance', '0'],
+    ['openingBalance', '1.234'],
+    ['duration', '0'],
+    ['duration', '1.5'],
+    ['disbursalDate', ''],
+    ['paymentFrequency', ''],
+  ] as const)('is null when %s is %j', (field, value) => {
+    expect(scheduleInputs({ ...valid(), [field]: value }, today)).toBeNull()
+  })
+
+  it('is null when a rate is out of range or the opening rate is missing', () => {
+    expect(scheduleInputs({ ...valid(), rows: [newRow('101', '2024-01-01')] }, today)).toBeNull()
+    expect(scheduleInputs({ ...valid(), rows: [newRow('5', '2025-01-01')] }, today)).toBeNull()
+  })
+
+  it('ignores an invalid Name', () => {
+    expect(scheduleInputs({ ...valid(), name: '' }, today)).not.toBeNull()
   })
 })
