@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ErrorMessage } from '@/components/ui/error-message'
 import { formatCurrencyAmount } from '@/lib/formatCurrencyAmount'
 import { useActualBalances } from './actualBalances'
-import { formatCurrency } from './FormattedNumberField'
+import { formatCents } from './formatCents'
 import { formatDisplayDate } from './loanDraft'
 import { finalRepaymentDate, type PaymentFrequency } from './repaymentDates'
 import type { ScheduledPeriod } from './scheduleCalculation'
@@ -144,13 +144,6 @@ type ScheduleTableProps = PeriodDates & {
   schedule?: ScheduledPeriod[]
 }
 
-/** 49950225 cents -> "$499,502.25". */
-function closingBalance(period: ScheduledPeriod): string {
-  const whole = Math.floor(period.closingCents / 100)
-  const cents = String(period.closingCents % 100).padStart(2, '0')
-  return formatCurrency(`${whole}.${cents}`)
-}
-
 /** "29 Dec 2023" for period k, or '' without a disbursal date and frequency or past 31 Dec 9999. */
 function periodDate(period: number, { disbursalDate, paymentFrequency }: PeriodDates): string {
   if (disbursalDate === undefined || paymentFrequency === undefined) {
@@ -203,7 +196,7 @@ function ScheduleTable({
   function bankScheduleCell(period: number): string {
     const scheduled = calculated ? schedule?.[period - 1] : undefined
     if (scheduled) {
-      return closingBalance(scheduled)
+      return formatCents(scheduled.closingCents)
     }
     return calculated ? NOT_CALCULATED : ''
   }

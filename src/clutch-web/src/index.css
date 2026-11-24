@@ -44,6 +44,12 @@
     --color-chart-primary: rgb(var(--primary));
     --color-chart-tint: rgb(var(--primary-tint));
     --color-chart-navy: rgb(var(--accent-navy));
+    --color-chart-schedule-start: rgb(var(--chart-schedule-start));
+    --color-chart-schedule-mid: rgb(var(--chart-schedule-mid));
+    --color-chart-schedule-end: rgb(var(--chart-schedule-end));
+    --color-chart-actual-start: rgb(var(--chart-actual-start));
+    --color-chart-actual-mid: rgb(var(--chart-actual-mid));
+    --color-chart-actual-end: rgb(var(--chart-actual-end));
 
     --radius-chip: 6px;
     --radius-control: 10px;
@@ -72,6 +78,13 @@
     --neutral-strong-contrast: 255 255 255;
     --accent-navy: 27 36 51;
     --scrim: 17 19 24;
+
+    --chart-schedule-start: 26 95 230;
+    --chart-schedule-mid: 124 58 237;
+    --chart-schedule-end: 190 24 93;
+    --chart-actual-start: 0 118 128;
+    --chart-actual-mid: 3 105 161;
+    --chart-actual-end: 67 56 202;
 
     --status-danger-bg: 253 236 236;
     --status-danger: 197 34 31;
@@ -111,6 +124,13 @@
     --neutral-strong-contrast: 212 212 212;
     --accent-navy: 138 180 255;
     --scrim: 14 14 16;
+
+    --chart-schedule-start: 142 186 255;
+    --chart-schedule-mid: 206 176 255;
+    --chart-schedule-end: 249 168 212;
+    --chart-actual-start: 90 205 220;
+    --chart-actual-mid: 110 190 255;
+    --chart-actual-end: 165 180 252;
 
     --status-danger-bg: 73 61 62;
     --status-danger: 245 156 148;

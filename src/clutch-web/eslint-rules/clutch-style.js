@@ -15,6 +15,8 @@ const TOKEN_COLOURS = [
   'warning', 'warning-bg', 'success', 'success-bg', 'info', 'info-bg',
   'secondary-solid', 'secondary-solid-contrast',
   'chart-primary', 'chart-tint', 'chart-navy',
+  'chart-schedule-start', 'chart-schedule-mid', 'chart-schedule-end',
+  'chart-actual-start', 'chart-actual-mid', 'chart-actual-end',
   'white', 'black', 'transparent', 'current', 'inherit',
 ].join('|')
 

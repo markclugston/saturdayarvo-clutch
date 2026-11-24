@@ -33,14 +33,14 @@ Redraw the Mortgage Burndown (`BurnDownChart.tsx`) as an area chart: each series
 | DOT-001 | No | No .NET change. | — | N/A |
 | DOT-002 | No | No database access change. | — | N/A |
 | AUD-001 | No | No audit records. | — | N/A |
-| ENG-001 | Yes | Unit tests for `chartGeometry.ts`; component tests for series, legend, label values, keyboard, live region, pointer/keyboard ownership; e2e and style-guide browser tests (contrast along gradients, axe, screenshots, 320 px, reduced motion). | Lint, typecheck, vitest, Playwright (mocked + style-guide), build, `npm audit --omit=dev` | PENDING |
+| ENG-001 | Yes | Unit tests for `chartGeometry.ts`; component tests for series, legend, label values, keyboard, live region, pointer/keyboard ownership; e2e and style-guide browser tests (contrast along gradients, axe, screenshots, 320 px, reduced motion). | Lint, typecheck, vitest, Playwright (mocked + style-guide), build, `npm audit --omit=dev` | Pass |
 | OPS-001 | No | No service, logging or migration change. | — | N/A |
 | SEC-001 | No | No endpoint, auth or input change; keyboard/pointer input is local UI state only. | Completion security review (required for every completion) | N/A |
 | SEC-002 | No | No secrets. | — | N/A |
 | SEC-003 | Yes | Hover label shows balances already on screen in the schedule; nothing logged, stored or sent; live region text stays in the page. | Security review | Pass |
 | SEC-004 | No | No data entry. | — | N/A |
-| WEB-001 | Yes | Tokens first (`index.css`, lint list, rule test, browser tests), Title Case legend/label names, right-aligned label amounts (`text-right tabular-nums`), WCAG 2.2 AA (focus ring, keyboard, 4.1.3 status, 1.4.11 line contrast, 1.4.10 at 320 px), no new primitive; label styled like the tooltip popup surface. | Frontend gates, UI compliance checklist below | PENDING |
-| Perf & Observability | Yes (performance); metrics N/A | Hover/keyboard feedback is synchronous (< 100 ms, SC-003). The OpenTelemetry metrics clause covers user-initiated actions and service behaviour; hover and keyboard here change only transient client-side view state, start no request and change no data, and clutch-web has no telemetry pipeline, so no metric is added. | Browser latency test at 1,560 periods (component timing as early warning) | PENDING |
+| WEB-001 | Yes | Tokens first (`index.css`, lint list, rule test, browser tests), Title Case legend/label names, right-aligned label amounts (`text-right tabular-nums`), WCAG 2.2 AA (focus ring, keyboard, 4.1.3 status, 1.4.11 line contrast, 1.4.10 at 320 px), no new primitive; label styled like the tooltip popup surface. | Frontend gates, UI compliance checklist below | Pass |
+| Perf & Observability | Yes (performance); metrics N/A | Hover/keyboard feedback is synchronous (< 100 ms, SC-003). The OpenTelemetry metrics clause covers user-initiated actions and service behaviour; hover and keyboard here change only transient client-side view state, start no request and change no data, and clutch-web has no telemetry pipeline, so no metric is added. | Browser latency test at 1,560 periods (component timing as early warning) | Pass |
 
 **Style guide sections**: §5 Charts (tokens, faint guides), §6 tokens, §7–9 (Title Case, motion, contrast, focus), §11 checklist.
 
@@ -48,21 +48,21 @@ Redraw the Mortgage Burndown (`BurnDownChart.tsx`) as an area chart: each series
 
 | Item | Check | Plan |
 |---|---|---|
-| [ ] Only tokens used: no raw colours, default palette, non-token radius, extra ring or shadow, or `dark:` colour | Lint | Gradient stops use `text-chart-*` + `stopColor="currentColor"`; label uses `bg-raised text-fg rounded-control shadow-float` |
-| [ ] No borders or divider lines on layout containers (hairline utilities only) | Lint, Review | None added |
-| [ ] Transitions, durations and easing within the allowed set; `prefers-reduced-motion` respected | Lint, Browser | Overlay has no transitions; browser test under reduced motion |
-| [ ] Surface hierarchy follows canvas, content, card, raised | Browser, Review | Chart on card; label on raised |
-| [ ] Built from existing primitives and variants; none restyled ad hoc | Review | Label is an in-chart overlay, not the hover-trigger `Tooltip` (R5); reuses the tooltip popup's token classes |
-| [ ] Form fields use floating labels | Review | N/A — no fields |
-| [ ] Labels, headings and button text use Title Case; helper, error and body text use sentence case | Review | "Bank Schedule", "Actual Balance"; instructions sentence case |
-| [ ] % and $ fields use the shared formatted field | Component | N/A — no entry fields |
-| [ ] Numbers and currency amounts, and their column headers, are right aligned (`text-right`, `tabular-nums`) | Lint, Component, Review | Label amounts in a right-aligned column |
-| [ ] Navigation expand/collapse behaviour unchanged | Browser | Unchanged |
-| [ ] Dark theme has no pure black surface or pure white text | Browser | Tokens only |
-| [ ] Both themes verified (screenshots) | Browser | Updated burndown screenshots + hovered-label screenshots, both themes, 320 px |
-| [ ] WCAG 2.2 AA (axe) and contrast pass in both themes | Browser | axe with label shown; sampled gradient contrast ≥ 3:1 (SC-002) |
-| [ ] Visible focus ring on every interactive element | Browser | `focus-visible:focus-ring` on chart group; focused-group screenshot and ring style check, both themes |
-| [ ] Status not conveyed by colour alone | Review | Dashed vs solid lines; label names each series |
+| [x] Only tokens used: no raw colours, default palette, non-token radius, extra ring or shadow, or `dark:` colour | Lint | Gradient stops use `text-chart-*` + `stopColor="currentColor"`; label uses `bg-raised text-fg rounded-control shadow-float` |
+| [x] No borders or divider lines on layout containers (hairline utilities only) | Lint, Review | None added |
+| [x] Transitions, durations and easing within the allowed set; `prefers-reduced-motion` respected | Lint, Browser | Overlay has no transitions; browser test under reduced motion |
+| [x] Surface hierarchy follows canvas, content, card, raised | Browser, Review | Chart on card; label on raised |
+| [x] Built from existing primitives and variants; none restyled ad hoc | Review | Label is an in-chart overlay, not the hover-trigger `Tooltip` (R5); reuses the tooltip popup's token classes |
+| [x] Form fields use floating labels | Review | N/A — no fields |
+| [x] Labels, headings and button text use Title Case; helper, error and body text use sentence case | Review | "Bank Schedule", "Actual Balance"; instructions sentence case |
+| [x] % and $ fields use the shared formatted field | Component | N/A — no entry fields |
+| [x] Numbers and currency amounts, and their column headers, are right aligned (`text-right`, `tabular-nums`) | Lint, Component, Review | Label amounts in a right-aligned column |
+| [x] Navigation expand/collapse behaviour unchanged | Browser | Unchanged |
+| [x] Dark theme has no pure black surface or pure white text | Browser | Tokens only |
+| [x] Both themes verified (screenshots) | Browser | Updated burndown screenshots + hovered-label screenshots, both themes, 320 px |
+| [x] WCAG 2.2 AA (axe) and contrast pass in both themes | Browser | axe with label shown; sampled gradient contrast ≥ 3:1 (SC-002) |
+| [x] Visible focus ring on every interactive element | Browser | `focus-visible:focus-ring` on chart group; focused-group screenshot and ring style check, both themes |
+| [x] Status not conveyed by colour alone | Review | Dashed vs solid lines; label names each series |
 
 ## Project Structure
 

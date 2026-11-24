@@ -408,13 +408,13 @@ test('mortgage account: linking shows a balance column right of Bank Schedule an
     // 024: the Burndown plots the Actual Balance over the Bank Schedule and names both in the legend.
     const chart = timeline(page).getByRole('img', { name: /balance over time/i })
     await expect(chart).toContainText('Actual Balance')
-    await expect(chart.locator('polyline.text-chart-primary')).toHaveCount(1)
-    await expect(chart.locator('polyline.text-chart-navy, circle.text-chart-navy')).toHaveCount(1)
+    await expect(chart.locator('path[data-series="schedule"][data-part="line"]')).toHaveCount(1)
+    await expect(chart.locator('path[data-series="actual"][data-part="line"], circle[data-series="actual"][data-part="dot"]')).toHaveCount(1)
     // Without an account only the Bank Schedule is drawn.
     await page.getByLabel('Mortgage Account').selectOption({ label: 'None' })
     await expect(chart).not.toContainText('Actual Balance')
-    await expect(chart.locator('polyline.text-chart-navy, circle.text-chart-navy')).toHaveCount(0)
-    await expect(chart.locator('polyline.text-chart-primary')).toHaveCount(1)
+    await expect(chart.locator('path[data-series="actual"][data-part="line"], circle[data-series="actual"][data-part="dot"]')).toHaveCount(0)
+    await expect(chart.locator('path[data-series="schedule"][data-part="line"]')).toHaveCount(1)
     await page.getByLabel('Mortgage Account').selectOption({ label: 'Offset Journey' })
     await expect(chart).toContainText('Actual Balance')
 
@@ -478,7 +478,7 @@ test('calculated bank schedule: values, rate change, invalid edit and burndown l
     // Burndown: a plotted line with a value-describing text alternative.
     const chart = timeline(page).getByRole('img', { name: /balance over time/i })
     await expect(chart).toHaveAccessibleName(/falling from \$500,000\.00 on 29 Nov 2023 to \$0\.00 on 29 Nov 2053/)
-    await expect(chart.locator('polyline')).toHaveCount(1)
+    await expect(chart.locator('path[data-part="line"]')).toHaveCount(1)
 
     // Schedule: calculated balances, never saved.
     await switchView(page, 'Show Amortization Schedule')
@@ -498,6 +498,129 @@ test('calculated bank schedule: values, rate change, invalid edit and burndown l
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
       .analyze()
     expect(accessibility.violations).toEqual([])
+  } finally {
+    await context.close()
+  }
+})
+
+/** Creates a calculated mortgage for a new user and opens its Burndown. */
+async function openCalculatedBurndown(browser: import('@playwright/test').Browser, mortgage: Record<string, unknown>) {
+  const baseURL = test.info().project.use.baseURL
+  const context = await browser.newContext({ baseURL })
+  await registerAndSignIn(context, `burndown-${randomUUID()}@example.test`)
+  const token = await (await context.request.get('/api/security/csrf-token')).json() as { requestToken: string }
+  const created = await context.request.post('/api/mortgages', {
+    headers: { 'X-CSRF-TOKEN': token.requestToken },
+    data: mortgage,
+  })
+  expect(created.status(), await created.text()).toBe(201)
+  const page = await context.newPage()
+  await page.goto('/')
+  await openMortgages(page)
+  const chart = timeline(page).getByRole('img', { name: /balance over time/i })
+  await expect(chart.locator('path[data-part="line"]')).toHaveCount(1)
+  await chart.scrollIntoViewIfNeeded()
+  return { context, page, chart }
+}
+
+// 026: hover and keyboard both show the values the schedule table shows (FR-007, FR-009, SC-001, SC-004).
+test('burndown hover label: pointer and keyboard show the schedule values, Escape hides', async ({ browser }) => {
+  const { context, page, chart } = await openCalculatedBurndown(browser, {
+    name: 'Hover Home',
+    openingBalance: 500000,
+    duration: 360,
+    disbursalDate: '2023-11-29',
+    paymentFrequency: 'Monthly',
+    interestRateChanges: [{ newInterestRate: 6, effectiveDate: '2023-11-29' }],
+  })
+  try {
+    const label = timeline(page).locator('[data-slot="burndown-label"]')
+    const area = chart.locator('rect[data-part="pointer-area"]')
+    const box = await area.boundingBox()
+    if (!box) throw new Error('No plot area')
+
+    // Pointer at the left edge: the Disbursal Date and the Opening Balance.
+    await page.mouse.move(box.x + 0.25, box.y + box.height / 2)
+    await expect(label).toContainText('29 Nov 2023')
+    await expect(label).toContainText('$500,000.00')
+    await expect(chart.locator('rect[data-part="band"]')).toHaveCount(1)
+    await expect(chart.locator('circle[data-part="ring"]')).toHaveCount(1)
+    // Pointer at the right edge: the final repayment.
+    await page.mouse.move(box.x + box.width - 0.25, box.y + box.height / 2)
+    await expect(label).toContainText('29 Nov 2053')
+    await expect(label).toContainText('$0.00')
+    // Leaving the plot hides a pointer-moved label.
+    await page.mouse.move(box.x + box.width / 2, box.y - 40)
+    await expect(label).toHaveCount(0)
+
+    // Keyboard: focus shows nothing; Right shows the first date, then each row's closing balance.
+    const values = timeline(page).getByRole('group', { name: 'Burndown Values' })
+    await values.focus()
+    await expect(label).toHaveCount(0)
+    await page.keyboard.press('ArrowRight')
+    await expect(label).toContainText('29 Nov 2023')
+    await page.keyboard.press('ArrowRight')
+    await expect(label).toContainText('29 Dec 2023')
+    await expect(label).toContainText('$499,502.25')
+    await expect(timeline(page).getByRole('status').filter({ hasText: '29 Dec 2023. Bank Schedule $499,502.25.' })).toHaveCount(1)
+    await page.keyboard.press('ArrowRight')
+    await expect(label).toContainText('$499,002.01')
+    await page.keyboard.press('PageDown')
+    await expect(label).toContainText('29 Jan 2025')
+    await page.keyboard.press('End')
+    await expect(label).toContainText('29 Nov 2053')
+    await page.keyboard.press('Escape')
+    await expect(label).toHaveCount(0)
+    await expect(values).toBeFocused()
+
+    // The same values in the schedule table.
+    await switchView(page, 'Show Amortization Schedule')
+    await expect(timeline(page).getByRole('cell', { name: '$499,502.25' })).toBeVisible()
+    await expect(timeline(page).getByRole('cell', { name: '$499,002.01' })).toBeVisible()
+  } finally {
+    await context.close()
+  }
+})
+
+// 026 SC-003: at 1,560 periods the label follows the pointer within 100 ms, measured in the browser.
+test('burndown hover label follows the pointer within 100 ms at 1,560 periods', async ({ browser }) => {
+  const { context, page, chart } = await openCalculatedBurndown(browser, {
+    name: 'Weekly Home',
+    openingBalance: 500000,
+    duration: 1560,
+    disbursalDate: '2023-11-29',
+    paymentFrequency: 'Weekly',
+    interestRateChanges: [{ newInterestRate: 6, effectiveDate: '2023-11-29' }],
+  })
+  try {
+    const area = chart.locator('rect[data-part="pointer-area"]')
+    const box = await area.boundingBox()
+    if (!box) throw new Error('No plot area')
+    // Warm up, then time pointer moves to new dates until the label shows each new date.
+    await page.mouse.move(box.x + 5, box.y + box.height / 2)
+    await expect(timeline(page).locator('[data-slot="burndown-label"]')).toBeVisible()
+    const timings = await area.evaluate(async (element) => {
+      const rect = element.getBoundingClientRect()
+      const label = () => document.querySelector('[data-slot="burndown-label"]')?.textContent ?? ''
+      const results: number[] = []
+      for (const fraction of [0.2, 0.45, 0.7, 0.95]) {
+        const before = label()
+        const start = performance.now()
+        element.dispatchEvent(new PointerEvent('pointermove', {
+          bubbles: true,
+          clientX: rect.left + rect.width * fraction,
+          clientY: rect.top + rect.height / 2,
+        }))
+        while (label() === before) {
+          await new Promise((resolve) => requestAnimationFrame(resolve))
+        }
+        results.push(performance.now() - start)
+      }
+      return results
+    })
+    for (const timing of timings) {
+      expect(timing).toBeLessThan(100)
+    }
   } finally {
     await context.close()
   }

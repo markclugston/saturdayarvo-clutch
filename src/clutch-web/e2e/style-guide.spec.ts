@@ -550,7 +550,7 @@ const states: StateDef[] = [
       await openMortgages(page)
       await expect(timelineGroup(page).getByRole('img', { name: /balance over time/i })).toBeVisible()
       // 023: the Bank Schedule line is plotted.
-      await expect(timelineGroup(page).locator('polyline')).toBeVisible()
+      await expect(timelineGroup(page).locator('path[data-series="schedule"][data-part="line"]')).toBeVisible()
     },
   },
   {
@@ -559,7 +559,7 @@ const states: StateDef[] = [
       await openMortgages(page)
       const chart = timelineGroup(page).getByRole('img', { name: /Actual Balance/ })
       await expect(chart).toBeVisible()
-      await expect(chart.locator('polyline.text-chart-navy')).toBeVisible()
+      await expect(chart.locator('path[data-series="actual"][data-part="line"]')).toBeVisible()
     },
   },
   {
@@ -793,13 +793,13 @@ for (const theme of ['Light', 'Dark'] as const) {
     await reachState(page, states.find((state) => state.name === 'mortgages-timeline-burndown')!, theme)
     const chart = timelineGroup(page).getByRole('img', { name: /falling from/i })
     await chart.scrollIntoViewIfNeeded()
-    await expect(chart.locator('polyline')).toBeVisible()
+    await expect(chart.locator('path[data-series="schedule"][data-part="line"]')).toBeVisible()
     await settle(page)
     await expect(chart).toHaveScreenshot(`mortgages-burndown-line-${theme}.png`)
   })
 }
 
-// 024: the two-line chart (dashed Actual Balance over Bank Schedule, axis below $0), on the chart itself and at 320 px.
+// 024: the two-line chart (solid, named Actual Balance over Bank Schedule, axis below $0), on the chart itself and at 320 px.
 for (const theme of ['Light', 'Dark'] as const) {
   test(`mortgages burndown actual balance line [${theme}]`, async ({ page }) => {
     await reachState(page, states.find((state) => state.name === 'mortgages-burndown-actual')!, theme)
@@ -819,6 +819,220 @@ for (const theme of ['Light', 'Dark'] as const) {
     await expect(chart).toHaveScreenshot(`mortgages-burndown-actual-${theme}-320.png`)
     const results = await new AxeBuilder({ page }).withTags(axeTags).analyze()
     expect(results.violations).toEqual([])
+  })
+}
+
+// 026: every step of each series gradient keeps 3:1 against every background a line, ring or dot can sit on, and the
+// Actual Balance colours stay at least 30° in hue from the success colour (FR-002, FR-004, SC-002).
+for (const theme of ['Light', 'Dark'] as const) {
+  test(`mortgages burndown gradient contrast and hue [${theme}]`, async ({ page }) => {
+    await reachState(page, states.find((state) => state.name === 'mortgages-burndown-actual')!, theme)
+    const chart = timelineGroup(page).getByRole('img', { name: /Actual Balance/ })
+    await expect(chart.locator('path[data-series="actual"][data-part="line"]')).toBeVisible()
+    await settle(page)
+    const result = await chart.evaluate((svg) => {
+      type Rgb = [number, number, number]
+      const parse = (value: string): Rgb => {
+        const [r = 0, g = 0, b = 0] = (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number)
+        return [r, g, b]
+      }
+      const resolve = (token: string) => {
+        const probe = document.createElement('div')
+        probe.style.color = `rgb(var(--${token}))`
+        document.body.appendChild(probe)
+        const value = parse(getComputedStyle(probe).color)
+        probe.remove()
+        return value
+      }
+      const mix = (from: Rgb, to: Rgb, amount: number): Rgb =>
+        [0, 1, 2].map((index) => from[index]! * (1 - amount) + to[index]! * amount) as Rgb
+      const luminance = (colour: Rgb) => {
+        const [r, g, b] = colour.map((channel) => {
+          const v = channel / 255
+          return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
+        }) as Rgb
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+      }
+      const contrast = (a: Rgb, b: Rgb) => {
+        const [high, low] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number]
+        return (high + 0.05) / (low + 0.05)
+      }
+      const hue = ([r, g, b]: Rgb) => {
+        const max = Math.max(r, g, b)
+        const min = Math.min(r, g, b)
+        if (max === min) return 0
+        const d = max - min
+        const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+        return (h * 60 + 360) % 360
+      }
+      const stops = (series: string) => Array.from(
+        svg.querySelectorAll(`linearGradient[data-series="${series}"]:not([data-part]) stop`),
+      ).map((stop) => parse(getComputedStyle(stop).stopColor))
+      const opacity = (series: string) =>
+        Number(svg.querySelector(`path[data-series="${series}"][data-part="area"]`)?.getAttribute('fill-opacity'))
+
+      const card = resolve('surface-card')
+      const fg = resolve('fg')
+      const success = resolve('status-success')
+      const scheduleStops = stops('schedule')
+      const actualStops = stops('actual')
+      if (scheduleStops.length !== 3 || actualStops.length !== 3) return { problems: ['expected three stops per series'], minimum: 0 }
+      // Stops at 0, 0.5 and 1: interpolate within the half that holds t.
+      const along = ([start, mid, end]: Rgb[], t: number) =>
+        t <= 0.5 ? mix(start!, mid!, t * 2) : mix(mid!, end!, (t - 0.5) * 2)
+      const scheduleOpacity = opacity('schedule')
+      const actualOpacity = opacity('actual')
+      const problems: string[] = []
+      let minimum = Number.POSITIVE_INFINITY
+      const steps = 41
+      for (let step = 0; step < steps; step += 1) {
+        const t = step / (steps - 1)
+        const schedule = along(scheduleStops, t)
+        const actual = along(actualStops, t)
+        // Painting order: card, Bank fill, Actual fill, hover band.
+        const fills: Rgb[] = [
+          card,
+          mix(card, schedule, scheduleOpacity),
+          mix(card, actual, actualOpacity),
+          mix(mix(card, schedule, scheduleOpacity), actual, actualOpacity),
+        ]
+        const backgrounds = [...fills, ...fills.map((fill) => mix(fill, fg, 0.05))]
+        for (const [name, colour] of [['schedule', schedule], ['actual', actual]] as const) {
+          for (const background of backgrounds) {
+            const ratio = contrast(colour, background)
+            minimum = Math.min(minimum, ratio)
+            if (ratio < 3) problems.push(`${name} step ${step} contrast ${ratio.toFixed(2)}`)
+          }
+        }
+        const distance = Math.abs(hue(actual) - hue(success))
+        const hueGap = Math.min(distance, 360 - distance)
+        if (hueGap < 30) problems.push(`actual step ${step} hue ${hueGap.toFixed(1)}° from success`)
+      }
+      // The Actual Balance name is text on its card-coloured halo: 4.5:1 (FR-004, R10).
+      const name = svg.querySelector('text[data-part="series-name"]')
+      if (!name) {
+        problems.push('missing series name')
+      } else {
+        const style = getComputedStyle(name)
+        const nameContrast = contrast(parse(style.fill), parse(style.stroke))
+        if (nameContrast < 4.5) problems.push(`series name contrast ${nameContrast.toFixed(2)}`)
+        if (parse(style.stroke).join() !== card.join()) problems.push('series name halo is not the card colour')
+      }
+      return { problems, minimum }
+    })
+    expect(result.problems).toEqual([])
+    expect(result.minimum).toBeGreaterThanOrEqual(3)
+  })
+}
+
+// 026: the hover label, band and rings. The style-guide config runs with reduced motion.
+async function reachBurndownValues(page: Page, theme: Theme) {
+  await reachState(page, states.find((state) => state.name === 'mortgages-burndown-actual')!, theme)
+  const values = timelineGroup(page).getByRole('group', { name: 'Burndown Values' })
+  await values.scrollIntoViewIfNeeded()
+  await expect(values.locator('path[data-series="actual"][data-part="line"]')).toBeVisible()
+  return values
+}
+
+const burndownLabel = (page: Page) => timelineGroup(page).locator('[data-slot="burndown-label"]')
+
+/** The label's box lies within the chart group's box, and its text has 4.5:1 against its surface. */
+async function expectLabelInsideAndReadable(page: Page) {
+  const values = timelineGroup(page).getByRole('group', { name: 'Burndown Values' })
+  const label = burndownLabel(page)
+  await expect(label).toBeVisible()
+  const chartBox = await values.boundingBox()
+  const labelBox = await label.boundingBox()
+  if (!chartBox || !labelBox) throw new Error('No chart or label box')
+  expect(labelBox.x).toBeGreaterThanOrEqual(chartBox.x - 0.5)
+  expect(labelBox.y).toBeGreaterThanOrEqual(chartBox.y - 0.5)
+  expect(labelBox.x + labelBox.width).toBeLessThanOrEqual(chartBox.x + chartBox.width + 0.5)
+  expect(labelBox.y + labelBox.height).toBeLessThanOrEqual(chartBox.y + chartBox.height + 0.5)
+  const ratios = await label.evaluate((element) => {
+    const parse = (value: string) => (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number)
+    const luminance = (value: string) => {
+      const [r = 0, g = 0, b = 0] = parse(value).map((channel) => {
+        const v = channel / 255
+        return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
+      })
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    }
+    const background = luminance(getComputedStyle(element).backgroundColor)
+    return Array.from(element.querySelectorAll('p, dt, dd')).map((text) => {
+      const foreground = luminance(getComputedStyle(text).color)
+      return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05)
+    })
+  })
+  expect(ratios.length).toBeGreaterThan(0)
+  for (const ratio of ratios) expect(ratio).toBeGreaterThanOrEqual(4.5)
+}
+
+for (const theme of ['Light', 'Dark'] as const) {
+  test(`mortgages burndown hover label stays inside the chart and is readable [${theme}]`, async ({ page }) => {
+    const values = await reachBurndownValues(page, theme)
+    const area = values.locator('rect[data-part="pointer-area"]')
+    const box = await area.boundingBox()
+    if (!box) throw new Error('No plot area')
+
+    // First and last dates, where the label is most likely to spill out (FR-010, SC-005).
+    await page.mouse.move(box.x + 1, box.y + box.height / 2)
+    await expect(burndownLabel(page)).toContainText('Bank Schedule')
+    await expectLabelInsideAndReadable(page)
+    await page.mouse.move(box.x + box.width - 1, box.y + box.height / 2)
+    await expectLabelInsideAndReadable(page)
+
+    // A date with both series, for the screenshot and axe with the label shown.
+    await page.mouse.move(box.x + box.width * 0.1, box.y + box.height / 2)
+    await expect(burndownLabel(page)).toContainText('Actual Balance')
+    await expectLabelInsideAndReadable(page)
+    // No motion on the overlay under reduced motion (FR-010): it declares none, so only the app-wide
+    // reduced-motion rule's 0.01ms applies.
+    const durationMs = (value: string) => (value.trim().endsWith('ms') ? parseFloat(value) : parseFloat(value) * 1000)
+    const durations = await values.evaluate((element) => Array.from(
+      element.querySelectorAll('[data-slot="burndown-label"], rect[data-part="band"], circle[data-part="ring"]'),
+    ).map((part) => {
+      const style = getComputedStyle(part)
+      return [style.transitionDuration, style.animationDuration]
+    }))
+    expect(durations.length).toBeGreaterThanOrEqual(3)
+    for (const [transition = '', animation = ''] of durations) {
+      expect(transition.split(',').every((value) => durationMs(value) <= 0.01)).toBe(true)
+      expect(animation.split(',').every((value) => durationMs(value) <= 0.01)).toBe(true)
+    }
+    await settle(page)
+    const results = await new AxeBuilder({ page }).withTags(axeTags).analyze()
+    expect(results.violations, JSON.stringify(results.violations.map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target) })))).toEqual([])
+    await expect(values).toHaveScreenshot(`mortgages-burndown-hover-${theme}.png`)
+  })
+
+  test(`mortgages burndown hover label at 320 px stays inside the chart [${theme}]`, async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 800 })
+    const values = await reachBurndownValues(page, theme)
+    await values.focus()
+    for (const key of ['Home', 'End']) {
+      await page.keyboard.press(key)
+      await expectLabelInsideAndReadable(page)
+    }
+    await expectNoHorizontalScroll(page)
+    await settle(page)
+    await expect(values).toHaveScreenshot(`mortgages-burndown-hover-${theme}-320.png`)
+  })
+
+  test(`mortgages burndown values group shows a focus ring [${theme}]`, async ({ page }) => {
+    const values = await reachBurndownValues(page, theme)
+    await page.keyboard.press('Shift+Tab')
+    await values.focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(burndownLabel(page)).toBeVisible()
+    const outline = await values.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return { focusVisible: element.matches(':focus-visible'), style: style.outlineStyle, width: parseFloat(style.outlineWidth) }
+    })
+    expect(outline.focusVisible).toBe(true)
+    expect(outline.style).not.toBe('none')
+    expect(outline.width).toBeGreaterThanOrEqual(2)
+    await settle(page)
+    await expect(timelineGroup(page)).toHaveScreenshot(`mortgages-burndown-focus-${theme}.png`)
   })
 }
 

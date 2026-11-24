@@ -7,9 +7,13 @@
   | Token | Light | Dark |
   |---|---|---|
   | `chart-schedule-start` (blue) | 26 95 230 | 142 186 255 |
-  | `chart-schedule-end` (purple) | 124 58 237 | 206 176 255 |
+  | `chart-schedule-mid` (violet) | 124 58 237 | 206 176 255 |
+  | `chart-schedule-end` (pink) | 190 24 93 | 249 168 212 |
   | `chart-actual-start` (teal) | 0 118 128 | 90 205 220 |
-  | `chart-actual-end` (cyan) | 0 105 170 | 110 190 255 |
+  | `chart-actual-mid` (sky) | 3 105 161 | 110 190 255 |
+  | `chart-actual-end` (indigo) | 67 56 202 | 165 180 252 |
+
+- **Revision (2026-11-24, user review)**: three stops per series (start at 0, mid at 0.5, end at 1), like the reference. Sampled piecewise at 41 steps against every background below, the minimum contrast is Light 3.15, Dark 3.29; the Actual Balance colours stay at least 36.5° (Light) and 40.5° (Dark) from `success`, and about 30° from the Bank Schedule colour at the same date. The figures in the rationale below are for the earlier two-stop pair.
 
 - **Rationale**: Every sampled step of the Actual Balance gradient (teal ≈185° → cyan ≈203° Light, ≈187° → ≈207° Dark) is at least 36° (Light) and 41° (Dark) in hue from `success` (22 122 69 ≈148° / 111 211 155 ≈146°), above FR-002's 30°, and well away from `warning` (amber ≈35°), so it implies neither status. At each date the Actual colour is at least 30° in hue from the Bank Schedule colour, and the lines also differ by dash (FR-004). Minimum contrast against `card` sampled at 41 sRGB interpolation steps: Light 5.49 (schedule), 5.38 (actual); Dark 6.94, 6.85 — all ≥ 3:1 (FR-004, SC-002). Against every background a line, ring or dot can sit on (card, card + Bank fill at 0.18, card + Actual fill at 0.14, both fills, and each of those under the hover band, `fg` at 0.05) the minimum is Light 3.22 (schedule), 3.15 (actual); Dark 3.36, 3.31 — all ≥ 3:1. The browser test recomputes this from computed styles, so the test, not this table, is authoritative.
 - **Decision history**: The first pick, teal→green, was dropped (user decision, 2026-11-24): a teal→green blend passes within ≈6° of `success` mid-schedule, failing FR-002. Teal→cyan keeps the teal start the user chose. Amber→yellow-green was rejected because amber reads as `warning`.
@@ -17,7 +21,7 @@
 
 ## R2 Gradient technique
 
-- **Decision**: One `<linearGradient gradientUnits="userSpaceOnUse">` per series from x = 70 to x = 580 (plot edges), so a colour always means the same date for both series and for stroke, fill and rings. Stops carry `className="text-chart-…"` and `stopColor="currentColor"` (lint-checked tokens, theme switch for free). Ids from `useId()` so two charts never collide. Legend samples sit at x ≈ 270–294 (Bank Schedule, when Actual Balance is listed) and x ≈ 400–424, where the series gradient would show only a late-range slice, so each legend sample uses its own `<linearGradient data-part="legend-gradient" gradientUnits="objectBoundingBox">` with the same two token stops, showing the full start→end range (FR-006).
+- **Decision**: One `<linearGradient gradientUnits="userSpaceOnUse">` per series from x = 70 to x = 580 (plot edges), so a colour always means the same date for both series and for stroke, fill and rings. Stops carry `className="text-chart-…"` and `stopColor="currentColor"` (lint-checked tokens, theme switch for free). Ids from `useId()` so two charts never collide. Legend samples sit at x ≈ 270–294 (Bank Schedule, when Actual Balance is listed) and x ≈ 400–424, where the series gradient would show only a late-range slice, so each legend sample uses its own `<linearGradient data-part="legend-gradient" gradientUnits="objectBoundingBox">` with the same three token stops, showing the full start→mid→end range (FR-006). Both legend samples are solid (the dash clip path is removed).
 - **Alternatives**: `objectBoundingBox` gradients (colour would track each path's own extent, breaking "same colour = same date"); inline `style` with `var()` (bypasses the token lint rule).
 
 ## R3 Fill strength
@@ -32,7 +36,7 @@
 
 ## R5 Hover label rendering
 
-- **Decision**: An HTML overlay (`pointer-events-none`, `aria-hidden`) absolutely positioned in the chart's existing `relative` container, styled with the tooltip popup's tokens (`rounded-control bg-raised text-fg shadow-float`). Horizontal: `left: p%` with `translateX(-p%)` where p is the hovered x as a fraction of the container width — always inside the chart without measuring (FR-010, US2-4). Vertical: lower part of the plot when the hovered points are in the upper half, else upper part, so it does not cover the rings. Band (`rect`, `fill-fg` at `fillOpacity` 0.05, at least 6 units wide, drawn above both fills and below the guides, lines, rings and dot) and rings (`circle`, `stroke="url(#gradient)"`, `fill` card) in the SVG, both `pointer-events-none` so they never take the pointer from the listener `rect` (no spurious `pointerleave`, nothing blocks other dates — FR-010).
+- **Decision**: An HTML overlay (`pointer-events-none`, `aria-hidden`) absolutely positioned in the chart's existing `relative` container, styled with the tooltip popup's tokens (`rounded-control bg-raised text-fg shadow-float`). **Revised 2026-11-24 (user review: the label jumped to the far side when the rings straddled the middle)**: the label always follows the hovered date. A pure `labelPosition` function (in `chartGeometry.ts`) takes the container size, the label size, the hovered x and ring ys in container pixels and returns `left`/`top` and a side: `right` (12 px right of the band) when it fits, else `left`, else `over` (clamped over the date, above or below the rings). Vertically it centres on the rings' midpoint, clamped inside the container. The component measures the label in a `useLayoutEffect` and writes the position straight to the element's style (no state, no extra render), so it never flashes in the wrong place. Band (`rect`, `fill-fg` at `fillOpacity` 0.05, at least 6 units wide, drawn above both fills and below the guides, lines, rings and dot) and rings (`circle`, `stroke="url(#gradient)"`, `fill` card) in the SVG, both `pointer-events-none` so they never take the pointer from the listener `rect` (no spurious `pointerleave`, nothing blocks other dates — FR-010).
 - **Alternatives**: The `Tooltip` primitive (trigger-based, one trigger per date would be 1,561 focus stops); SVG `<text>` label (no token surface/shadow, harder alignment).
 
 ## R6 Pointer mapping and nearest date
@@ -48,3 +52,9 @@
 ## R8 State ownership
 
 - **Decision**: One `useState<{ index: number; source: 'pointer' | 'keyboard' } | null>`; announcement string in separate state set only in the key handler. Everything else (band x, ring y, label text) derived during render — no `useEffect`.
+
+## R10 End-of-line series name (2026-11-24)
+
+- **Decision**: With both lines solid, an SVG `<text data-part="series-name">Actual Balance</text>` sits 6 units right of the last Actual Balance point (or the single dot), vertically centred on it; if it would cross the plot's right edge it is anchored `end` and placed above the point. Filled `text-fg-secondary` with a `stroke-card` halo (`paint-order: stroke`, width 3) so it keeps 4.5:1 over fills, guides and lines. Drawn above the lines, below the rings, `pointer-events-none`.
+- **Rationale**: WCAG 2.2 SC 1.4.1: once the dash goes, a name on the line is the non-colour cue (direct labelling); the Bank Schedule is the unnamed line and the legend names both.
+- **Alternatives**: Dots on every Actual point (cluttered on weekly schedules); a thicker line (weak cue).

@@ -117,13 +117,15 @@ describe('LoanPayoffTimeline calculation', () => {
 
   it('draws the same schedule on the chart and redraws when the inputs change', () => {
     const { rerender } = render(<LoanPayoffTimeline calculation={calculation} onSwitch={vi.fn()} saved view="Burndown" />)
-    const points = () => screen.getByRole('img').querySelector('polyline')?.getAttribute('points') ?? ''
-    expect(points().split(' ')).toHaveLength(361)
+    const points = () => screen.getByRole('img').querySelector('path[data-series="schedule"][data-part="line"]')?.getAttribute('d') ?? ''
+    // One vertex at the start plus one per segment.
+    const vertexCount = () => points().split(/ [CL] /).length
+    expect(vertexCount()).toBe(361)
     const before = points()
 
     rerender(<LoanPayoffTimeline calculation={{ ...calculation, duration: 12 }} onSwitch={vi.fn()} saved view="Burndown" />)
 
-    expect(points().split(' ')).toHaveLength(13)
+    expect(vertexCount()).toBe(13)
     expect(points()).not.toBe(before)
     expect(screen.queryByText('The burn down will appear once the schedule is calculated.')).not.toBeInTheDocument()
   })
@@ -151,7 +153,7 @@ describe('LoanPayoffTimeline Actual Balance', () => {
       <LoanPayoffTimeline accountId={account.id} calculation={calculation} onSwitch={vi.fn()} saved view="Burndown" />,
     )
 
-    await waitFor(() => expect(screen.getByRole('img').querySelectorAll('polyline')).toHaveLength(2))
+    await waitFor(() => expect(screen.getByRole('img').querySelectorAll('path[data-part="line"]')).toHaveLength(2))
     expect(screen.getByRole('img')).toHaveTextContent('Actual Balance')
     const params = new URLSearchParams(server.balanceRequests[0])
     expect(params.get('accountId')).toBe(account.id)

@@ -38,7 +38,12 @@ vi.mock('@/lib/api/client', async (importOriginal) => ({
 const PLEASE_ENTER = 'Please enter your mortgage details'
 
 const timeline = () => screen.getByRole('region', { name: 'Loan Payoff Timeline' })
-const timelineStatus = () => within(timeline()).getByRole('status')
+// The timeline's own view announcer, not the chart's hover announcer inside "Burndown Values".
+const timelineStatus = () => {
+  const [status] = within(timeline()).getAllByRole('status').filter((element) => !element.closest('[aria-label="Burndown Values"]'))
+  if (!status) throw new Error('No timeline status')
+  return status
+}
 
 function expectOnlyChart() {
   expect(within(timeline()).getByRole('img', { name: /balance over time/i })).toBeInTheDocument()
@@ -810,8 +815,8 @@ describe('MortgagesPage Actual Balance line', () => {
   const accountA = { id: '11111111-1111-4111-8111-111111111111', description: 'Offset A', currencyCode: 'AUD' }
   const accountB = { id: '22222222-2222-4222-8222-222222222222', description: 'Offset B', currencyCode: 'AUD' }
   const chart = () => within(timeline()).getByRole('img', { name: /balance over time/i })
-  const actualLine = () => chart().querySelector('polyline.text-chart-navy')
-  const lastActualY = () => (actualLine()?.getAttribute('points') ?? '').split(' ').map((pair) => Number(pair.split(',')[1])).at(-1)
+  const actualLine = () => chart().querySelector('path[data-series="actual"][data-part="line"]')
+  const lastActualY = () => Number((actualLine()?.getAttribute('d') ?? '').trim().split(' ').at(-1)?.split(',')[1])
 
   beforeEach(() => {
     vi.resetAllMocks()
@@ -829,11 +834,11 @@ describe('MortgagesPage Actual Balance line', () => {
   it('redraws for another account and removes the line and legend entry for None', async () => {
     const { server } = await renderWithAccount()
     const user = userEvent.setup()
-    const before = actualLine()?.getAttribute('points')
+    const before = actualLine()?.getAttribute('d')
 
     server.balances = { currencyCode: 'AUD', periodCount: 12, balances: ['70000.00', '60000.00'] }
     await user.selectOptions(screen.getByLabelText('Mortgage Account'), accountB.id)
-    await waitFor(() => expect(actualLine()?.getAttribute('points')).not.toBe(before))
+    await waitFor(() => expect(actualLine()?.getAttribute('d')).not.toBe(before))
 
     await user.selectOptions(screen.getByLabelText('Mortgage Account'), '')
     await waitFor(() => expect(actualLine()).toBeNull())
@@ -855,14 +860,14 @@ describe('MortgagesPage Actual Balance line', () => {
   it('redraws both lines when a Detail is edited', async () => {
     await renderWithAccount()
     const user = userEvent.setup()
-    const bank = () => chart().querySelector('polyline.text-chart-primary')?.getAttribute('points')
+    const bank = () => chart().querySelector('path[data-series="schedule"][data-part="line"]')?.getAttribute('d')
     const before = bank()
-    const actualBefore = actualLine()?.getAttribute('points')
+    const actualBefore = actualLine()?.getAttribute('d')
 
     await user.clear(screen.getByLabelText('Opening Balance'))
     await user.type(screen.getByLabelText('Opening Balance'), '200000')
 
     await waitFor(() => expect(bank()).not.toBe(before))
-    await waitFor(() => expect(actualLine()?.getAttribute('points')).not.toBe(actualBefore))
+    await waitFor(() => expect(actualLine()?.getAttribute('d')).not.toBe(actualBefore))
   })
 })
