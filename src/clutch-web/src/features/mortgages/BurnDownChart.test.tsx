@@ -333,16 +333,13 @@ describe('BurnDownChart with an Actual Balance', () => {
     expect(svg()).toHaveTextContent('Actual Balance')
   })
 
-  it('draws a single dot filled from the Actual Balance gradient, with no area, and describes it', async () => {
+  it('draws a single balance as a dot at the end of a line from the starting balance, and describes it', async () => {
     setBalances([null, '480000.00'])
     renderChart()
 
-    await waitFor(() => expect(dot()).not.toBeNull())
-    expect(dot()).toHaveAttribute('r', '3')
-    expect(dot()).toHaveAttribute('fill', `url(#${gradientId('actual')})`)
-    expect(dot()).not.toHaveClass('text-chart-navy')
-    expect(svg().querySelector('path[data-series="actual"]')).toBeNull()
-    expect(lines()).toHaveLength(1)
+    await waitFor(() => expect(lines()).toHaveLength(2))
+    expect(dot()).not.toBeNull()
+    expect(lineVertices(seriesPath(svg(), 'actual', 'line')?.getAttribute('d'))).toHaveLength(2)
     expect(svg().getAttribute('aria-label')).toMatch(/ Actual Balance: \$480,000\.00 on 29 Jan 2024\.$/)
   })
 
@@ -360,12 +357,13 @@ describe('BurnDownChart with an Actual Balance', () => {
     expect(actual).not.toHaveAttribute('stroke-dasharray')
     expect(actual).toHaveAttribute('fill', 'none')
     const actualPoints = lineVertices(actual?.getAttribute('d'))
-    expect(actualPoints).toHaveLength(3)
-    // Same x as the Bank Schedule point of the same row, and the y of the balance.
+    expect(actualPoints).toHaveLength(4)
+    // Starts at the Bank Schedule's opening point, then each balance at its row's x and the y of the balance.
     const bankPoints = lineVertices(bank?.getAttribute('d'))
-    expect(actualPoints[0]?.[0]).toBe(bankPoints[2]?.[0])
-    expect(actualPoints[0]?.[1]).toBeCloseTo(260 - (230 * 480000) / 500000, 5)
-    expect(actualPoints[2]?.[0]).toBe(bankPoints[5]?.[0])
+    expect(actualPoints[0]).toEqual(bankPoints[0])
+    expect(actualPoints[1]?.[0]).toBe(bankPoints[2]?.[0])
+    expect(actualPoints[1]?.[1]).toBeCloseTo(260 - (230 * 480000) / 500000, 5)
+    expect(actualPoints[3]?.[0]).toBe(bankPoints[5]?.[0])
     expect(svg().getAttribute('aria-label')).toMatch(
       / Actual Balance: from \$480,000\.00 on 29 Jan 2024 to \$450,000\.50 on 29 Apr 2024\.$/,
     )
@@ -497,10 +495,10 @@ describe('BurnDownChart with an Actual Balance', () => {
     const vertices = lineVertices(area)
     const actualLine = lineVertices(seriesPath(svg(), 'actual', 'line')?.getAttribute('d'))
     expect(vertices.slice(0, actualLine.length)).toEqual(actualLine)
-    expect(actualLine[0]?.[1]).toBeLessThan(zeroY)
-    expect(actualLine[1]?.[1]).toBeGreaterThan(zeroY)
+    expect(actualLine[1]?.[1]).toBeLessThan(zeroY)
+    expect(actualLine[2]?.[1]).toBeGreaterThan(zeroY)
     const [down, back] = vertices.slice(actualLine.length)
-    expect(down?.[0]).toBe(actualLine[1]?.[0])
+    expect(down?.[0]).toBe(actualLine[2]?.[0])
     expect(down?.[1]).toBeCloseTo(zeroY, 5)
     expect(back?.[0]).toBe(actualLine[0]?.[0])
     expect(back?.[1]).toBeCloseTo(zeroY, 5)
@@ -556,7 +554,7 @@ describe('BurnDownChart with an Actual Balance', () => {
     )
     await waitFor(() => expect(lines()).toHaveLength(2))
 
-    expect(lineVertices(lines()[1]?.getAttribute('d'))).toHaveLength(1560)
+    expect(lineVertices(lines()[1]?.getAttribute('d'))).toHaveLength(1561)
     expect(performance.now() - start).toBeLessThan(500)
   })
 })

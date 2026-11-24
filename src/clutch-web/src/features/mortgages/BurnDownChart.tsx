@@ -278,6 +278,10 @@ function plotGeometry(
     ...schedule.map((period, index) => ({ x: xs[index + 1] ?? PLOT_LEFT, y: y(period.closingCents / 100) })),
   ]
   const actual = actualPoints.map((point) => ({ x: x(point.date), y: y(point.value) }))
+  // The Actual Balance line begins at the starting balance on the Disbursal Date, then moves to its first value.
+  const actualDrawn: ChartPoint[] = actual.length > 0
+    ? [{ x: xs[0] ?? PLOT_LEFT, y: y(openingBalanceCents / 100) }, ...actual]
+    : []
 
   const xTicks: Plot['xTicks'] = []
   for (let index = 0; index < X_TICKS; index += 1) {
@@ -302,8 +306,8 @@ function plotGeometry(
     xs,
     scheduleLine: monotonePath(bank),
     scheduleArea: areaPath(bank, zeroY),
-    actualLine: actual.length >= 2 ? monotonePath(actual) : '',
-    actualArea: areaPath(actual, zeroY),
+    actualLine: actualDrawn.length >= 2 ? monotonePath(actualDrawn) : '',
+    actualArea: areaPath(actualDrawn, zeroY),
     single: actual.length === 1 ? actual[0] ?? null : null,
     yTicks: axis.ticks.map((value) => ({ value, y: y(value) })),
     xTicks,
