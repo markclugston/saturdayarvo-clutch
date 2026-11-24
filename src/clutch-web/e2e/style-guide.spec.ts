@@ -799,7 +799,7 @@ for (const theme of ['Light', 'Dark'] as const) {
   })
 }
 
-// 024: the two-line chart (solid, named Actual Balance over Bank Schedule, axis below $0), on the chart itself and at 320 px.
+// 024: the two-line chart (solid Actual Balance over Bank Schedule, axis below $0), on the chart itself and at 320 px.
 for (const theme of ['Light', 'Dark'] as const) {
   test(`mortgages burndown actual balance line [${theme}]`, async ({ page }) => {
     await reachState(page, states.find((state) => state.name === 'mortgages-burndown-actual')!, theme)
@@ -907,16 +907,6 @@ for (const theme of ['Light', 'Dark'] as const) {
         const distance = Math.abs(hue(actual) - hue(success))
         const hueGap = Math.min(distance, 360 - distance)
         if (hueGap < 30) problems.push(`actual step ${step} hue ${hueGap.toFixed(1)}° from success`)
-      }
-      // The Actual Balance name is text on its card-coloured halo: 4.5:1 (FR-004, R10).
-      const name = svg.querySelector('text[data-part="series-name"]')
-      if (!name) {
-        problems.push('missing series name')
-      } else {
-        const style = getComputedStyle(name)
-        const nameContrast = contrast(parse(style.fill), parse(style.stroke))
-        if (nameContrast < 4.5) problems.push(`series name contrast ${nameContrast.toFixed(2)}`)
-        if (parse(style.stroke).join() !== card.join()) problems.push('series name halo is not the card colour')
       }
       return { problems, minimum }
     })

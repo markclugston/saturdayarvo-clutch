@@ -1,4 +1,4 @@
-import { useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from 'react'
 import { formatCurrencyAmount } from '@/lib/formatCurrencyAmount'
 import { actualBalancePoints, useActualBalances, type ActualBalancePoint } from './actualBalances'
 import { ENTER_DETAILS_MESSAGE } from './AmortizationSchedule'
@@ -46,7 +46,8 @@ const NO_ACTUAL: Actual = { selected: false, ready: false, points: [], currencyC
 
 const GUIDES = [60, 110, 160, 210]
 const PLOT_LEFT = 70
-const PLOT_RIGHT = 580
+/** Space right of the plot, in viewBox units. */
+const PLOT_RIGHT_MARGIN = 20
 const PLOT_TOP = 30
 const PLOT_BOTTOM = 260
 const Y_INTERVALS = 4
@@ -54,14 +55,42 @@ const X_TICKS = 5
 /** Fill strength per series (R3, FR-003: at most 20%). */
 const SCHEDULE_FILL_OPACITY = 0.18
 const ACTUAL_FILL_OPACITY = 0.14
-/** Rough width of the 11px "Actual Balance" end-of-line name, to keep it inside the plot (R10). */
-const SERIES_NAME_WIDTH = 80
-const SERIES_NAME = 'Actual Balance'
-const VIEW_BOX = { width: 600, height: 300 }
+/** The viewBox is always 300 units tall; its width follows the chart box, never narrower than 2:1. */
+const VIEW_HEIGHT = 300
+const MIN_VIEW_WIDTH = 600
 /** Hover band width in viewBox units (at least 6, R5). */
 const BAND_WIDTH = 8
 const KEY_INSTRUCTIONS = 'Use the arrow keys, Home, End, Page Up and Page Down to read values; Escape hides them.'
 const compactDollars = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 })
+
+/** The viewBox width and where the plot ends in it. */
+type Layout = { width: number, plotRight: number }
+
+function layoutFor(width: number): Layout {
+  return { width, plotRight: width - PLOT_RIGHT_MARGIN }
+}
+
+/** A viewBox width that fills the observed box at the fixed height, so the chart spans the card's width. */
+function useViewWidth(): [(element: HTMLElement | null) => void, number] {
+  const [width, setWidth] = useState(MIN_VIEW_WIDTH)
+  const [element, setElement] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    if (element === null || typeof ResizeObserver === 'undefined') {
+      return
+    }
+    const measure = () => {
+      const { clientWidth, clientHeight } = element
+      setWidth(clientWidth > 0 && clientHeight > 0
+        ? Math.max(MIN_VIEW_WIDTH, Math.round((VIEW_HEIGHT * clientWidth) / clientHeight))
+        : MIN_VIEW_WIDTH)
+    }
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    measure()
+    return () => observer.disconnect()
+  }, [element])
+  return [setElement, width]
+}
 
 /** Smallest 1, 2, 2.5 or 5 times a power of ten that is at least `value`. */
 function niceMaximum(value: number): number {
@@ -118,7 +147,7 @@ function GradientStops({ series }: { series: Series }) {
 }
 
 /** Series gradients span the plot so a colour means the same date everywhere; legend gradients span each sample. */
-function Gradients({ ids }: { ids: ChartIds }) {
+function Gradients({ ids, layout }: { ids: ChartIds, layout: Layout }) {
   return (
     <defs>
       {(['schedule', 'actual'] as const).map((series) => (
@@ -128,7 +157,7 @@ function Gradients({ ids }: { ids: ChartIds }) {
           id={ids[series]}
           key={series}
           x1={PLOT_LEFT}
-          x2={PLOT_RIGHT}
+          x2={layout.plotRight}
           y1="0"
           y2="0"
         >
@@ -154,37 +183,40 @@ function Gradients({ ids }: { ids: ChartIds }) {
   )
 }
 
-function Guides({ guides }: { guides: number[] }) {
+function Guides({ guides, layout }: { guides: number[], layout: Layout }) {
   return (
     <>
       {guides.map((y) => (
-        <line className="opacity-30" key={y} stroke="currentColor" strokeWidth="1" x1="70" x2="580" y1={y} y2={y} />
+        <line className="opacity-30" key={y} stroke="currentColor" strokeWidth="1" x1={PLOT_LEFT} x2={layout.plotRight} y1={y} y2={y} />
       ))}
     </>
   )
 }
 
-function Frame({ withActual, ids }: { withActual: boolean, ids: ChartIds }) {
+function Frame({ withActual, ids, layout }: { withActual: boolean, ids: ChartIds, layout: Layout }) {
+  // The legend keeps its place relative to the right edge.
+  const actualLegendX = layout.width - 200
+  const scheduleLegendX = withActual ? layout.width - 330 : actualLegendX
   return (
     <>
-      <line stroke="currentColor" strokeWidth="1.5" x1="70" x2="580" y1="260" y2="260" />
+      <line stroke="currentColor" strokeWidth="1.5" x1={PLOT_LEFT} x2={layout.plotRight} y1={PLOT_BOTTOM} y2={PLOT_BOTTOM} />
       <line stroke="currentColor" strokeWidth="1.5" x1="70" x2="70" y1="30" y2="260" />
       <text fill="currentColor" fontSize="12" textAnchor="middle" transform="rotate(-90 20 145)" x="20" y="145">
         Balance ($)
       </text>
-      <text fill="currentColor" fontSize="12" textAnchor="middle" x="325" y="294">
+      <text fill="currentColor" fontSize="12" textAnchor="middle" x={(PLOT_LEFT + layout.plotRight) / 2} y="294">
         Repayment Date
       </text>
       <g data-part="legend" data-series="schedule">
-        <rect fill={`url(#${ids.legendSchedule})`} height="3" width="24" x={withActual ? 270 : 400} y="13.5" />
-        <text className="text-fg-secondary" fill="currentColor" fontSize="12" x={withActual ? 300 : 430} y="19">
+        <rect fill={`url(#${ids.legendSchedule})`} height="3" width="24" x={scheduleLegendX} y="13.5" />
+        <text className="text-fg-secondary" fill="currentColor" fontSize="12" x={scheduleLegendX + 30} y="19">
           Bank Schedule
         </text>
       </g>
       {withActual && (
         <g data-part="legend" data-series="actual">
-          <rect fill={`url(#${ids.legendActual})`} height="3" width="24" x="400" y="13.5" />
-          <text className="text-fg-secondary" fill="currentColor" fontSize="12" x="430" y="19">
+          <rect fill={`url(#${ids.legendActual})`} height="3" width="24" x={actualLegendX} y="13.5" />
+          <text className="text-fg-secondary" fill="currentColor" fontSize="12" x={actualLegendX + 30} y="19">
             Actual Balance
           </text>
         </g>
@@ -221,8 +253,6 @@ type Plot = {
   actualArea: string
   /** The one Actual Balance, drawn as a dot. */
   single: ChartPoint | null
-  /** The last Actual Balance point, where the series is named (R10). */
-  actualEnd: ChartPoint | null
   yTicks: { value: number, y: number }[]
   xTicks: { date: string, year: string, x: number }[]
 }
@@ -233,10 +263,11 @@ function plotGeometry(
   disbursalDate: string,
   axis: BalanceAxis,
   actualPoints: ActualBalancePoint[],
+  plotRight: number,
 ): Plot {
   const finalDate = schedule[schedule.length - 1]?.date ?? disbursalDate
   const totalDays = Math.max(1, daysBetween(disbursalDate, finalDate))
-  const x = (date: string) => PLOT_LEFT + ((PLOT_RIGHT - PLOT_LEFT) * daysBetween(disbursalDate, date)) / totalDays
+  const x = (date: string) => PLOT_LEFT + ((plotRight - PLOT_LEFT) * daysBetween(disbursalDate, date)) / totalDays
   const { y } = axis
   const zeroY = y(0)
 
@@ -274,7 +305,6 @@ function plotGeometry(
     actualLine: actual.length >= 2 ? monotonePath(actual) : '',
     actualArea: areaPath(actual, zeroY),
     single: actual.length === 1 ? actual[0] ?? null : null,
-    actualEnd: actual[actual.length - 1] ?? null,
     yTicks: axis.ticks.map((value) => ({ value, y: y(value) })),
     xTicks,
   }
@@ -353,34 +383,7 @@ function Lines({ plot, ids }: { plot: Plot, ids: ChartIds }) {
           r="3"
         />
       )}
-      {plot.actualEnd && <SeriesName point={plot.actualEnd} />}
     </>
-  )
-}
-
-/**
- * Names the Actual Balance line at its last point, so the two solid lines are told apart without colour (FR-004,
- * R10): to the right of the point, or above it, ending at the point, when the right has no room.
- */
-function SeriesName({ point }: { point: ChartPoint }) {
-  const right = point.x + 6 + SERIES_NAME_WIDTH <= PLOT_RIGHT
-  const aboveY = point.y - 8 < PLOT_TOP + 10 ? point.y + 16 : point.y - 8
-  return (
-    <text
-      className="pointer-events-none stroke-card text-fg-secondary"
-      data-part="series-name"
-      data-series="actual"
-      fill="currentColor"
-      fontSize="11"
-      paintOrder="stroke"
-      strokeLinejoin="round"
-      strokeWidth="3"
-      textAnchor={right ? 'start' : 'end'}
-      x={right ? point.x + 6 : point.x}
-      y={right ? point.y + 4 : aboveY}
-    >
-      {SERIES_NAME}
-    </text>
   )
 }
 
@@ -442,10 +445,11 @@ function announcementFor(date: PlottedDate, currencyCode: string): string {
  * The visible label, an in-chart overlay styled like the tooltip popup. It follows the hovered date: measured before
  * paint and placed beside the band at the rings' height, inside the chart (FR-010, R5).
  */
-function HoverLabel({ date, currencyCode, svgRef }: {
+function HoverLabel({ date, currencyCode, svgRef, viewWidth }: {
   date: PlottedDate
   currencyCode: string
   svgRef: RefObject<SVGSVGElement | null>
+  viewWidth: number
 }) {
   const values = labelValues(date, currencyCode)
   const ref = useRef<HTMLDivElement>(null)
@@ -457,10 +461,10 @@ function HoverLabel({ date, currencyCode, svgRef }: {
     }
     // The SVG fills the label's container, letterboxed by `xMidYMid meet`.
     const scale = rect.width > 0 && rect.height > 0
-      ? Math.min(rect.width / VIEW_BOX.width, rect.height / VIEW_BOX.height)
+      ? Math.min(rect.width / viewWidth, rect.height / VIEW_HEIGHT)
       : 0
-    const offsetX = (rect.width - VIEW_BOX.width * scale) / 2
-    const offsetY = (rect.height - VIEW_BOX.height * scale) / 2
+    const offsetX = (rect.width - viewWidth * scale) / 2
+    const offsetY = (rect.height - VIEW_HEIGHT * scale) / 2
     const ys = [date.bankY, ...(date.actual ? [date.actual.y] : [])].map((y) => offsetY + y * scale)
     const position = labelPosition(
       { width: rect.width, height: rect.height },
@@ -471,7 +475,7 @@ function HoverLabel({ date, currencyCode, svgRef }: {
     element.style.left = `${position.left}px`
     element.style.top = `${position.top}px`
     element.dataset.side = position.side
-  }, [date, svgRef])
+  }, [date, svgRef, viewWidth])
   return (
     <div
       aria-hidden="true"
@@ -556,9 +560,13 @@ function Chart({
     () => (openingBalanceCents === undefined ? null : balanceAxis(openingBalanceCents, actual.points)),
     [openingBalanceCents, actual.points],
   )
+  const [boxRef, viewWidth] = useViewWidth()
+  const layout = useMemo(() => layoutFor(viewWidth), [viewWidth])
   const plot = useMemo(
-    () => (plotted && axis ? plotGeometry(schedule, openingBalanceCents, disbursalDate, axis, actual.points) : null),
-    [plotted, schedule, openingBalanceCents, disbursalDate, axis, actual.points],
+    () => (plotted && axis
+      ? plotGeometry(schedule, openingBalanceCents, disbursalDate, axis, actual.points, layout.plotRight)
+      : null),
+    [plotted, schedule, openingBalanceCents, disbursalDate, axis, actual.points, layout],
   )
   const [hover, setHover] = useState<HoverState>(null)
   const [announcement, setAnnouncement] = useState('')
@@ -572,11 +580,11 @@ function Chart({
   const areas = useMemo(() => plot && <Areas ids={ids} plot={plot} />, [plot, ids])
   const frame = useMemo(() => (
     <>
-      <Guides guides={guides} />
-      <Frame ids={ids} withActual={withActual} />
+      <Guides guides={guides} layout={layout} />
+      <Frame ids={ids} layout={layout} withActual={withActual} />
       {plot && <AxisLabels plot={plot} />}
     </>
-  ), [guides, ids, withActual, plot])
+  ), [guides, ids, withActual, plot, layout])
   const lines = useMemo(() => plot && <Lines ids={ids} plot={plot} />, [plot, ids])
 
   function handlePointerMove(event: PointerEvent<SVGRectElement>) {
@@ -584,7 +592,7 @@ function Chart({
     if (!plot || !rect || rect.width === 0 || rect.height === 0) {
       return
     }
-    const index = nearestIndex(plot.xs, clientXToViewBox(event.clientX, rect, VIEW_BOX))
+    const index = nearestIndex(plot.xs, clientXToViewBox(event.clientX, rect, { width: layout.width, height: VIEW_HEIGHT }))
     if (index < 0) {
       return
     }
@@ -653,7 +661,7 @@ function Chart({
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="relative min-h-64 flex-1">
+      <div className="relative min-h-64 flex-1" ref={boxRef}>
         {plot
           ? (
               <div
@@ -665,8 +673,8 @@ function Chart({
                 role="group"
                 tabIndex={0}
               >
-                <svg aria-label={label} className="absolute inset-0 size-full text-fg-secondary" ref={svgRef} role="img" viewBox="0 0 600 300">
-                  <Gradients ids={ids} />
+                <svg aria-label={label} className="absolute inset-0 size-full text-fg-secondary" ref={svgRef} role="img" viewBox={`0 0 ${layout.width} ${VIEW_HEIGHT}`}>
+                  <Gradients ids={ids} layout={layout} />
                   {areas}
                   {hovered && <Band date={hovered} />}
                   {frame}
@@ -679,19 +687,19 @@ function Chart({
                     height={PLOT_BOTTOM - PLOT_TOP}
                     onPointerLeave={handlePointerLeave}
                     onPointerMove={handlePointerMove}
-                    width={PLOT_RIGHT - PLOT_LEFT}
+                    width={layout.plotRight - PLOT_LEFT}
                     x={PLOT_LEFT}
                     y={PLOT_TOP}
                   />
                 </svg>
-                {hovered && <HoverLabel currencyCode={actual.currencyCode} date={hovered} svgRef={svgRef} />}
+                {hovered && <HoverLabel currencyCode={actual.currencyCode} date={hovered} svgRef={svgRef} viewWidth={layout.width} />}
                 <span className="sr-only" id={`${id}keys`}>{KEY_INSTRUCTIONS}</span>
                 <div aria-live="polite" className="sr-only" role="status">{announcement}</div>
               </div>
             )
           : (
-              <svg aria-label={label} className="absolute inset-0 size-full text-fg-secondary" role="img" viewBox="0 0 600 300">
-                <Gradients ids={ids} />
+              <svg aria-label={label} className="absolute inset-0 size-full text-fg-secondary" role="img" viewBox={`0 0 ${layout.width} ${VIEW_HEIGHT}`}>
+                <Gradients ids={ids} layout={layout} />
                 {frame}
               </svg>
             )}

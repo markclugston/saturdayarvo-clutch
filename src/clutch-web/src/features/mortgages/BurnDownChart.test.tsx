@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiRequest } from '@/lib/api/client'
 import type { PeriodBalances } from '@/lib/api/schemas'
 import { BurnDownChart } from './BurnDownChart'
@@ -197,6 +197,43 @@ describe('BurnDownChart with a schedule', () => {
       expect(screen.queryByRole(role)).not.toBeInTheDocument()
     }
   })
+
+  describe('in a box wider than 2:1', () => {
+    function sizeBox(width: number, height: number) {
+      vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(width)
+      vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(height)
+      vi.stubGlobal('ResizeObserver', class {
+        observe() {}
+        disconnect() {}
+      })
+    }
+
+    afterEach(() => {
+      vi.restoreAllMocks()
+      vi.unstubAllGlobals()
+    })
+
+    it('widens the drawing to fill the box, keeping the plot 20 units from the right edge', () => {
+      sizeBox(1200, 300)
+      renderPlotted()
+
+      const svg = screen.getByRole('img')
+      expect(svg).toHaveAttribute('viewBox', '0 0 1200 300')
+      const points = lineVertices(seriesPath(svg, 'schedule', 'line')?.getAttribute('d'))
+      expect(points[0]).toEqual([70, 30])
+      expect(points[360]).toEqual([1180, 260])
+      expect(svg.querySelector('linearGradient[data-series="schedule"]:not([data-part])')).toHaveAttribute('x2', '1180')
+      expect(svg.querySelector('[data-part="legend"][data-series="schedule"] rect')).toHaveAttribute('x', '1000')
+      expect(screen.getByText('Repayment Date')).toHaveAttribute('x', '625')
+    })
+
+    it('keeps the 2:1 drawing in a box narrower than 2:1', () => {
+      sizeBox(400, 300)
+      renderPlotted()
+
+      expect(screen.getByRole('img')).toHaveAttribute('viewBox', '0 0 600 300')
+    })
+  })
 })
 
 describe('BurnDownChart with an Actual Balance', () => {
@@ -347,34 +384,17 @@ describe('BurnDownChart with an Actual Balance', () => {
       .toEqual(['text-chart-actual-start', 'text-chart-actual-mid', 'text-chart-actual-end'])
   })
 
-  it('names the solid Actual Balance line in text at its last point, so the series differ without colour (FR-004, R10)', async () => {
+  it('does not name the Actual Balance line or dot inside the plot; the legend names it', async () => {
     setBalances(['480000.00', '470000.00', '460000.00'])
-    renderChart()
-
-    await waitFor(() => expect(lines()).toHaveLength(2))
-    const name = svg().querySelector('text[data-part="series-name"]')
-    expect(name).toHaveTextContent('Actual Balance')
-    expect(name).toHaveAttribute('data-series', 'actual')
-    expect(name).toHaveClass('pointer-events-none', 'stroke-card', 'text-fg-secondary')
-    expect(name).toHaveAttribute('paint-order', 'stroke')
-    const last = lineVertices(lines()[1]?.getAttribute('d')).at(-1) ?? [0, 0]
-    expect(name).toHaveAttribute('text-anchor', 'start')
-    expect(Number(name?.getAttribute('x'))).toBeCloseTo(last[0] + 6, 5)
-    expect(Number(name?.getAttribute('y'))).toBeCloseTo(last[1] + 4, 5)
-    // Drawn after both lines, so it sits on top of them.
-    expect(lines()[1]?.compareDocumentPosition(name as Element)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
-  })
-
-  it('names a single Actual Balance dot, and names nothing without balances', async () => {
-    setBalances(['480000.00'])
     const { unmount } = renderChart()
-    await waitFor(() => expect(svg().querySelector('circle[data-part="dot"]')).not.toBeNull())
-    expect(svg().querySelector('text[data-part="series-name"]')).toHaveTextContent('Actual Balance')
+    await waitFor(() => expect(lines()).toHaveLength(2))
+    expect(svg().querySelector('text[data-part="series-name"]')).toBeNull()
+    expect(svg().querySelector('[data-part="legend"][data-series="actual"]')).toHaveTextContent('Actual Balance')
     unmount()
 
-    setBalances([])
+    setBalances(['480000.00'])
     renderChart()
-    await waitFor(() => expect(svg().getAttribute('aria-label')).toMatch(/no actual balances/))
+    await waitFor(() => expect(svg().querySelector('circle[data-part="dot"]')).not.toBeNull())
     expect(svg().querySelector('text[data-part="series-name"]')).toBeNull()
   })
 
