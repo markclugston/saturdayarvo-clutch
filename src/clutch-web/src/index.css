@@ -82,9 +82,9 @@
     --chart-schedule-start: 26 95 230;
     --chart-schedule-mid: 124 58 237;
     --chart-schedule-end: 190 24 93;
-    --chart-actual-start: 0 118 128;
-    --chart-actual-mid: 3 105 161;
-    --chart-actual-end: 67 56 202;
+    --chart-actual-start: 8 145 178;
+    --chart-actual-mid: 22 163 74;
+    --chart-actual-end: 202 138 4;
 
     --status-danger-bg: 253 236 236;
     --status-danger: 197 34 31;
@@ -128,9 +128,9 @@
     --chart-schedule-start: 142 186 255;
     --chart-schedule-mid: 206 176 255;
     --chart-schedule-end: 249 168 212;
-    --chart-actual-start: 90 205 220;
-    --chart-actual-mid: 110 190 255;
-    --chart-actual-end: 165 180 252;
+    --chart-actual-start: 34 211 238;
+    --chart-actual-mid: 74 222 128;
+    --chart-actual-end: 250 204 21;
 
     --status-danger-bg: 73 61 62;
     --status-danger: 245 156 148;

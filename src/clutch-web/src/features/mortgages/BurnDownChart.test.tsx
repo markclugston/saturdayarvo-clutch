@@ -103,9 +103,10 @@ describe('BurnDownChart with a schedule', () => {
 
     const gradient = screen.getByRole('img').querySelector('linearGradient[data-series="schedule"]:not([data-part])')
     expect(gradient).toHaveAttribute('gradientUnits', 'userSpaceOnUse')
-    expect(gradient).toHaveAttribute('x1', '70')
-    expect(gradient).toHaveAttribute('x2', '580')
-    expect(gradient?.getAttribute('y1')).toBe(gradient?.getAttribute('y2'))
+    expect(gradient).toHaveAttribute('x1', '0')
+    expect(gradient).toHaveAttribute('x2', '0')
+    expect(gradient).toHaveAttribute('y1', '30')
+    expect(gradient).toHaveAttribute('y2', '260')
     const stops = Array.from(gradient?.querySelectorAll('stop') ?? [])
     expect(stops.map((stop) => stop.getAttribute('class')))
       .toEqual(['text-chart-schedule-start', 'text-chart-schedule-mid', 'text-chart-schedule-end'])
@@ -135,7 +136,7 @@ describe('BurnDownChart with a schedule', () => {
     renderPlotted()
 
     const area = seriesPath(screen.getByRole('img'), 'schedule', 'area')
-    expect(area).toHaveAttribute('fill-opacity', '0.18')
+    expect(area).toHaveAttribute('fill-opacity', '0.6')
     const d = area?.getAttribute('d') ?? ''
     expect(d.endsWith('L 580,260 L 70,260 Z')).toBe(true)
     const line = seriesPath(screen.getByRole('img'), 'schedule', 'line')?.getAttribute('d') ?? ''
@@ -222,7 +223,6 @@ describe('BurnDownChart with a schedule', () => {
       const points = lineVertices(seriesPath(svg, 'schedule', 'line')?.getAttribute('d'))
       expect(points[0]).toEqual([70, 30])
       expect(points[360]).toEqual([1180, 260])
-      expect(svg.querySelector('linearGradient[data-series="schedule"]:not([data-part])')).toHaveAttribute('x2', '1180')
       expect(svg.querySelector('[data-part="legend"][data-series="schedule"] rect')).toHaveAttribute('x', '1000')
       expect(screen.getByText('Repayment Date')).toHaveAttribute('x', '625')
     })
@@ -376,8 +376,10 @@ describe('BurnDownChart with an Actual Balance', () => {
     await waitFor(() => expect(lines()).toHaveLength(2))
     const gradient = svg().querySelector('linearGradient[data-series="actual"]:not([data-part])')
     expect(gradient).toHaveAttribute('gradientUnits', 'userSpaceOnUse')
-    expect(gradient).toHaveAttribute('x1', '70')
-    expect(gradient).toHaveAttribute('x2', '580')
+    expect(gradient).toHaveAttribute('x1', '0')
+    expect(gradient).toHaveAttribute('x2', '0')
+    expect(gradient).toHaveAttribute('y1', '30')
+    expect(gradient).toHaveAttribute('y2', '260')
     expect(Array.from(gradient?.querySelectorAll('stop') ?? []).map((stop) => stop.getAttribute('class')))
       .toEqual(['text-chart-actual-start', 'text-chart-actual-mid', 'text-chart-actual-end'])
   })
@@ -411,9 +413,9 @@ describe('BurnDownChart with an Actual Balance', () => {
     order.slice(1).forEach((element, index) => {
       expect(order[index]?.compareDocumentPosition(element as Node)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
     })
-    expect(seriesPath(svg(), 'actual', 'area')).toHaveAttribute('fill-opacity', '0.14')
+    expect(seriesPath(svg(), 'actual', 'area')).toHaveAttribute('fill-opacity', '0.5')
     expect(seriesPath(svg(), 'actual', 'area')).toHaveAttribute('fill', `url(#${gradientId('actual')})`)
-    expect(seriesPath(svg(), 'schedule', 'area')).toHaveAttribute('fill-opacity', '0.18')
+    expect(seriesPath(svg(), 'schedule', 'area')).toHaveAttribute('fill-opacity', '0.6')
   })
 
   it('lays out both legend entries, each sampling its full gradient and line style (FR-006)', async () => {

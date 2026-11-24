@@ -9,9 +9,9 @@
   | `chart-schedule-start` (blue) | 26 95 230 | 142 186 255 |
   | `chart-schedule-mid` (violet) | 124 58 237 | 206 176 255 |
   | `chart-schedule-end` (pink) | 190 24 93 | 249 168 212 |
-  | `chart-actual-start` (teal) | 0 118 128 | 90 205 220 |
-  | `chart-actual-mid` (sky) | 3 105 161 | 110 190 255 |
-  | `chart-actual-end` (indigo) | 67 56 202 | 165 180 252 |
+  | `chart-actual-start` (cyan) | 8 145 178 | 34 211 238 |
+  | `chart-actual-mid` (green) | 22 163 74 | 74 222 128 |
+  | `chart-actual-end` (yellow) | 202 138 4 | 250 204 21 |
 
 - **Revision (2026-11-24, user review)**: three stops per series (start at 0, mid at 0.5, end at 1), like the reference. Sampled piecewise at 41 steps against every background below, the minimum contrast is Light 3.15, Dark 3.29; the Actual Balance colours stay at least 36.5° (Light) and 40.5° (Dark) from `success`, and about 30° from the Bank Schedule colour at the same date. The figures in the rationale below are for the earlier two-stop pair.
 

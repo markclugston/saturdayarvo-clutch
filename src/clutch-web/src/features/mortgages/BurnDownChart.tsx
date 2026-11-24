@@ -52,9 +52,13 @@ const PLOT_TOP = 30
 const PLOT_BOTTOM = 260
 const Y_INTERVALS = 4
 const X_TICKS = 5
-/** Fill strength per series (R3, FR-003: at most 20%). */
-const SCHEDULE_FILL_OPACITY = 0.18
-const ACTUAL_FILL_OPACITY = 0.14
+/** Strength of the hatch lines per series; the lines cover about a third of the area, so the fill stays soft. */
+const SCHEDULE_FILL_OPACITY = 0.6
+/** The Actual Balance area is a solid fill of its three-colour gradient, not hatched. */
+const ACTUAL_FILL_OPACITY = 0.5
+/** Diagonal hatch: tile size and line width in viewBox units. */
+const HATCH_SPACING = 5
+const HATCH_STROKE = 1.2
 /** The viewBox is always 300 units tall; its width follows the chart box, never narrower than 2:1. */
 const VIEW_HEIGHT = 300
 const MIN_VIEW_WIDTH = 600
@@ -134,7 +138,7 @@ function balanceAxis(openingBalanceCents: number, points: ActualBalancePoint[]):
 type Series = 'schedule' | 'actual'
 
 /** Element ids for one chart's gradients and clip path (unique per chart, R2). */
-type ChartIds = { schedule: string, actual: string, legendSchedule: string, legendActual: string }
+type ChartIds = { schedule: string, actual: string, legendSchedule: string, legendActual: string, hatch: string, hatchMask: string, fade: string, fadeMask: string }
 
 function GradientStops({ series }: { series: Series }) {
   return (
@@ -146,7 +150,7 @@ function GradientStops({ series }: { series: Series }) {
   )
 }
 
-/** Series gradients span the plot so a colour means the same date everywhere; legend gradients span each sample. */
+/** Series gradients run top to bottom over the plot so a colour means the same balance everywhere; legend gradients span each sample. */
 function Gradients({ ids, layout }: { ids: ChartIds, layout: Layout }) {
   return (
     <defs>
@@ -156,10 +160,10 @@ function Gradients({ ids, layout }: { ids: ChartIds, layout: Layout }) {
           gradientUnits="userSpaceOnUse"
           id={ids[series]}
           key={series}
-          x1={PLOT_LEFT}
-          x2={layout.plotRight}
-          y1="0"
-          y2="0"
+          x1="0"
+          x2="0"
+          y1={PLOT_TOP}
+          y2={PLOT_BOTTOM}
         >
           <GradientStops series={series} />
         </linearGradient>
@@ -179,6 +183,27 @@ function Gradients({ ids, layout }: { ids: ChartIds, layout: Layout }) {
           <GradientStops series={series} />
         </linearGradient>
       ))}
+      {/* The areas are filled with the series gradient, then masked to diagonal lines so the colours follow the line. */}
+      <pattern
+        height={HATCH_SPACING}
+        id={ids.hatch}
+        patternTransform="rotate(45)"
+        patternUnits="userSpaceOnUse"
+        width={HATCH_SPACING}
+      >
+        <line stroke="white" strokeWidth={HATCH_STROKE} x1="0" x2="0" y1="0" y2={HATCH_SPACING} />
+      </pattern>
+      <mask height={VIEW_HEIGHT} id={ids.hatchMask} maskUnits="userSpaceOnUse" width={layout.width} x="0" y="0">
+        <rect fill={`url(#${ids.hatch})`} height={VIEW_HEIGHT} width={layout.width} x="0" y="0" />
+      </mask>
+      {/* Each area fades from its own top edge to transparent at its bottom (bounding-box units). */}
+      <linearGradient id={ids.fade} x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0" stopColor="white" stopOpacity="1" />
+        <stop offset="1" stopColor="white" stopOpacity="0" />
+      </linearGradient>
+      <mask id={ids.fadeMask} maskContentUnits="objectBoundingBox">
+        <rect fill={`url(#${ids.fade})`} height="1" width="1" x="0" y="0" />
+      </mask>
     </defs>
   )
 }
@@ -334,21 +359,26 @@ function AxisLabels({ plot }: { plot: Plot }) {
 function Areas({ plot, ids }: { plot: Plot, ids: ChartIds }) {
   return (
     <>
-      <path
-        d={plot.scheduleArea}
-        data-part="area"
-        data-series="schedule"
-        fill={`url(#${ids.schedule})`}
-        fillOpacity={SCHEDULE_FILL_OPACITY}
-      />
-      {plot.actualArea && (
+      <g mask={`url(#${ids.fadeMask})`}>
         <path
-          d={plot.actualArea}
+          d={plot.scheduleArea}
           data-part="area"
-          data-series="actual"
-          fill={`url(#${ids.actual})`}
-          fillOpacity={ACTUAL_FILL_OPACITY}
+          data-series="schedule"
+          fill={`url(#${ids.schedule})`}
+          fillOpacity={SCHEDULE_FILL_OPACITY}
+          mask={`url(#${ids.hatchMask})`}
         />
+      </g>
+      {plot.actualArea && (
+        <g mask={`url(#${ids.fadeMask})`}>
+          <path
+            d={plot.actualArea}
+            data-part="area"
+            data-series="actual"
+            fill={`url(#${ids.actual})`}
+            fillOpacity={ACTUAL_FILL_OPACITY}
+          />
+        </g>
       )}
     </>
   )
@@ -556,6 +586,10 @@ function Chart({
     actual: `${id}actual`,
     legendSchedule: `${id}legend-schedule`,
     legendActual: `${id}legend-actual`,
+    hatch: `${id}hatch`,
+    hatchMask: `${id}hatch-mask`,
+    fade: `${id}fade`,
+    fadeMask: `${id}fade-mask`,
   }), [id])
   const plotted = schedule !== undefined && schedule.length > 0
     && openingBalanceCents !== undefined && disbursalDate !== undefined
