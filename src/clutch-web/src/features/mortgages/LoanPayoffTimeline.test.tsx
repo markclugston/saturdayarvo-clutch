@@ -17,7 +17,6 @@ describe('LoanPayoffTimeline', () => {
     expect(group.tagName).toBe('SECTION')
     expect(screen.getByRole('heading', { level: 2, name: 'Amortization Schedule' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Mortgage Burndown' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Amortization Schedule' })).not.toBeInTheDocument()
   })
 
   it('shows only the burndown chart with a switch to the schedule', () => {

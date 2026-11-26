@@ -122,7 +122,6 @@ describe('MortgagesPage', () => {
       expect(follows(details, timeline)).toBe(true)
       expect(screen.getAllByRole('region', { name: 'Amortization Schedule' })).toHaveLength(1)
       expect(screen.queryByRole('heading', { name: 'Mortgage Burndown' })).not.toBeInTheDocument()
-      expect(screen.queryByRole('heading', { name: 'Amortization Schedule' })).not.toBeInTheDocument()
       expectOnlyChart()
     })
   })

@@ -1445,7 +1445,6 @@ test.describe('Mortgages layout and motion', () => {
       const group = timelineGroup(page)
       await expect(group).toHaveCount(1)
       await expect(page.getByRole('heading', { name: 'Mortgage Burndown' })).toHaveCount(0)
-      await expect(page.getByRole('heading', { name: 'Amortization Schedule' })).toHaveCount(0)
 
       // Full content width: the same width as the Details group above it.
       const groupBox = (await group.boundingBox())!
