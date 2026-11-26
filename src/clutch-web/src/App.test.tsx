@@ -36,6 +36,11 @@ vi.mock('@/lib/api/client', async (importActual) => ({
   apiRequest: vi.fn(),
 }))
 
+// No timer wait between simulated keystrokes, which otherwise dominates the typing tests.
+function setupUser() {
+  return userEvent.setup({ delay: null })
+}
+
 type ApiRequestInit = RequestInit | undefined
 
 function navigationRequests(method: 'GET' | 'PUT') {
@@ -257,7 +262,7 @@ describe('session loading', () => {
     vi.mocked(getSession)
       .mockRejectedValueOnce(new ApiError(500, { title: 'Server error' }))
       .mockRejectedValueOnce(new ApiError(401, { title: 'Authentication required' }))
-    const user = userEvent.setup()
+    const user = setupUser()
     renderWithQueryClient(<App />)
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load your session')
@@ -316,7 +321,7 @@ describe('session loading', () => {
     vi.mocked(getSession)
       .mockRejectedValueOnce(new ApiError(500, { title: 'Server error' }))
       .mockImplementationOnce(() => new Promise(() => {}))
-    const user = userEvent.setup()
+    const user = setupUser()
 
     renderWithQueryClient(<App />)
     await screen.findByRole('alert')
@@ -344,7 +349,7 @@ describe('session loading', () => {
       .mockImplementationOnce(() => new Promise((resolve) => {
         resolveRefresh = resolve
       }))
-    const user = userEvent.setup()
+    const user = setupUser()
 
     renderWithQueryClient(<App />)
     await startImportReview(user)
@@ -373,7 +378,7 @@ describe('session loading', () => {
       .mockResolvedValueOnce({ id: 'user-1', roles: [] })
       .mockRejectedValueOnce(new ApiError(500, { title: 'Server error' }))
       .mockResolvedValueOnce({ id: 'user-1', roles: [] })
-    const user = userEvent.setup()
+    const user = setupUser()
 
     renderWithQueryClient(<App />)
     await startImportReview(user)
@@ -395,7 +400,7 @@ describe('session loading', () => {
     vi.mocked(getSession)
       .mockResolvedValueOnce({ id: 'user-1', roles: [] })
       .mockRejectedValueOnce(new ApiError(401, { title: 'Authentication required' }))
-    const user = userEvent.setup()
+    const user = setupUser()
 
     renderWithQueryClient(<App />)
     await startImportReview(user)
@@ -426,7 +431,7 @@ describe('session loading', () => {
   })
 
   it('navigates between Accounts and Categories using buttons', async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
 
     renderWithQueryClient(<App />)
@@ -445,7 +450,7 @@ describe('session loading', () => {
   })
 
   it('lists Mortgages directly above Categories and marks it current when shown', async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
 
     renderWithQueryClient(<App />)
@@ -461,7 +466,7 @@ describe('session loading', () => {
   })
 
   it('asks before leaving the Mortgages screen with unsaved changes (navigation and Sign out)', async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
     vi.mocked(signOut).mockResolvedValue()
     renderWithQueryClient(<App />)
@@ -481,7 +486,7 @@ describe('session loading', () => {
   })
 
   it('does not refetch the session on focus or reconnect while the form is dirty, but does once clean', async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
     renderWithQueryClient(<App />)
     await user.click(await screen.findByRole('button', { name: 'Mortgages' }))
@@ -505,7 +510,7 @@ describe('session loading', () => {
   })
 
   it('keeps primary navigation outside the header across signed-in screens', async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
     renderWithQueryClient(<App />)
 
@@ -530,7 +535,7 @@ describe('session loading', () => {
       .mockResolvedValueOnce({ id: 'user-1', roles: [] })
     vi.mocked(signOut).mockResolvedValue()
     vi.mocked(signIn).mockResolvedValue()
-    const user = userEvent.setup()
+    const user = setupUser()
     renderWithQueryClient(<App />)
 
     const nav = await screen.findByRole('navigation', { name: 'Primary' })
@@ -553,7 +558,7 @@ describe('session loading', () => {
   it('keeps expanded navigation available when sign-out fails', async () => {
     vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
     vi.mocked(signOut).mockRejectedValue(new ApiError(500, { title: 'Server error' }))
-    const user = userEvent.setup()
+    const user = setupUser()
     renderWithQueryClient(<App />)
 
     await screen.findByRole('navigation', { name: 'Primary' })
@@ -573,7 +578,7 @@ describe('session loading', () => {
       .mockResolvedValueOnce({ id: 'user-2', roles: [] })
     vi.mocked(signOut).mockResolvedValue()
     vi.mocked(signIn).mockResolvedValue()
-    const user = userEvent.setup()
+    const user = setupUser()
     renderWithQueryClient(<App />)
 
     await screen.findByRole('navigation', { name: 'Primary' })
@@ -594,7 +599,7 @@ describe('session loading', () => {
 
   it('expands on hover and the hamburger pins it open until clicked again', async () => {
     vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
-    const user = userEvent.setup()
+    const user = setupUser()
     renderWithQueryClient(<App />)
 
     const nav = await screen.findByRole('navigation', { name: 'Primary' })
@@ -651,7 +656,7 @@ describe('session loading', () => {
     it('does not expand on hover, and the hamburger still pins and unpins', async () => {
       stubViewport(false)
       vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithQueryClient(<App />)
 
       const nav = await screen.findByRole('navigation', { name: 'Primary' })
@@ -675,7 +680,7 @@ describe('session loading', () => {
     it('collapses a hover expansion when the viewport narrows and hover works again once it widens', async () => {
       const viewport = stubViewport(true)
       vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithQueryClient(<App />)
 
       const nav = await screen.findByRole('navigation', { name: 'Primary' })
@@ -697,7 +702,7 @@ describe('session loading', () => {
 
   it('operates destinations by keyboard', async () => {
     vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
-    const user = userEvent.setup()
+    const user = setupUser()
     renderWithQueryClient(<App />)
 
     const accounts = await screen.findByRole('button', { name: 'Accounts' })
@@ -726,7 +731,7 @@ describe('session loading', () => {
       .mockResolvedValueOnce({ id: 'user-1', roles: [] })
       .mockRejectedValueOnce(new ApiError(401, { title: 'Authentication required' }))
     vi.mocked(signOut).mockResolvedValue()
-    const user = userEvent.setup()
+    const user = setupUser()
 
     renderWithQueryClient(<App />)
     const selector = await screen.findByRole<HTMLSelectElement>('combobox', { name: 'Theme' })
@@ -747,7 +752,7 @@ describe('session loading', () => {
       .mockResolvedValueOnce({ id: 'other-user', roles: [] })
     vi.mocked(signOut).mockResolvedValue()
     vi.mocked(signIn).mockResolvedValue()
-    const user = userEvent.setup()
+    const user = setupUser()
 
     const { queryClient } = renderWithQueryClient(<App />)
     queryClient.setQueryData(['accounts'], [{ description: 'Owner private account' }])
@@ -823,7 +828,7 @@ describe('session loading', () => {
         .mockResolvedValueOnce({ id: 'user-1', roles: [] })
       vi.mocked(signIn).mockResolvedValue()
       respondToNavigation({ get: async () => ({ state: 'Pinned' }) })
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithQueryClient(<App />)
 
       await user.type(await screen.findByLabelText('Email'), 'user@example.test')
@@ -861,7 +866,7 @@ describe('session loading', () => {
 
     it('flips aria-expanded at once and sends one PUT per toggle; hover and focus send none', async () => {
       vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithQueryClient(<App />)
 
       const toggle = await screen.findByRole('button', { name: 'Toggle navigation' })
@@ -880,7 +885,7 @@ describe('session loading', () => {
     it('shows a toast and keeps the chosen state when the save fails', async () => {
       vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
       respondToNavigation({ put: async () => { throw new ApiError(503, { title: 'Unavailable' }) } })
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithQueryClient(<App />)
 
       const toggle = await screen.findByRole('button', { name: 'Toggle navigation' })
@@ -893,7 +898,7 @@ describe('session loading', () => {
     it('responds to the hamburger at once while a save never completes (FR-010)', async () => {
       vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
       respondToNavigation({ put: () => new Promise(() => {}) })
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithQueryClient(<App />)
 
       const toggle = await screen.findByRole('button', { name: 'Toggle navigation' })
@@ -908,7 +913,7 @@ describe('session loading', () => {
 
     it('saves rapid toggles in order so the last request carries the final state', async () => {
       vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithQueryClient(<App />)
 
       const toggle = await screen.findByRole('button', { name: 'Toggle navigation' })
@@ -937,7 +942,7 @@ describe('session loading', () => {
           failPendingSave = () => reject(new ApiError(503, { title: 'Unavailable' }))
         }),
       })
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithQueryClient(<App />)
 
       await user.click(await screen.findByRole('button', { name: 'Toggle navigation' }))
@@ -966,7 +971,7 @@ describe('session loading', () => {
       vi.mocked(signOut).mockResolvedValue()
       vi.mocked(signIn).mockResolvedValue()
       respondToNavigation({ get: async () => ({ state: 'Pinned' }) })
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithQueryClient(<App />)
 
       expect(await screen.findByRole('button', { name: 'Toggle navigation' }))

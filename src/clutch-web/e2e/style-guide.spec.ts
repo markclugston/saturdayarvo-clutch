@@ -1,7 +1,7 @@
 ﻿/// <reference lib="dom" />
 /// <reference lib="dom.iterable" />
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 
 /*
  * Style-guide compliance states (specs/014-style-guide-compliance/contracts/visual-states.md).
@@ -92,6 +92,12 @@ const actualBalancesFixture = () => ({
     return period % 50 === 0 ? null : (500000 - period * 1388.89 + 8000 * Math.sin(period / 20)).toFixed(2)
   }),
 })
+// 027: 120 balances falling $2,000 a month, so the forecast starts at row 121, is $0.00 at row 250 and blank after.
+const forecastBalancesFixture = () => ({
+  currencyCode: 'AUD',
+  periodCount: 360,
+  balances: Array.from({ length: 120 }, (_, index) => (500000 - (index + 1) * 2000).toFixed(2)),
+})
 // Mortgage 1 has one change, Mortgage 2 has 60 (monthly from the disbursal date).
 const rateFixtures = () => [
   { ...mortgageFixture(1), name: 'One rate', interestRateChanges: [{ newInterestRate: 5.25, effectiveDate: '2000-01-01' }] },
@@ -116,6 +122,8 @@ type Mock = {
   loanPayoffTimeline: 'Burndown' | 'Schedule' | 'delay'
   /** Link the first mortgage to an account whose balances (some blank, the last below $0) are plotted (024). */
   actualBalances: boolean
+  /** With `actualBalances`, answer with balances that stop early, so a forecast follows them (027). */
+  forecast: boolean
   /** When the mocked route received the saved-view request (ms since epoch). */
   loanPayoffTimelineRequestedAt?: number
 }
@@ -130,6 +138,7 @@ async function mockApi(page: Page, options: Partial<Mock> = {}): Promise<Mock> {
     mortgages: 'ok',
     loanPayoffTimeline: 'Burndown',
     actualBalances: false,
+    forecast: false,
     ...options,
   }
   await page.route((url) => url.pathname.startsWith('/api/'), async (route) => {
@@ -188,7 +197,9 @@ async function mockApi(page: Page, options: Partial<Mock> = {}): Promise<Mock> {
       if (method === 'PUT' && path === '/api/admin/import-limits') return route.fulfill({ json: limits })
       return route.fulfill({ status: 204 })
     }
-    if (path === '/api/mortgages/period-balances') return route.fulfill({ json: actualBalancesFixture() })
+    if (path === '/api/mortgages/period-balances') {
+      return route.fulfill({ json: mock.forecast ? forecastBalancesFixture() : actualBalancesFixture() })
+    }
     if (path === '/api/accounts') return route.fulfill({ json: accounts })
     if (path === '/api/currencies') return route.fulfill({ json: [currency] })
     if (path === `/api/accounts/${accountId}`) return route.fulfill({ json: accounts[0] })
@@ -311,6 +322,22 @@ type StateDef = {
 }
 
 const signedIn = { session: 'ok' } as const
+
+/** Scrolls the content panel until the schedule's row for `period` sits just below the sticky header. */
+async function scrollScheduleTo(page: Page, period: number) {
+  const table = timelineGroup(page).getByRole('table')
+  await expect(table).toBeVisible()
+  const row = table.locator(`[role="row"][aria-rowindex="${period + 1}"]`)
+  await table.evaluate((element, rowsAbove) => {
+    let scroller = element.parentElement
+    while (scroller && !/auto|scroll/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement
+    if (!scroller) return
+    // The header and every body row are 40 px tall.
+    scroller.scrollTop += element.getBoundingClientRect().top - scroller.getBoundingClientRect().top + rowsAbove * 40
+  }, period - 2)
+  // Any part: at 320 px most of the row's width is off screen.
+  await expect(row).toBeInViewport()
+}
 
 const states: StateDef[] = [
   {
@@ -560,6 +587,24 @@ const states: StateDef[] = [
       const chart = timelineGroup(page).getByRole('img', { name: /Actual Balance/ })
       await expect(chart).toBeVisible()
       await expect(chart.locator('path[data-series="actual"][data-part="line"]')).toBeVisible()
+    },
+  },
+  {
+    name: 'mortgages-burndown-forecast', mock: { ...signedIn, actualBalances: true, forecast: true },
+    reach: async (page) => {
+      await openMortgages(page)
+      const chart = timelineGroup(page).getByRole('img', { name: /Forecast Balance/ })
+      await expect(chart).toBeVisible()
+      await expect(chart.locator('path[data-series="forecast"][data-part="line"]')).toBeVisible()
+    },
+  },
+  {
+    name: 'mortgages-schedule-forecast',
+    mock: { ...signedIn, loanPayoffTimeline: 'Schedule', actualBalances: true, forecast: true },
+    reach: async (page) => {
+      await openMortgages(page)
+      await expect(timelineGroup(page).getByRole('columnheader', { name: 'Forecast Balance' })).toBeVisible()
+      await scrollScheduleTo(page, 121)
     },
   },
   {
@@ -822,99 +867,6 @@ for (const theme of ['Light', 'Dark'] as const) {
   })
 }
 
-// 026: every step of each series gradient keeps 3:1 against every background a line, ring or dot can sit on, and the
-// Actual Balance colours stay at least 30° in hue from the success colour (FR-002, FR-004, SC-002).
-for (const theme of ['Light', 'Dark'] as const) {
-  test(`mortgages burndown gradient contrast and hue [${theme}]`, async ({ page }) => {
-    await reachState(page, states.find((state) => state.name === 'mortgages-burndown-actual')!, theme)
-    const chart = timelineGroup(page).getByRole('img', { name: /Actual Balance/ })
-    await expect(chart.locator('path[data-series="actual"][data-part="line"]')).toBeVisible()
-    await settle(page)
-    const result = await chart.evaluate((svg) => {
-      type Rgb = [number, number, number]
-      const parse = (value: string): Rgb => {
-        const [r = 0, g = 0, b = 0] = (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number)
-        return [r, g, b]
-      }
-      const resolve = (token: string) => {
-        const probe = document.createElement('div')
-        probe.style.color = `rgb(var(--${token}))`
-        document.body.appendChild(probe)
-        const value = parse(getComputedStyle(probe).color)
-        probe.remove()
-        return value
-      }
-      const mix = (from: Rgb, to: Rgb, amount: number): Rgb =>
-        [0, 1, 2].map((index) => from[index]! * (1 - amount) + to[index]! * amount) as Rgb
-      const luminance = (colour: Rgb) => {
-        const [r, g, b] = colour.map((channel) => {
-          const v = channel / 255
-          return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
-        }) as Rgb
-        return 0.2126 * r + 0.7152 * g + 0.0722 * b
-      }
-      const contrast = (a: Rgb, b: Rgb) => {
-        const [high, low] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number]
-        return (high + 0.05) / (low + 0.05)
-      }
-      const hue = ([r, g, b]: Rgb) => {
-        const max = Math.max(r, g, b)
-        const min = Math.min(r, g, b)
-        if (max === min) return 0
-        const d = max - min
-        const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4
-        return (h * 60 + 360) % 360
-      }
-      const stops = (series: string) => Array.from(
-        svg.querySelectorAll(`linearGradient[data-series="${series}"]:not([data-part]) stop`),
-      ).map((stop) => parse(getComputedStyle(stop).stopColor))
-      const opacity = (series: string) =>
-        Number(svg.querySelector(`path[data-series="${series}"][data-part="area"]`)?.getAttribute('fill-opacity'))
-
-      const card = resolve('surface-card')
-      const fg = resolve('fg')
-      const success = resolve('status-success')
-      const scheduleStops = stops('schedule')
-      const actualStops = stops('actual')
-      if (scheduleStops.length !== 3 || actualStops.length !== 3) return { problems: ['expected three stops per series'], minimum: 0 }
-      // Stops at 0, 0.5 and 1: interpolate within the half that holds t.
-      const along = ([start, mid, end]: Rgb[], t: number) =>
-        t <= 0.5 ? mix(start!, mid!, t * 2) : mix(mid!, end!, (t - 0.5) * 2)
-      const scheduleOpacity = opacity('schedule')
-      const actualOpacity = opacity('actual')
-      const problems: string[] = []
-      let minimum = Number.POSITIVE_INFINITY
-      const steps = 41
-      for (let step = 0; step < steps; step += 1) {
-        const t = step / (steps - 1)
-        const schedule = along(scheduleStops, t)
-        const actual = along(actualStops, t)
-        // Painting order: card, Bank fill, Actual fill, hover band.
-        const fills: Rgb[] = [
-          card,
-          mix(card, schedule, scheduleOpacity),
-          mix(card, actual, actualOpacity),
-          mix(mix(card, schedule, scheduleOpacity), actual, actualOpacity),
-        ]
-        const backgrounds = [...fills, ...fills.map((fill) => mix(fill, fg, 0.05))]
-        for (const [name, colour] of [['schedule', schedule], ['actual', actual]] as const) {
-          for (const background of backgrounds) {
-            const ratio = contrast(colour, background)
-            minimum = Math.min(minimum, ratio)
-            if (ratio < 3) problems.push(`${name} step ${step} contrast ${ratio.toFixed(2)}`)
-          }
-        }
-        const distance = Math.abs(hue(actual) - hue(success))
-        const hueGap = Math.min(distance, 360 - distance)
-        if (hueGap < 30) problems.push(`actual step ${step} hue ${hueGap.toFixed(1)}° from success`)
-      }
-      return { problems, minimum }
-    })
-    expect(result.problems).toEqual([])
-    expect(result.minimum).toBeGreaterThanOrEqual(3)
-  })
-}
-
 // 026: the hover label, band and rings. The style-guide config runs with reduced motion.
 async function reachBurndownValues(page: Page, theme: Theme) {
   await reachState(page, states.find((state) => state.name === 'mortgages-burndown-actual')!, theme)
@@ -1026,6 +978,283 @@ for (const theme of ['Light', 'Dark'] as const) {
   })
 }
 
+// 027: the Forecast Balance series and column.
+const stateNamed = (name: string) => states.find((state) => state.name === name)!
+
+async function reachForecastValues(page: Page, theme: Theme) {
+  await reachState(page, stateNamed('mortgages-burndown-forecast'), theme)
+  const values = timelineGroup(page).getByRole('group', { name: 'Burndown Values' })
+  await values.scrollIntoViewIfNeeded()
+  await expect(values.locator('path[data-series="forecast"][data-part="line"]')).toBeVisible()
+  return values
+}
+
+/** Points at row 180 of 360, a forecast date, and waits for its label. */
+async function hoverForecastDate(page: Page, values: Locator) {
+  const box = await values.locator('rect[data-part="pointer-area"]').boundingBox()
+  if (!box) throw new Error('No plot area')
+  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height / 2)
+  await expect(burndownLabel(page)).toContainText('Forecast Balance')
+}
+
+async function expectNoViolations(page: Page) {
+  const results = await new AxeBuilder({ page }).withTags(axeTags).analyze()
+  expect(results.violations, JSON.stringify(results.violations.map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target) })))).toEqual([])
+}
+
+/** Header and cell of the Forecast Balance column are on screen, unclipped and clear of Actual Balance. */
+async function expectForecastColumnReadable(page: Page, period: number) {
+  const table = timelineGroup(page).getByRole('table')
+  const row = table.locator(`[role="row"][aria-rowindex="${period + 1}"]`)
+  const header = table.getByRole('columnheader', { name: 'Forecast Balance' })
+  const cell = row.getByRole('cell').nth(4)
+  await cell.evaluate((element) => element.scrollIntoView({ block: 'nearest', inline: 'end' }))
+  for (const [forecast, actual] of [
+    [header, table.getByRole('columnheader', { name: 'Actual Balance' })],
+    [cell, row.getByRole('cell').nth(3)],
+  ] as const) {
+    await expect(forecast).toBeInViewport({ ratio: 1 })
+    expect(await forecast.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(0)
+    const [forecastBox, actualBox] = [await forecast.boundingBox(), await actual.boundingBox()]
+    if (!forecastBox || !actualBox) throw new Error('No column box')
+    expect(forecastBox.x).toBeGreaterThanOrEqual(actualBox.x + actualBox.width - 0.5)
+  }
+}
+
+for (const theme of ['Light', 'Dark'] as const) {
+  test(`mortgages burndown forecast contrast and distinct colours [${theme}]`, async ({ page }) => {
+    const values = await reachForecastValues(page, theme)
+    const chart = values.getByRole('img', { name: /Forecast Balance/ })
+    await hoverForecastDate(page, values)
+    await settle(page)
+    const result = await chart.evaluate((svg) => {
+      type Rgb = [number, number, number]
+      const parse = (value: string): Rgb => {
+        const [r = 0, g = 0, b = 0] = (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number)
+        return [r, g, b]
+      }
+      const resolve = (token: string) => {
+        const probe = document.createElement('div')
+        probe.style.color = `rgb(var(--${token}))`
+        document.body.appendChild(probe)
+        const value = getComputedStyle(probe).color
+        probe.remove()
+        return value
+      }
+      const linear = (colour: Rgb) => colour.map((channel) => {
+        const v = channel / 255
+        return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
+      }) as Rgb
+      const luminance = (colour: Rgb) => {
+        const [r, g, b] = linear(colour)
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+      }
+      const contrast = (a: Rgb, b: Rgb) => {
+        const [high, low] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number]
+        return (high + 0.05) / (low + 0.05)
+      }
+      const oklab = (colour: Rgb): Rgb => {
+        const [r, g, b] = linear(colour)
+        const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
+        const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
+        const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
+        return [
+          0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+          1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+          0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+        ]
+      }
+      const distance = (a: Rgb, b: Rgb) => {
+        const [x, y] = [oklab(a), oklab(b)]
+        return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2])
+      }
+      const mix = (from: Rgb, to: Rgb, amount: number): Rgb =>
+        [0, 1, 2].map((index) => from[index]! * (1 - amount) + to[index]! * amount) as Rgb
+      const stops = (series: string) => Array.from(
+        svg.querySelectorAll(`linearGradient[data-series="${series}"]:not([data-part]) stop`),
+      ).map((stop) => parse(getComputedStyle(stop).stopColor))
+      // Stops at 0, 0.5 and 1: interpolate within the half that holds t.
+      const along = ([start, mid, end]: Rgb[], t: number) =>
+        t <= 0.5 ? mix(start!, mid!, t * 2) : mix(mid!, end!, (t - 0.5) * 2)
+
+      const problems: string[] = []
+      const [schedule, actual, forecast] = [stops('schedule'), stops('actual'), stops('forecast')]
+      if ([schedule, actual, forecast].some((series) => series.length !== 3)) return ['expected three stops per series']
+      const card = resolve('surface-card')
+      const statuses = ['danger', 'warning', 'success', 'info']
+        .map((name) => [name, parse(resolve(`status-${name}`))] as const)
+      const steps = 401
+      for (let step = 0; step < steps; step += 1) {
+        const t = step / (steps - 1)
+        const colour = along(forecast, t)
+        const ratio = contrast(colour, parse(card))
+        if (ratio < 3) problems.push(`step ${step} contrast ${ratio.toFixed(2)}`)
+        for (const [name, other] of [['schedule', along(schedule, t)], ['actual', along(actual, t)], ...statuses] as const) {
+          const gap = distance(colour, other)
+          if (gap < 0.1) problems.push(`step ${step} is ${gap.toFixed(3)} from ${name}`)
+        }
+      }
+
+      return problems
+    })
+    expect(result).toEqual([])
+  })
+
+  test(`mortgages burndown forecast chart and hover label [${theme}]`, async ({ page }) => {
+    const values = await reachForecastValues(page, theme)
+    await settle(page)
+    await expect(values).toHaveScreenshot(`mortgages-burndown-forecast-${theme}.png`)
+
+    await hoverForecastDate(page, values)
+    await expectLabelInsideAndReadable(page)
+    await settle(page)
+    await expectNoViolations(page)
+    await expect(values).toHaveScreenshot(`mortgages-burndown-forecast-hover-${theme}.png`)
+  })
+
+  test(`mortgages burndown forecast at 320 px stays inside the chart [${theme}]`, async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 800 })
+    const values = await reachForecastValues(page, theme)
+    const chart = values.getByRole('img', { name: /Forecast Balance/ })
+    const outside = await chart.evaluate((svg) => {
+      const bounds = svg.getBoundingClientRect()
+      const selectors = [
+        'path[data-series="forecast"][data-part="line"]',
+        'path[data-series="forecast"][data-part="area"]',
+        '[data-part="legend"][data-series="schedule"]',
+        '[data-part="legend"][data-series="actual"]',
+        '[data-part="legend"][data-series="forecast"]',
+      ]
+      const boxes = selectors.map((selector) => [selector, svg.querySelector(selector)!.getBoundingClientRect()] as const)
+      const problems = boxes
+        .filter(([, box]) => box.left < bounds.left - 0.5 || box.right > bounds.right + 0.5
+          || box.top < bounds.top - 0.5 || box.bottom > bounds.bottom + 0.5)
+        .map(([selector]) => `${selector} is outside the chart`)
+      const legends = boxes.slice(2)
+      legends.slice(1).forEach(([selector, box], index) => {
+        if (box.left < legends[index]![1].right) problems.push(`${selector} overlaps the entry before it`)
+      })
+      return problems
+    })
+    expect(outside).toEqual([])
+    await settle(page)
+    await expect(values).toHaveScreenshot(`mortgages-burndown-forecast-${theme}-320.png`)
+
+    await hoverForecastDate(page, values)
+    await expectLabelInsideAndReadable(page)
+    await expectNoHorizontalScroll(page)
+    await settle(page)
+    await expectNoViolations(page)
+    await expect(values).toHaveScreenshot(`mortgages-burndown-forecast-hover-${theme}-320.png`)
+  })
+
+  for (const narrow of [false, true]) {
+    const suffix = narrow ? '-320' : ''
+    test(`mortgages schedule forecast rows${narrow ? ' at 320 px' : ''} [${theme}]`, async ({ page }) => {
+      if (narrow) await page.setViewportSize({ width: 320, height: 800 })
+      await reachState(page, stateNamed('mortgages-schedule-forecast'), theme)
+      const table = timelineGroup(page).getByRole('table')
+      const cell = (period: number) => table.locator(`[role="row"][aria-rowindex="${period + 1}"]`).getByRole('cell').nth(4)
+
+      // The first forecast row, then the last positive value, $0.00 and a blank cell.
+      for (const [name, period] of [['start', 121], ['end', 249]] as const) {
+        await scrollScheduleTo(page, period)
+        if (narrow) await expectForecastColumnReadable(page, period)
+        await expectNoHorizontalScroll(page)
+        await settle(page)
+        await expectNoViolations(page)
+        await expect(page).toHaveScreenshot(`mortgages-schedule-forecast-${name}-${theme}${suffix}.png`)
+      }
+      await expect(cell(249)).toHaveText('$2,000.00')
+      await expect(cell(250)).toHaveText('$0.00')
+      await expect(cell(251)).toHaveText('')
+    })
+  }
+}
+
+// 027: every step of every series gradient reaches 3:1 against the card (WCAG 2.2 SC 1.4.11). Contrast against the
+// series fills is not required for the Burndown: an accepted exception (specs/027-forecast-balance/plan.md).
+for (const theme of ['Light', 'Dark'] as const) {
+  test(`mortgages burndown lines reach 3:1 on the card [${theme}]`, async ({ page }) => {
+    const values = await reachForecastValues(page, theme)
+    const problems = await values.getByRole('img').evaluate((svg) => {
+      const parse = (value: string) => (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number)
+      const luminance = (colour: number[]) => {
+        const [r = 0, g = 0, b = 0] = colour.map((channel) => {
+          const v = channel / 255
+          return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
+        })
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+      }
+      const probe = document.createElement('div')
+      probe.style.color = 'rgb(var(--surface-card))'
+      document.body.appendChild(probe)
+      const card = luminance(parse(getComputedStyle(probe).color))
+      probe.remove()
+      return ['schedule', 'actual', 'forecast'].flatMap((series) => {
+        const [start, mid, end] = Array.from(
+          svg.querySelectorAll(`linearGradient[data-series="${series}"]:not([data-part]) stop`),
+        ).map((stop) => parse(getComputedStyle(stop).stopColor))
+        if (!start || !mid || !end) return [`${series} has no three stops`]
+        let lowest = Number.POSITIVE_INFINITY
+        for (let step = 0; step <= 400; step += 1) {
+          const t = step / 400
+          const [from, to, amount] = t <= 0.5 ? [start, mid, t * 2] : [mid, end, t * 2 - 1]
+          const line = luminance(from.map((channel, index) => channel + (to[index]! - channel) * amount))
+          lowest = Math.min(lowest, (Math.max(line, card) + 0.05) / (Math.min(line, card) + 0.05))
+        }
+        return lowest < 3 ? [`${series} ${lowest.toFixed(2)}`] : []
+      })
+    })
+    expect(problems).toEqual([])
+  })
+}
+
+// 027: the blue stripes are faint on the dark card, so Dark draws them solid and wider.
+for (const [theme, expected] of [['Light', { opacity: 0.6, width: 1.2 }], ['Dark', { opacity: 1, width: 2.2 }]] as const) {
+  test(`mortgages burndown stripe strength [${theme}]`, async ({ page }) => {
+    const values = await reachForecastValues(page, theme)
+    const stripes = await values.getByRole('img').evaluate((svg) => ({
+      opacity: Number(getComputedStyle(svg.querySelector('path[data-series="schedule"][data-part="area"]')!).fillOpacity),
+      width: parseFloat(getComputedStyle(svg.querySelector('pattern line')!).strokeWidth),
+    }))
+    expect(stripes).toEqual(expected)
+  })
+}
+
+// The schedule renders only the rows in view; replacing them must never move the content panel by itself.
+test('mortgages schedule stays where it is scrolled to', async ({ page }) => {
+  await reachState(page, stateNamed('mortgages-timeline-schedule'), 'Light')
+  const main = page.locator('main')
+  await expect(timelineGroup(page).getByRole('table')).toBeVisible()
+  await settle(page)
+  await main.evaluate((element) => {
+    const positions: number[] = []
+    Object.assign(window, { positions })
+    element.addEventListener('scroll', () => positions.push(Math.round(element.scrollTop)))
+  })
+  const positions = () => page.evaluate(() => (window as unknown as { positions: number[] }).positions.splice(0))
+  const scrollTop = () => main.evaluate((element) => Math.round(element.scrollTop))
+
+  // Ordinary wheel steps only ever move down, and end where they add up to.
+  await main.hover()
+  for (let step = 1; step <= 20; step += 1) {
+    await page.mouse.wheel(0, 100)
+    await expect.poll(scrollTop).toBeGreaterThanOrEqual(step * 100)
+    await settle(page)
+  }
+  await page.waitForTimeout(500)
+  const wheeled = await positions()
+  expect(wheeled).toEqual([...wheeled].sort((a, b) => a - b))
+  expect(await scrollTop()).toBe(2000)
+
+  // A jump well past the rendered rows, as dragging the scrollbar makes, holds its position.
+  await main.evaluate((element) => { element.scrollTop = 8000 })
+  await page.waitForTimeout(500)
+  expect(await positions()).toEqual([8000])
+  await expect(timelineGroup(page).locator('[role="row"][aria-rowindex="200"]')).toBeInViewport()
+})
+
 for (const theme of ['Light', 'Dark'] as const) {
   test(`surface lightness [${theme}]`, async ({ page }) => {
     await mockApi(page, { theme })
@@ -1064,6 +1293,52 @@ for (const theme of ['Light', 'Dark'] as const) {
       expect(lightness.canvas).toBeCloseTo(lightness.card, 5)
     }
   })
+}
+
+// WEB-001 reflow (WCAG 2.2 SC 1.4.10): the logo and the header controls never cover each other.
+for (const theme of ['Light', 'Dark'] as const) {
+  // The last case makes the header taller and wider with the theme load error.
+  for (const { width, themeLoadFails } of [
+    ...[320, 480, 768, 1024].map((width) => ({ width, themeLoadFails: false })),
+    { width: 1024, themeLoadFails: true },
+  ]) {
+    const suffix = themeLoadFails ? ' with a theme error' : ''
+    test(`header logo and controls do not overlap at ${width} px${suffix} [${theme}]`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 })
+      await mockApi(page, { theme, themeLoadFails })
+      await page.goto('/')
+      if (themeLoadFails) {
+        // A failed load leaves Light active, so Dark is applied by hand.
+        await expect(page.getByText('Your saved theme could not be loaded.')).toBeVisible()
+        if (theme === 'Dark') await forceDark(page)
+      } else {
+        await expectTheme(page, theme)
+      }
+      await expect(page.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
+      await settle(page)
+
+      const parts: Array<[string, Locator]> = [
+        ['logo', page.getByRole('img', { name: 'Clutch' })],
+        ['Theme', page.getByRole('combobox', { name: 'Theme' })],
+        ['Import Limits', page.getByRole('button', { name: 'Import Limits' })],
+        ['Sign Out', page.getByRole('button', { name: 'Sign Out' })],
+        ['Toggle navigation', page.getByRole('button', { name: 'Toggle navigation' })],
+      ]
+      const boxes = await Promise.all(parts.map(async ([name, locator]) => ({ name, ...(await locator.boundingBox())! })))
+      const contentTop = (await page.getByRole('main').boundingBox())!.y
+
+      const problems = boxes.flatMap((box, index) => [
+        ...(box.x < 0 || box.x + box.width > width + 0.5 ? [`${box.name} is cut off sideways`] : []),
+        ...(box.name !== 'Toggle navigation' && box.y + box.height > contentTop + 0.5 ? [`${box.name} covers the content panel`] : []),
+        ...boxes.slice(index + 1)
+          .filter((other) => box.x < other.x + other.width - 0.5 && other.x < box.x + box.width - 0.5
+            && box.y < other.y + other.height - 0.5 && other.y < box.y + box.height - 0.5)
+          .map((other) => `${box.name} overlaps ${other.name}`),
+      ])
+      expect(problems).toEqual([])
+      await expectNoHorizontalScroll(page)
+    })
+  }
 }
 
 test('switching theme while the delete dialog is open updates its surface', async ({ page }) => {

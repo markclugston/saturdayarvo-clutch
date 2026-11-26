@@ -29,7 +29,7 @@ describe('AmortizationSchedule with a Mortgage Account', () => {
     expect(await screen.findByRole('columnheader', { name: 'Actual Balance' })).toBeInTheDocument()
     const table = screen.getByRole('table')
     expect(within(table).getAllByRole('columnheader').map((header) => header.textContent))
-      .toEqual(['Period', 'Date', 'Bank Schedule', 'Actual Balance'])
+      .toEqual(['Period', 'Date', 'Bank Schedule', 'Actual Balance', 'Forecast Balance'])
     await waitFor(() => expect(within(table).getAllByRole('row')[2]).toHaveTextContent('$1,000.50'))
     const rows = within(table).getAllByRole('row').slice(1)
     expect(rows).toHaveLength(4)
@@ -51,9 +51,9 @@ describe('AmortizationSchedule with a Mortgage Account', () => {
     const rows = within(table).getAllByRole('row').slice(1)
       .map((row) => within(row).getAllByRole('cell').map((cell) => cell.textContent))
     expect(rows).toEqual([
-      ['1', '1 Feb 2026', 'Not yet calculated', '$1,000.00'],
-      ['2', '1 Mar 2026', 'Not yet calculated', '$990.00'],
-      ['3', '1 Apr 2026', 'Not yet calculated', '$980.00'],
+      ['1', '1 Feb 2026', 'Not yet calculated', '$1,000.00', ''],
+      ['2', '1 Mar 2026', 'Not yet calculated', '$990.00', ''],
+      ['3', '1 Apr 2026', 'Not yet calculated', '$980.00', ''],
     ])
   })
 
@@ -137,9 +137,9 @@ describe('AmortizationSchedule with a Mortgage Account', () => {
     const params = new URLSearchParams(server.balanceRequests[0])
     expect([...params.keys()]).toEqual(['accountId'])
     const first = within(within(table).getAllByRole('row')[1] as HTMLElement).getAllByRole('cell')
-    expect(first.map((cell) => cell.textContent)).toEqual(['1', '', '', '$500.00'])
+    expect(first.map((cell) => cell.textContent)).toEqual(['1', '', '', '$500.00', ''])
     const second = within(within(table).getAllByRole('row')[2] as HTMLElement).getAllByRole('cell')
-    expect(second.map((cell) => cell.textContent)).toEqual(['2', '', '', '$400.00'])
+    expect(second.map((cell) => cell.textContent)).toEqual(['2', '', '', '$400.00', ''])
   })
 
   it('shows the enter-details prompt when the fallback has no balance-bearing transactions', async () => {
@@ -202,8 +202,114 @@ describe('AmortizationSchedule with a Mortgage Account and a calculated schedule
     const table = screen.getByRole('table')
     const rows = within(table).getAllByRole('row').slice(1)
     expect(within(rows[0] as HTMLElement).getAllByRole('cell').map((cell) => cell.textContent))
-      .toEqual(['1', '1 Feb 2026', '$500.00', '$1,000.50'])
+      .toEqual(['1', '1 Feb 2026', '$500.00', '$1,000.50', ''])
     expect(within(rows[1] as HTMLElement).getAllByRole('cell').map((cell) => cell.textContent))
-      .toEqual(['2', '1 Mar 2026', '$0.00', '$980.00'])
+      .toEqual(['2', '1 Mar 2026', '$0.00', '$980.00', ''])
+  })
+})
+
+describe('AmortizationSchedule Forecast Balance column', () => {
+  const account = { id: '11111111-1111-4111-8111-111111111111', description: 'Offset Account', currencyCode: 'AUD' }
+  const saved = { disbursalDate: '2026-01-01', paymentFrequency: 'Monthly' as const }
+  let server: FakeServer
+
+  beforeEach(() => {
+    vi.resetAllMocks()
+    server = installFakeApi([])
+    server.accounts = [account]
+    server.balances = { currencyCode: 'AUD', periodCount: 6, balances: [null, '300.00', '200.00'] }
+  })
+
+  const forecastCells = () => within(screen.getByRole('table')).getAllByRole('row').slice(1)
+    .map((row) => within(row).getAllByRole('cell')[4]?.textContent)
+
+  async function renderLinked(duration = 6) {
+    const view = renderWithProviders(<AmortizationSchedule accountId={account.id} duration={duration} {...saved} />)
+    await screen.findByRole('columnheader', { name: 'Forecast Balance' })
+    await waitFor(() => expect(screen.getByRole('table')).not.toHaveAttribute('aria-busy'))
+    return view
+  }
+
+  it('is immediately right of Actual Balance', async () => {
+    await renderLinked()
+
+    expect(screen.getAllByRole('columnheader').map((header) => header.textContent))
+      .toEqual(['Period', 'Date', 'Bank Schedule', 'Actual Balance', 'Forecast Balance'])
+  })
+
+  it('is blank up to the last Actual Balance, then shows one $0.00 followed by blanks, without a Bank Schedule', async () => {
+    await renderLinked()
+
+    expect(forecastCells()).toEqual(['', '', '', '$100.00', '$0.00', ''])
+    expect(within(screen.getByRole('table')).getAllByText('Not yet calculated')).toHaveLength(6)
+  })
+
+  it('right aligns the header and cells with tabular figures', async () => {
+    await renderLinked()
+
+    expect(screen.getByRole('columnheader', { name: 'Forecast Balance' })).toHaveClass('justify-end', 'text-right')
+    expect(screen.getByRole('cell', { name: '$100.00' })).toHaveClass('justify-end', 'text-right', 'tabular-nums')
+  })
+
+  it('is blank while the balances load', async () => {
+    const release = server.holdBalances()
+    renderWithProviders(<AmortizationSchedule accountId={account.id} duration={6} {...saved} />)
+
+    await screen.findByRole('columnheader', { name: 'Forecast Balance' })
+    expect(forecastCells()).toEqual(Array(6).fill(''))
+    await act(async () => release())
+    await waitFor(() => expect(forecastCells()[3]).toBe('$100.00'))
+  })
+
+  it('is blank when the balances fail to load', async () => {
+    server.balancesError = problem(500)
+    renderWithProviders(<AmortizationSchedule accountId={account.id} duration={6} {...saved} />)
+
+    expect(await screen.findByText(BALANCES_FAILED_MESSAGE)).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Forecast Balance' })).toBeInTheDocument()
+    expect(forecastCells()).toEqual(Array(6).fill(''))
+  })
+
+  it('is shown blank in the monthly fallback', async () => {
+    server.balances = { currencyCode: 'AUD', periodCount: 3, balances: ['300.00', '200.00', null] }
+    renderWithProviders(<AmortizationSchedule accountId={account.id} />)
+
+    await screen.findByRole('columnheader', { name: 'Forecast Balance' })
+    await waitFor(() => expect(forecastCells()).toHaveLength(3))
+    expect(forecastCells()).toEqual(['', '', ''])
+  })
+
+  it('is shown blank with no Actual Balance data', async () => {
+    server.balances = { currencyCode: 'AUD', periodCount: 0, balances: [] }
+    await renderLinked()
+
+    expect(forecastCells()).toEqual(Array(6).fill(''))
+  })
+
+  it('is absent without an account, and only the linked table is wider', async () => {
+    const plain = renderWithProviders(<AmortizationSchedule duration={6} {...saved} />)
+
+    expect(screen.queryByRole('columnheader', { name: 'Forecast Balance' })).not.toBeInTheDocument()
+    expect(screen.getByRole('table')).toHaveClass('min-w-80')
+    expect(screen.getByRole('table')).not.toHaveClass('min-w-140')
+    plain.unmount()
+
+    await renderLinked()
+    expect(screen.getByRole('table')).toHaveClass('min-w-140')
+    expect(screen.getByRole('table')).not.toHaveClass('min-w-80')
+  })
+
+  it('shows the forecast for 1,560 periods within 500 ms of the balances', async () => {
+    server.balances = { currencyCode: 'AUD', periodCount: 1560, balances: ['100000.00', '99950.00'] }
+    const release = server.holdBalances()
+    renderWithProviders(<AmortizationSchedule accountId={account.id} duration={1560} {...saved} />)
+    await screen.findByRole('columnheader', { name: 'Forecast Balance' })
+    await waitFor(() => expect(server.balanceRequests).toHaveLength(1))
+
+    const start = performance.now()
+    await act(async () => release())
+    await waitFor(() => expect(forecastCells()[2]).toBe('$99,900.00'))
+
+    expect(performance.now() - start).toBeLessThan(500)
   })
 })

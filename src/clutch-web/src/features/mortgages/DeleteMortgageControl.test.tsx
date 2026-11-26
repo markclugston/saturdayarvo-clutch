@@ -80,7 +80,9 @@ describe('DeleteMortgageControl', () => {
   })
 
   it('a 409 keeps the dialog open with a conflict alert and Reload; a clean Reload shows Reloading… then closes', async () => {
-    const onReload = vi.fn(() => new Promise<void>((resolve) => { setTimeout(resolve, 50) }))
+    // Held until released below, so "Reloading…" cannot end before it is checked.
+    let finishReload = () => {}
+    const onReload = vi.fn(() => new Promise<void>((resolve) => { finishReload = resolve }))
     const user = userEvent.setup()
     render(<Harness mortgage={home} onReload={onReload} />)
     server.failNext('DELETE', conflictError())
@@ -90,6 +92,7 @@ describe('DeleteMortgageControl', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('This mortgage was changed elsewhere; reload to see the latest')
     await user.click(screen.getByRole('button', { name: 'Reload' }))
     expect(screen.getByRole('button', { name: 'Reloading…' })).toBeDisabled()
+    await act(async () => finishReload())
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(onReload).toHaveBeenCalledTimes(1)

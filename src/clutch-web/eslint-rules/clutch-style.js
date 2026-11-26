@@ -17,6 +17,7 @@ const TOKEN_COLOURS = [
   'chart-primary', 'chart-tint', 'chart-navy',
   'chart-schedule-start', 'chart-schedule-mid', 'chart-schedule-end',
   'chart-actual-start', 'chart-actual-mid', 'chart-actual-end',
+  'chart-forecast-start', 'chart-forecast-mid', 'chart-forecast-end',
   'white', 'black', 'transparent', 'current', 'inherit',
 ].join('|')
 

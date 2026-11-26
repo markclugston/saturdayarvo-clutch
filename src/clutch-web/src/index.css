@@ -50,6 +50,9 @@
     --color-chart-actual-start: rgb(var(--chart-actual-start));
     --color-chart-actual-mid: rgb(var(--chart-actual-mid));
     --color-chart-actual-end: rgb(var(--chart-actual-end));
+    --color-chart-forecast-start: rgb(var(--chart-forecast-start));
+    --color-chart-forecast-mid: rgb(var(--chart-forecast-mid));
+    --color-chart-forecast-end: rgb(var(--chart-forecast-end));
 
     --radius-chip: 6px;
     --radius-control: 10px;
@@ -79,12 +82,18 @@
     --accent-navy: 27 36 51;
     --scrim: 17 19 24;
 
-    --chart-schedule-start: 26 95 230;
-    --chart-schedule-mid: 124 58 237;
-    --chart-schedule-end: 190 24 93;
-    --chart-actual-start: 8 145 178;
+    --chart-schedule-start: 0 15 255;
+    --chart-schedule-mid: 128 15 255;
+    --chart-schedule-end: 255 15 255;
+    /* Actual and Forecast Balance are one colour along their whole gradient. */
+    --chart-actual-start: 22 163 74;
     --chart-actual-mid: 22 163 74;
-    --chart-actual-end: 202 138 4;
+    --chart-actual-end: 22 163 74;
+    --chart-forecast-start: 233 108 7;
+    --chart-forecast-mid: 233 108 7;
+    --chart-forecast-end: 233 108 7;
+    --chart-hatch-opacity: 0.6;
+    --chart-hatch-width: 1.2;
 
     --status-danger-bg: 253 236 236;
     --status-danger: 197 34 31;
@@ -125,12 +134,18 @@
     --accent-navy: 138 180 255;
     --scrim: 14 14 16;
 
-    --chart-schedule-start: 142 186 255;
-    --chart-schedule-mid: 206 176 255;
-    --chart-schedule-end: 249 168 212;
-    --chart-actual-start: 34 211 238;
+    --chart-schedule-start: 52 110 255;
+    --chart-schedule-mid: 142 84 255;
+    --chart-schedule-end: 255 15 255;
+    --chart-actual-start: 74 222 128;
     --chart-actual-mid: 74 222 128;
-    --chart-actual-end: 250 204 21;
+    --chart-actual-end: 74 222 128;
+    --chart-forecast-start: 255 128 45;
+    --chart-forecast-mid: 255 128 45;
+    --chart-forecast-end: 255 128 45;
+    /* Blue stripes are faint on the dark card, so Dark draws them solid and wider. */
+    --chart-hatch-opacity: 1;
+    --chart-hatch-width: 2.2;
 
     --status-danger-bg: 73 61 62;
     --status-danger: 245 156 148;

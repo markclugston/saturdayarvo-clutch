@@ -31,6 +31,12 @@ type Handlers = {
   onReload?: () => Promise<Mortgage | null>
 }
 
+// No pause between simulated keystrokes. By default user-event waits on a timer after each one, which
+// was most of the typing time here and pushed the longest tests past the timeout in a full run.
+function setupUser() {
+  return userEvent.setup({ delay: null })
+}
+
 function renderForm(handlers: Handlers = {}) {
   return renderWithProviders(
     <LoanDetailsForm
@@ -71,7 +77,7 @@ describe('LoanDetailsForm disbursal date lock', () => {
   })
 
   it('disables Disbursal Date with a hint while rate changes exist and enables it at zero rows', async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     renderForm({ mortgage: makeMortgage() })
 
     const field = screen.getByLabelText('Disbursal Date')
@@ -96,7 +102,7 @@ describe('LoanDetailsForm schedule report', () => {
 
   it('reports Duration, Disbursal Date and Payment Frequency only while all three are valid', async () => {
     const onScheduleChange = vi.fn()
-    const user = userEvent.setup()
+    const user = setupUser()
     renderWithProviders(
       <LoanDetailsForm
         onDeleted={() => {}}
@@ -155,7 +161,7 @@ describe('LoanDetailsForm (new mortgage)', () => {
     })
 
     it('disables Interest Rates while saving', async () => {
-      const user = userEvent.setup()
+      const user = setupUser()
       renderForm()
       await fillForm(user, validValues)
       const release = server.hold('POST')
@@ -180,10 +186,16 @@ describe('LoanDetailsForm (new mortgage)', () => {
     ]
 
     it.each(cases)('%s', async (_label, patch, field, message) => {
-      const user = userEvent.setup()
+      const user = setupUser()
       renderForm()
       await fillForm(user, validValues)
-      await fillForm(user, patch)
+      const { name, ...otherFields } = patch
+      await fillForm(user, otherFields)
+      if (name !== undefined) {
+        // Pasted: typing re-renders the form once per character, and one name here is 101 long.
+        await user.clear(screen.getByLabelText('Name'))
+        await user.paste(name)
+      }
       await submit(user)
 
       expect(screen.getByLabelText(field)).toHaveAccessibleDescription(message)
@@ -192,7 +204,7 @@ describe('LoanDetailsForm (new mortgage)', () => {
     })
 
     it('flags a missing or future Disbursal Date before any request is sent', async () => {
-      const user = userEvent.setup()
+      const user = setupUser()
       renderForm()
       await fillForm(user, { ...validValues, rates: undefined })
       setDate('Disbursal Date', '')
@@ -209,7 +221,7 @@ describe('LoanDetailsForm (new mortgage)', () => {
     })
 
     it('sends a duplicate name and shows the server message under Name', async () => {
-      const user = userEvent.setup()
+      const user = setupUser()
       renderForm()
       server.failNext('POST', problem(400, { errors: { name: ['A mortgage with this name already exists'] } }))
       await fillForm(user, validValues)
@@ -224,7 +236,7 @@ describe('LoanDetailsForm (new mortgage)', () => {
   describe('saving', () => {
     it('shows Saving… and disables Save at once, then reports the saved mortgage', async () => {
       const onSaved = vi.fn()
-      const user = userEvent.setup()
+      const user = setupUser()
       renderForm({ onSaved })
       await fillForm(user, validValues)
       const release = server.hold('POST')
@@ -238,7 +250,7 @@ describe('LoanDetailsForm (new mortgage)', () => {
     })
 
     it('shows server field errors with aria-invalid, aria-describedby and an alert summary, keeping values', async () => {
-      const user = userEvent.setup()
+      const user = setupUser()
       renderForm()
       server.failNext('POST', problem(400, {
         errors: {
@@ -260,7 +272,7 @@ describe('LoanDetailsForm (new mortgage)', () => {
     })
 
     it('shows server row errors in the dialog and points the summary at Interest Rates', async () => {
-      const user = userEvent.setup()
+      const user = setupUser()
       renderForm()
       server.failNext('POST', problem(400, {
         errors: { 'interestRateChanges[0].newInterestRate': ['Enter an interest rate from 0 to 100'] },
@@ -276,7 +288,7 @@ describe('LoanDetailsForm (new mortgage)', () => {
     })
 
     it('shows a set-level interestRateChanges error in the dialog and the summary, with no "Correct" line', async () => {
-      const user = userEvent.setup()
+      const user = setupUser()
       renderForm()
       server.failNext('POST', problem(400, {
         errors: { interestRateChanges: ['Add the opening interest rate, effective on the disbursal date'] },
@@ -295,7 +307,7 @@ describe('LoanDetailsForm (new mortgage)', () => {
       ['413', problem(413)],
       ['network failure', new TypeError('Failed to fetch')],
     ])('a %s shows a generic alert, keeps values and shows no details', async (_label, error) => {
-      const user = userEvent.setup()
+      const user = setupUser()
       renderForm()
       server.failNext('POST', error)
       await fillForm(user, validValues)
@@ -309,7 +321,7 @@ describe('LoanDetailsForm (new mortgage)', () => {
     })
 
     it('Cancel clears a new form', async () => {
-      const user = userEvent.setup()
+      const user = setupUser()
       renderForm()
       await fillForm(user, validValues)
 
@@ -339,7 +351,7 @@ describe('LoanDetailsForm (editing)', () => {
     const mortgage = makeMortgage({ name: 'Car', version: 3 })
     const server = installFakeApi([{ ...mortgage }])
     const onSaved = vi.fn()
-    const user = userEvent.setup()
+    const user = setupUser()
     renderForm({ mortgage, onSaved })
 
     expect(screen.getByLabelText('Name')).toHaveValue('Car')
@@ -374,7 +386,7 @@ describe('LoanDetailsForm (editing)', () => {
     it('never re-initialises a dirty form', async () => {
       const mortgage = makeMortgage({ name: 'Car' })
       installFakeApi([mortgage])
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithProviders(<Refetching initial={mortgage} newer={{ ...mortgage, name: 'Elsewhere', version: 2 }} />)
       await user.type(screen.getByLabelText('Name'), ' typed')
 
@@ -386,7 +398,7 @@ describe('LoanDetailsForm (editing)', () => {
     it('does update a clean form', async () => {
       const mortgage = makeMortgage({ name: 'Car' })
       installFakeApi([mortgage])
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithProviders(<Refetching initial={mortgage} newer={{ ...mortgage, name: 'Elsewhere', version: 2 }} />)
 
       await user.click(screen.getByRole('button', { name: 'Refetch' }))
@@ -401,7 +413,7 @@ describe('LoanDetailsForm (editing)', () => {
     server.failNext('PUT', problem(409, { type: '/problems/mortgage-changed' }))
     const latest = { ...mortgage, name: 'Latest', version: 2 }
     const onReload = vi.fn(async () => latest)
-    const user = userEvent.setup()
+    const user = setupUser()
     renderForm({ mortgage, onReload })
     await submit(user)
 
@@ -415,7 +427,7 @@ describe('LoanDetailsForm (editing)', () => {
   it('Cancel restores the saved values after edits, including dialog edits', async () => {
     const mortgage = makeMortgage({ name: 'Car' })
     installFakeApi([mortgage])
-    const user = userEvent.setup()
+    const user = setupUser()
     renderForm({ mortgage })
     await user.type(screen.getByLabelText('Name'), ' edited')
     const dialog = await openDialog(user)
@@ -457,7 +469,7 @@ describe('LoanDetailsForm (editing)', () => {
     it('updates Current Interest Rate after a dialog add and remove, before Save', async () => {
       const mortgage = makeMortgage()
       const server = installFakeApi([mortgage])
-      const user = userEvent.setup()
+      const user = setupUser()
       renderForm({ mortgage })
 
       await addRates(user, [['6.5', '2010-01-01']])
@@ -473,7 +485,7 @@ describe('LoanDetailsForm (editing)', () => {
       const mortgage = makeMortgage()
       const server = installFakeApi([mortgage])
       const onSaved = vi.fn()
-      const user = userEvent.setup()
+      const user = setupUser()
       renderForm({ mortgage, onSaved })
 
       await addRates(user, [['6', '2001-01-01']])
@@ -492,7 +504,7 @@ describe('LoanDetailsForm (editing)', () => {
       const mortgage = makeMortgage()
       const server = installFakeApi([mortgage])
       server.failNext('PUT', problem(409, { type: '/problems/mortgage-changed' }))
-      const user = userEvent.setup()
+      const user = setupUser()
       renderForm({ mortgage })
 
       await addRates(user, [['6', '2001-01-01']])
@@ -506,7 +518,7 @@ describe('LoanDetailsForm (editing)', () => {
     it('removing the opening rate refuses Save and shows the message in the dialog, not beside Current Interest Rate', async () => {
       const mortgage = makeMortgage()
       const server = installFakeApi([mortgage])
-      const user = userEvent.setup()
+      const user = setupUser()
       renderForm({ mortgage })
       let dialog = await openDialog(user)
       await user.click(within(dialog).getByRole('button', { name: 'Remove 5.25% from 1 Jan 2000' }))
@@ -527,7 +539,7 @@ describe('LoanDetailsForm (editing)', () => {
     it('removes the "add the opening interest rate" message once an opening rate is added', async () => {
       const mortgage = makeMortgage()
       installFakeApi([mortgage])
-      const user = userEvent.setup()
+      const user = setupUser()
       renderForm({ mortgage })
       let dialog = await openDialog(user)
       await user.click(within(dialog).getByRole('button', { name: 'Remove 5.25% from 1 Jan 2000' }))
@@ -579,7 +591,7 @@ describe('LoanDetailsForm Mortgage Account', () => {
   it('offers only None when accounts fail to load and the form still saves', async () => {
     const server = installFakeApi([])
     server.accountsError = problem(500)
-    const user = userEvent.setup()
+    const user = setupUser()
     renderForm()
     await fillForm(user, validValues)
 
@@ -606,7 +618,7 @@ describe('LoanDetailsForm Mortgage Account', () => {
     const server = installFakeApi([])
     server.accounts = [accountA, accountB]
     const onAccountChange = vi.fn()
-    const user = userEvent.setup()
+    const user = setupUser()
     renderWithProviders(
       <LoanDetailsForm
         onAccountChange={onAccountChange}
@@ -639,7 +651,7 @@ describe('LoanDetailsForm Mortgage Account', () => {
     const server = installFakeApi([])
     server.accounts = [accountA]
     server.failNext('POST', problem(400, { errors: { accountId: ['Choose one of your accounts'] } }))
-    const user = userEvent.setup()
+    const user = setupUser()
     renderForm()
     await fillForm(user, validValues)
     await waitFor(() => expect(within(screen.getByLabelText('Mortgage Account')).getAllByRole('option')).toHaveLength(2))
@@ -687,7 +699,7 @@ describe('LoanDetailsForm calculation inputs', () => {
   })
 
   it('emits undefined while a calculation input is invalid, and inputs when only the Name is invalid', async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     const emit = renderEmitting(makeMortgage())
     await waitFor(() => expect(emit).toHaveBeenLastCalledWith(expect.objectContaining({ duration: 360 })))
 

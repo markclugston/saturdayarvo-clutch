@@ -153,8 +153,10 @@ describe('LoanPayoffTimeline Actual Balance', () => {
       <LoanPayoffTimeline accountId={account.id} calculation={calculation} onSwitch={vi.fn()} saved view="Burndown" />,
     )
 
-    await waitFor(() => expect(screen.getByRole('img').querySelectorAll('path[data-part="line"]')).toHaveLength(2))
+    // Bank Schedule, Actual Balance and the Forecast Balance the falling balances give.
+    await waitFor(() => expect(screen.getByRole('img').querySelectorAll('path[data-part="line"]')).toHaveLength(3))
     expect(screen.getByRole('img')).toHaveTextContent('Actual Balance')
+    expect(screen.getByRole('img')).toHaveTextContent('Forecast Balance')
     const params = new URLSearchParams(server.balanceRequests[0])
     expect(params.get('accountId')).toBe(account.id)
     expect(params.get('disbursalDate')).toBe('2023-11-29')

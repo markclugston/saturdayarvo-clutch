@@ -32,18 +32,20 @@ type AmortizationScheduleProps = {
   /** Disbursal Date and Payment Frequency: saved, or the form's valid values for an unsaved mortgage. */
   disbursalDate?: string
   paymentFrequency?: PaymentFrequency
-  /** The Mortgage Account selection; with one, a balance column follows Bank Schedule. */
+  /** The Mortgage Account selection; with one, the balance columns follow Bank Schedule. */
   accountId?: string
   /** The calculated Bank Schedule; absent shows "Not yet calculated". */
   schedule?: ScheduledPeriod[]
 }
 
-/** What the schedule table needs to add the account balance column. */
-type BalanceColumn = {
-  header: string
+/** What the schedule table needs to add the account balance columns. */
+type BalanceColumns = {
   loading: boolean
-  /** Formatted balance for a 1-based period; '' when blank. */
-  cell: (period: number) => string
+  columns: {
+    header: string
+    /** Formatted balance for a 1-based period; '' when blank. */
+    cell: (period: number) => string
+  }[]
 }
 
 /** The repayment date shown for a period: the disbursal date plus that many intervals (022 FR-001). */
@@ -104,15 +106,18 @@ function AccountSchedule({
 
   const loading = actual.status === 'loading'
   const failed = actual.status === 'failed'
-  const column: BalanceColumn = {
-    header: 'Actual Balance',
+  const cells = (values: (string | null)[]) => (period: number) => {
+    const value = values[period - 1]
+    return value === null || value === undefined
+      ? ''
+      : formatCurrencyAmount(value, actual.currencyCode ?? '')
+  }
+  const balanceColumns: BalanceColumns = {
     loading,
-    cell: (period) => {
-      const value = actual.balances[period - 1]
-      return value === null || value === undefined
-        ? ''
-        : formatCurrencyAmount(value, actual.currencyCode ?? '')
-    },
+    columns: [
+      { header: 'Actual Balance', cell: cells(actual.balances) },
+      { header: 'Forecast Balance', cell: cells(actual.forecast) },
+    ],
   }
 
   // Details complete: the mortgage's own rows. Incomplete (new, unsaved): monthly rows from the account.
@@ -124,7 +129,7 @@ function AccountSchedule({
         ? <p className="text-sm text-fg-secondary">{ENTER_DETAILS_MESSAGE}</p>
         : (
             <ScheduleTable
-              balanceColumn={column}
+              balanceColumns={balanceColumns}
               calculated={complete}
               disbursalDate={disbursalDate}
               paymentFrequency={paymentFrequency}
@@ -138,8 +143,8 @@ function AccountSchedule({
 
 type ScheduleTableProps = PeriodDates & {
   rowCount: number
-  balanceColumn?: BalanceColumn
-  /** False for the fallback view: only Period and the balance are filled. */
+  balanceColumns?: BalanceColumns
+  /** False for the fallback view: only Period and the balances are filled. */
   calculated?: boolean
   schedule?: ScheduledPeriod[]
 }
@@ -155,7 +160,7 @@ function periodDate(period: number, { disbursalDate, paymentFrequency }: PeriodD
 
 function ScheduleTable({
   rowCount,
-  balanceColumn,
+  balanceColumns,
   calculated = true,
   schedule,
   disbursalDate,
@@ -201,7 +206,7 @@ function ScheduleTable({
     return calculated ? NOT_CALCULATED : ''
   }
 
-  const columns = balanceColumn ? 'grid-cols-[5rem_1fr_1fr_1fr]' : 'grid-cols-[5rem_1fr_1fr]'
+  const columns = balanceColumns ? 'grid-cols-[5rem_1fr_1fr_1fr_1fr]' : 'grid-cols-[5rem_1fr_1fr]'
   const first = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN)
   const last = Math.min(rowCount, Math.ceil((scrollTop + viewportHeight) / ROW_HEIGHT) + OVERSCAN)
   const periods: number[] = []
@@ -210,14 +215,16 @@ function ScheduleTable({
   }
 
   return (
-    <div className="min-w-0 flex-1" ref={wrapperRef}>
+    // No scroll anchoring: swapping rows for spacer height keeps the total height, and the browser's
+    // anchor adjustment would move the scroller itself, which renders new rows and moves it again.
+    <div className="min-w-0 flex-1 [overflow-anchor:none]" ref={wrapperRef}>
       <div
-        aria-busy={balanceColumn?.loading ? true : undefined}
+        aria-busy={balanceColumns?.loading ? true : undefined}
         aria-rowcount={rowCount + 1}
-        className="min-w-80 text-sm"
+        className={`${balanceColumns ? 'min-w-140' : 'min-w-80'} text-sm`}
         role="table"
       >
-        {balanceColumn?.loading && <p className="sr-only" role="status">Loading account balances</p>}
+        {balanceColumns?.loading && <p className="sr-only" role="status">Loading account balances</p>}
         <div
           aria-rowindex={1}
           className={`sticky top-0 z-10 grid ${columns} bg-card font-semibold`}
@@ -227,9 +234,9 @@ function ScheduleTable({
           <div className="flex items-center justify-end px-3 text-right" role="columnheader">Period</div>
           <div className="flex items-center px-3" role="columnheader">Date</div>
           <div className="flex items-center justify-end px-3 text-right" role="columnheader">Bank Schedule</div>
-          {balanceColumn && (
-            <div className="flex items-center justify-end px-3 text-right" role="columnheader">{balanceColumn.header}</div>
-          )}
+          {balanceColumns?.columns.map(({ header }) => (
+            <div className="flex items-center justify-end px-3 text-right" key={header} role="columnheader">{header}</div>
+          ))}
         </div>
         <div role="rowgroup">
           <div aria-hidden="true" role="presentation" style={{ height: first * ROW_HEIGHT }} />
@@ -251,9 +258,9 @@ function ScheduleTable({
               >
                 {bankScheduleCell(period)}
               </div>
-              {balanceColumn && (
-                <div className="flex items-center justify-end px-3 text-right tabular-nums" role="cell">{balanceColumn.cell(period)}</div>
-              )}
+              {balanceColumns?.columns.map(({ header, cell }) => (
+                <div className="flex items-center justify-end px-3 text-right tabular-nums" key={header} role="cell">{cell(period)}</div>
+              ))}
             </div>
           ))}
           <div aria-hidden="true" role="presentation" style={{ height: (rowCount - last) * ROW_HEIGHT }} />

@@ -1,7 +1,8 @@
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { apiRequest } from '@/lib/api/client'
 import {
   addRates,
   conflictError,
@@ -34,6 +35,11 @@ vi.mock('@/lib/api/client', async (importOriginal) => ({
   apiRequest: vi.fn(),
   clearCsrfToken: vi.fn(),
 }))
+
+// No timer wait between simulated keystrokes, which otherwise dominates the typing tests.
+function setupUser() {
+  return userEvent.setup({ delay: null })
+}
 
 const PLEASE_ENTER = 'Please enter your mortgage details'
 
@@ -78,7 +84,7 @@ describe('MortgagesPage', () => {
     it('shows a generic alert with Retry and no form when loading fails, and Retry shows Loading... at once', async () => {
       server = installFakeApi([makeMortgage({ name: 'Home' })])
       server.failNext('GET', new Error('internal details'))
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithProviders(<MortgagesPage userId="user-1" />)
 
       const alert = await screen.findByRole('alert')
@@ -124,7 +130,7 @@ describe('MortgagesPage', () => {
   describe('loan payoff timeline view', () => {
     it('switches between the chart and the schedule within 500 ms, never showing both, and announces each view', async () => {
       server = installFakeApi([makeMortgage({ name: 'Home' })])
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithProviders(<MortgagesPage userId="user-1" />)
       await screen.findByRole('button', { name: 'Home' })
       expect(timelineStatus()).toHaveTextContent('Showing Burndown Chart')
@@ -141,7 +147,7 @@ describe('MortgagesPage', () => {
 
     it('keeps the chosen view across mortgage tabs and Add mortgage', async () => {
       server = installFakeApi([makeMortgage({ name: 'Home' }), makeMortgage({ name: 'Car' })])
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithProviders(<MortgagesPage userId="user-1" />)
       await screen.findByRole('button', { name: 'Home' })
 
@@ -156,7 +162,7 @@ describe('MortgagesPage', () => {
 
     it('shows the prompt in both views for an unsaved mortgage and the switch still works', async () => {
       server = installFakeApi([])
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithProviders(<MortgagesPage userId="user-1" />)
       await screen.findByRole('heading', { name: 'Details' })
       expect(within(timeline()).getByText(PLEASE_ENTER)).toBeInTheDocument()
@@ -239,7 +245,7 @@ describe('MortgagesPage', () => {
 
     it('shows the view last chosen at once when returning to the page in the same visit', async () => {
       server = installFakeApi([makeMortgage({ name: 'Home' })])
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithProviders(<LeaveAndReturn><MortgagesPage userId="user-1" /></LeaveAndReturn>)
       await screen.findByRole('button', { name: 'Home' })
       await user.click(screen.getByRole('button', { name: 'Show Amortization Schedule' }))
@@ -259,7 +265,7 @@ describe('MortgagesPage', () => {
 
     it('a switch updates the cache at once and saves with an increasing sequence', async () => {
       server = installFakeApi([makeMortgage({ name: 'Home' })])
-      const user = userEvent.setup()
+      const user = setupUser()
       const { queryClient } = renderWithProviders(<MortgagesPage userId="user-1" />)
       await screen.findByRole('button', { name: 'Home' })
 
@@ -280,7 +286,7 @@ describe('MortgagesPage', () => {
     it('an older save answering last does not change the view', async () => {
       server = installFakeApi([makeMortgage({ name: 'Home' })])
       const releases = server.holdAllPreference('PUT')
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithProviders(<MortgagesPage userId="user-1" />)
       await screen.findByRole('button', { name: 'Home' })
 
@@ -311,7 +317,7 @@ describe('MortgagesPage', () => {
     it('a failed save shows no toast and keeps the chosen view', async () => {
       server = installFakeApi([makeMortgage({ name: 'Home' })])
       server.failPreference('PUT', problem(500))
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithProviders(<MortgagesPage userId="user-1" />)
       await screen.findByRole('button', { name: 'Home' })
 
@@ -337,7 +343,7 @@ describe('MortgagesPage', () => {
 
     it('shows the prompt again when Add mortgage is selected', async () => {
       server = installFakeApi([makeMortgage({ name: 'Home' })])
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithProviders(<MortgagesPage userId="user-1" />)
       await screen.findByRole('button', { name: 'Home' })
       expect(screen.queryByText(PLEASE_ENTER)).not.toBeInTheDocument()
@@ -352,7 +358,7 @@ describe('MortgagesPage', () => {
   describe('schedule of an unsaved mortgage', () => {
     it('sizes the schedule from the valid Duration, Disbursal Date and Payment Frequency typed in the form', async () => {
       server = installFakeApi([], 'Schedule')
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithProviders(<MortgagesPage userId="user-1" />)
       await screen.findByRole('heading', { name: 'Details' })
       expect(within(timeline()).getByText(PLEASE_ENTER)).toBeInTheDocument()
@@ -364,7 +370,7 @@ describe('MortgagesPage', () => {
 
     it('shows the prompt again when the Duration becomes invalid', async () => {
       server = installFakeApi([], 'Schedule')
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithProviders(<MortgagesPage userId="user-1" />)
       await screen.findByRole('heading', { name: 'Details' })
       await fillForm(user, { periods: '360', first: '2024-01-01', frequency: 'Monthly' })
@@ -379,7 +385,7 @@ describe('MortgagesPage', () => {
   describe('saving a new mortgage', () => {
     it('saves, shows the "Mortgage saved" toast, selects the new tab and keeps rate changes in the response order', async () => {
       server = installFakeApi([])
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithProviders(<MortgagesPage userId="user-1" />)
       await screen.findByRole('heading', { name: 'Details' })
 
@@ -417,7 +423,7 @@ describe('MortgagesPage', () => {
       })])
       renderWithProviders(<MortgagesPage userId="user-1" />)
 
-      const user = userEvent.setup()
+      const user = setupUser()
       await screen.findByRole('button', { name: 'Ordered' })
       await user.click(screen.getByRole('button', { name: 'Interest Rates' }))
       await screen.findByRole('dialog', { name: 'Interest Rates' })
@@ -426,7 +432,7 @@ describe('MortgagesPage', () => {
 
     it('disables Add mortgage at 20 mortgages without making it unfocusable, and ignores activation', async () => {
       server = installFakeApi(Array.from({ length: 20 }, (_, index) => makeMortgage({ name: `Loan ${index + 1}` })))
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithProviders(<MortgagesPage userId="user-1" />)
 
       const add = await screen.findByRole('button', { name: 'Add Mortgage' })
@@ -454,7 +460,7 @@ describe('MortgagesPage', () => {
         makeMortgage({ name: 'Home', openingBalance: 1000 }),
         makeMortgage({ name: 'Car', openingBalance: 2000 }),
       ])
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithProviders(<MortgagesPage userId="user-1" />)
       await screen.findByRole('button', { name: 'Home' })
       expect(screen.getByLabelText('Opening Balance')).toHaveValue('$1,000.00')
@@ -472,7 +478,7 @@ describe('MortgagesPage', () => {
 
     it('asks before switching away from unsaved changes: Stay keeps them, Discard switches', async () => {
       server = installFakeApi([makeMortgage({ name: 'Home' }), makeMortgage({ name: 'Car' })])
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithProviders(<MortgagesPage userId="user-1" />)
       await screen.findByRole('button', { name: 'Home' })
       await user.type(screen.getByLabelText('Name'), ' edited')
@@ -490,7 +496,7 @@ describe('MortgagesPage', () => {
 
     it('values typed in the dialog but not added leave the form clean, so switching tabs does not ask', async () => {
       server = installFakeApi([makeMortgage({ name: 'Home' }), makeMortgage({ name: 'Car' })])
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithProviders(<MortgagesPage userId="user-1" />)
       await screen.findByRole('button', { name: 'Home' })
       await user.click(screen.getByRole('button', { name: 'Interest Rates' }))
@@ -508,7 +514,7 @@ describe('MortgagesPage', () => {
 
     it('asks before switching away after a dialog remove (the unsaved-changes prompt covers dialog edits)', async () => {
       server = installFakeApi([makeMortgage({ name: 'Home' }), makeMortgage({ name: 'Car' })])
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithProviders(<MortgagesPage userId="user-1" />)
       await screen.findByRole('button', { name: 'Home' })
       await user.click(screen.getByRole('button', { name: 'Interest Rates' }))
@@ -524,7 +530,7 @@ describe('MortgagesPage', () => {
 
     it('Cancel restores the saved values', async () => {
       server = installFakeApi([makeMortgage({ name: 'Home' })])
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithProviders(<MortgagesPage userId="user-1" />)
       await screen.findByRole('button', { name: 'Home' })
       await user.type(screen.getByLabelText('Name'), ' edited')
@@ -537,7 +543,7 @@ describe('MortgagesPage', () => {
     it('a background refetch with a newer version leaves entered values and the next save gets the 409', async () => {
       const home = makeMortgage({ name: 'Home' })
       server = installFakeApi([home])
-      const user = userEvent.setup()
+      const user = setupUser()
       const { queryClient } = renderWithProviders(<MortgagesPage userId="user-1" />)
       await screen.findByRole('button', { name: 'Home' })
       await user.type(screen.getByLabelText('Name'), ' edited')
@@ -554,7 +560,7 @@ describe('MortgagesPage', () => {
       const home = makeMortgage({ name: 'Home' })
       const car = makeMortgage({ name: 'Car' })
       server = installFakeApi([home, car])
-      const user = userEvent.setup()
+      const user = setupUser()
       const { queryClient } = renderWithProviders(<MortgagesPage userId="user-1" />)
       await screen.findByRole('button', { name: 'Home' })
       await user.type(screen.getByLabelText('Name'), ' edited')
@@ -588,7 +594,7 @@ describe('MortgagesPage', () => {
     it('Reload after a 409 passes through the guard, shows Reloading… with values kept, then the latest version', async () => {
       const home = makeMortgage({ name: 'Home' })
       server = installFakeApi([home])
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithProviders(<MortgagesPage userId="user-1" />)
       await screen.findByRole('button', { name: 'Home' })
       await user.type(screen.getByLabelText('Name'), ' edited')
@@ -612,7 +618,7 @@ describe('MortgagesPage', () => {
     it('a failed Reload keeps the form, the conflict alert and Reload, and adds a reload-failed alert', async () => {
       const home = makeMortgage({ name: 'Home' })
       server = installFakeApi([home])
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithProviders(<MortgagesPage userId="user-1" />)
       await screen.findByRole('button', { name: 'Home' })
       server.mortgages[0] = { ...home, version: 2 }
@@ -632,7 +638,7 @@ describe('MortgagesPage', () => {
       const home = makeMortgage({ name: 'Home' })
       const car = makeMortgage({ name: 'Car' })
       server = installFakeApi([home, car])
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithProviders(<MortgagesPage userId="user-1" />)
       await screen.findByRole('button', { name: 'Home' })
       server.mortgages = [{ ...car }]
@@ -650,7 +656,7 @@ describe('MortgagesPage', () => {
       const home = makeMortgage({ name: 'Home' })
       const car = makeMortgage({ name: 'Car' })
       server = installFakeApi([home, car])
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithProviders(<MortgagesPage userId="user-1" />)
       await user.click(await screen.findByRole('button', { name: 'Car' }))
       server.mortgages = [home]
@@ -664,7 +670,7 @@ describe('MortgagesPage', () => {
 
     it('401 while dirty asks Stay / Sign in again; Stay keeps the values', async () => {
       server = installFakeApi([makeMortgage({ name: 'Home' })])
-      const user = userEvent.setup()
+      const user = setupUser()
       const { queryClient } = renderWithProviders(<MortgagesPage userId="user-1" />)
       const reset = vi.spyOn(queryClient, 'resetQueries')
       await screen.findByRole('button', { name: 'Home' })
@@ -681,7 +687,7 @@ describe('MortgagesPage', () => {
 
     it('Sign in again resets the session; 401 while clean goes straight to sign-in with no dialog', async () => {
       server = installFakeApi([makeMortgage({ name: 'Home' })])
-      const user = userEvent.setup()
+      const user = setupUser()
       const { queryClient } = renderWithProviders(<MortgagesPage userId="user-1" />)
       const reset = vi.spyOn(queryClient, 'resetQueries')
       await screen.findByRole('button', { name: 'Home' })
@@ -703,7 +709,7 @@ describe('MortgagesPage', () => {
   describe('deleting', () => {
     it('removes the tab and selects the first remaining tab', async () => {
       server = installFakeApi([makeMortgage({ name: 'Home' }), makeMortgage({ name: 'Car' })])
-      const user = userEvent.setup()
+      const user = setupUser()
       renderWithProviders(<MortgagesPage userId="user-1" />)
       await user.click(await screen.findByRole('button', { name: 'Car' }))
 
@@ -721,7 +727,7 @@ describe('MortgagesPage', () => {
       makeMortgage({ name: 'Car' }),
       makeMortgage({ name: 'Boat' }),
     ])
-    const user = userEvent.setup()
+    const user = setupUser()
     renderWithProviders(<MortgagesPage userId="user-1" />)
     await user.click(await screen.findByRole('button', { name: 'Boat' }))
 
@@ -754,7 +760,7 @@ describe('MortgagesPage Bank Schedule values', () => {
 
   it('shows calculated balances for a saved mortgage, updates them on edit without saving, hides them when invalid', async () => {
     const server = installFakeApi([makeMortgage({ name: 'Home', openingBalance: 100000, duration: 12 })], 'Schedule')
-    const user = userEvent.setup()
+    const user = setupUser()
     renderWithProviders(<MortgagesPage userId="user-1" />)
 
     await screen.findByRole('table')
@@ -782,7 +788,7 @@ describe('MortgagesPage Bank Schedule values', () => {
 
   it('shows values for a valid unsaved form', async () => {
     installFakeApi([], 'Schedule')
-    const user = userEvent.setup()
+    const user = setupUser()
     renderWithProviders(<MortgagesPage userId="user-1" />)
 
     await screen.findByRole('heading', { name: 'Details' })
@@ -793,7 +799,7 @@ describe('MortgagesPage Bank Schedule values', () => {
 
   it('updates the values when a rate change is added, edited and removed, without saving', async () => {
     const server = installFakeApi([makeMortgage({ name: 'Home', openingBalance: 100000, duration: 12 })], 'Schedule')
-    const user = userEvent.setup()
+    const user = setupUser()
     renderWithProviders(<MortgagesPage userId="user-1" />)
     await screen.findByRole('table')
     await waitFor(() => expect(bankCell(12)).toBe('$0.00'))
@@ -808,6 +814,96 @@ describe('MortgagesPage Bank Schedule values', () => {
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^Remove 9/ }))
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }))
     await waitFor(() => expect(bankCell(8)).toBe(before))
+  })
+})
+
+describe('MortgagesPage Forecast Balance values', () => {
+  const accountA = { id: '11111111-1111-4111-8111-111111111111', description: 'Offset A', currencyCode: 'AUD' }
+  const accountB = { id: '22222222-2222-4222-8222-222222222222', description: 'Offset B', currencyCode: 'AUD' }
+  // 15 balances. The last 12 reductions have median 15.00 (Monthly); all 14 have median 10.00 (Fortnightly).
+  const reductions = [...Array<number>(8).fill(10), ...Array<number>(6).fill(20)]
+  const history = reductions.reduce((list, reduction) => [...list, (list.at(-1) as number) - reduction], [1000])
+    .map((balance) => balance.toFixed(2))
+
+  /** The Forecast Balance cell of period 16, the first after the history. */
+  const firstForecast = () => {
+    const row = within(timeline()).getAllByRole('row')[16]
+    return row ? within(row).getAllByRole('cell')[4]?.textContent : undefined
+  }
+
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('recalculates on invalidation, account and Details changes with no extra request', async () => {
+    const server = installFakeApi(
+      [makeMortgage({ name: 'Home', openingBalance: 100000, duration: 18, accountId: accountA.id })],
+      'Schedule',
+    )
+    server.accounts = [accountA, accountB]
+    server.balances = { currencyCode: 'AUD', periodCount: 18, balances: history }
+    const { queryClient } = renderWithProviders(<MortgagesPage userId="user-1" />)
+    const user = setupUser()
+    // 1,000.00 less 200.00 repaid leaves 800.00.
+    await waitFor(() => expect(firstForecast()).toBe('$785.00'))
+    const otherRequests = () => vi.mocked(apiRequest).mock.calls
+      .filter(([path]) => !path.startsWith('/api/mortgages/period-balances')).length
+    const others = otherRequests()
+    expect(server.balanceRequests).toHaveLength(1)
+
+    const replaceLast = (last: string) => {
+      server.balances = { currencyCode: 'AUD', periodCount: 18, balances: [...history.slice(0, -1), last] }
+    }
+
+    replaceLast('790.00')
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: periodBalancesQueryKey })
+    })
+    await waitFor(() => expect(firstForecast()).toBe('$775.00'))
+    expect(server.balanceRequests).toHaveLength(2)
+
+    replaceLast('780.00')
+    await user.selectOptions(screen.getByLabelText('Mortgage Account'), accountB.id)
+    await waitFor(() => expect(firstForecast()).toBe('$765.00'))
+    expect(server.balanceRequests).toHaveLength(3)
+
+    await user.selectOptions(screen.getByLabelText('Payment Frequency'), 'Fortnightly')
+    await waitFor(() => expect(firstForecast()).toBe('$770.00'))
+    expect(server.balanceRequests).toHaveLength(4)
+
+    // The last balance is now on the final row, so there is no forecast.
+    fireEvent.change(screen.getByLabelText('Duration'), { target: { value: '15' } })
+    await waitFor(() => expect(within(timeline()).getByRole('table')).toHaveAttribute('aria-rowcount', '16'))
+    await waitFor(() => expect(server.balanceRequests).toHaveLength(5))
+    expect(firstForecast()).toBeUndefined()
+    expect(within(timeline()).queryByRole('cell', { name: '$770.00' })).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Duration'), { target: { value: '17' } })
+    await waitFor(() => expect(firstForecast()).toBe('$770.00'))
+    expect(server.balanceRequests).toHaveLength(6)
+    expect(otherRequests()).toBe(others)
+  })
+
+  // An unsaved mortgage: on a saved one, moving only the date leaves the opening rate out of range.
+  it('recalculates on a Disbursal Date edit with only the balances request', async () => {
+    const server = installFakeApi([], 'Schedule')
+    server.accounts = [accountA]
+    server.balances = { currencyCode: 'AUD', periodCount: 18, balances: history }
+    renderWithProviders(<MortgagesPage userId="user-1" />)
+    const user = setupUser()
+    await screen.findByRole('heading', { name: 'Details' })
+    await fillForm(user, { periods: '18', first: '2000-01-01', frequency: 'Monthly' })
+    await user.selectOptions(await screen.findByLabelText('Mortgage Account'), accountA.id)
+    await waitFor(() => expect(firstForecast()).toBe('$785.00'))
+    const requests = vi.mocked(apiRequest).mock.calls.length
+
+    server.balances = { currencyCode: 'AUD', periodCount: 18, balances: [...history.slice(0, -1), '790.00'] }
+    setDate('Disbursal Date', '2000-02-01')
+
+    await waitFor(() => expect(firstForecast()).toBe('$775.00'))
+    expect(vi.mocked(apiRequest).mock.calls.slice(requests).map(([path]) => path))
+      .toEqual([expect.stringContaining('/api/mortgages/period-balances?')])
+    expect(server.balanceRequests.at(-1)).toContain('disbursalDate=2000-02-01')
   })
 })
 
@@ -833,7 +929,7 @@ describe('MortgagesPage Actual Balance line', () => {
 
   it('redraws for another account and removes the line and legend entry for None', async () => {
     const { server } = await renderWithAccount()
-    const user = userEvent.setup()
+    const user = setupUser()
     const before = actualLine()?.getAttribute('d')
 
     server.balances = { currencyCode: 'AUD', periodCount: 12, balances: ['70000.00', '60000.00'] }
@@ -859,7 +955,7 @@ describe('MortgagesPage Actual Balance line', () => {
 
   it('redraws both lines when a Detail is edited', async () => {
     await renderWithAccount()
-    const user = userEvent.setup()
+    const user = setupUser()
     const bank = () => chart().querySelector('path[data-series="schedule"][data-part="line"]')?.getAttribute('d')
     const before = bank()
     const actualBefore = actualLine()?.getAttribute('d')

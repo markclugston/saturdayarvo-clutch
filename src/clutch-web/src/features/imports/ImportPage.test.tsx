@@ -70,6 +70,14 @@ const savedMapping: ImportMapping = {
   numberFormat: 'dot-decimal-comma-grouping',
 }
 
+// The header row is read after upload() returns. "Selected file" appears once it has been read, which
+// is when the controls that depend on the headers are ready.
+async function uploadCsv(user: ReturnType<typeof userEvent.setup>, contents: string) {
+  await user.upload(await screen.findByLabelText('CSV File'),
+    new File([contents], 'transactions.csv', { type: 'text/csv' }))
+  expect(await screen.findByText('Selected file: transactions.csv')).toBeInTheDocument()
+}
+
 async function showOwnReview(onBack = vi.fn()) {
   vi.mocked(getAccountImportSettings).mockResolvedValue({ mapping: savedMapping })
   const rendered = renderWithQueryClient(<ImportPage accountId={account.id} onBack={onBack} />)
@@ -570,14 +578,7 @@ describe('ImportPage', () => {
     vi.mocked(getAccountImportSettings).mockResolvedValue({ mapping: savedMapping })
     const user = userEvent.setup()
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
-    await user.upload(
-      await screen.findByLabelText('CSV File'),
-      new File(
-        ['Date,Description,Amount\n15/01/2025,Market,-10.00'],
-        'transactions.csv',
-        { type: 'text/csv' },
-      ),
-    )
+    await uploadCsv(user, 'Date,Description,Amount\n15/01/2025,Market,-10.00')
     const changeSettingsButton = screen.getByRole('button', { name: 'View or Change Settings' })
     changeSettingsButton.focus()
     await user.keyboard('{Enter}')
@@ -655,14 +656,7 @@ describe('ImportPage', () => {
     })
     const user = userEvent.setup()
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
-    await user.upload(
-      await screen.findByLabelText('CSV File'),
-      new File(
-        ['Date,Description,Amount,Balance\n15/01/2025,Market,-10.00,90.00'],
-        'transactions.csv',
-        { type: 'text/csv' },
-      ),
-    )
+    await uploadCsv(user, 'Date,Description,Amount,Balance\n15/01/2025,Market,-10.00,90.00')
     await user.click(screen.getByRole('button', { name: 'View or Change Settings' }))
     expect(screen.getByLabelText('Balance Column (Optional)')).toHaveValue('3')
 
@@ -680,14 +674,7 @@ describe('ImportPage', () => {
     })
     const user = userEvent.setup()
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
-    await user.upload(
-      await screen.findByLabelText('CSV File'),
-      new File(
-        ['Date,Description,Amount,Balance\n15/01/2025,Market,-10.00,90.00'],
-        'transactions.csv',
-        { type: 'text/csv' },
-      ),
-    )
+    await uploadCsv(user, 'Date,Description,Amount,Balance\n15/01/2025,Market,-10.00,90.00')
     await user.click(screen.getByRole('button', { name: 'View or Change Settings' }))
     await user.selectOptions(screen.getByLabelText('Balance Column (Optional)'), '')
     await user.click(screen.getByRole('button', { name: 'Review Import' }))
@@ -727,14 +714,7 @@ describe('ImportPage', () => {
     })
     const user = userEvent.setup()
     renderWithQueryClient(<ImportPage accountId={account.id} onBack={vi.fn()} />)
-    await user.upload(
-      await screen.findByLabelText('CSV File'),
-      new File(
-        ['Date,Description,Amount\n2025-01-15,Market,-10.00'],
-        'transactions.csv',
-        { type: 'text/csv' },
-      ),
-    )
+    await uploadCsv(user, 'Date,Description,Amount\n2025-01-15,Market,-10.00')
     await user.click(screen.getByRole('button', { name: 'Review Import with Saved Settings' }))
     await user.click(await screen.findByRole('button', { name: 'Confirm Import' }))
 

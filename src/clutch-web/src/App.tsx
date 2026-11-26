@@ -13,6 +13,7 @@ import { signOut, getSession } from '@/features/auth/api'
 import { ImportPage } from '@/features/imports/ImportPage'
 import { MortgagesPage } from '@/features/mortgages/MortgagesPage'
 import { ApiError } from '@/lib/api/client'
+import { AppErrorBoundary, PageErrorBoundary } from '@/components/error-boundary/PageErrorBoundary'
 import { ThemeSelector } from '@/components/theme/ThemeSelector'
 import { useTheme } from '@/components/theme/ThemeProvider'
 import { AppShell } from '@/components/ui/app-shell'
@@ -28,11 +29,13 @@ import { cn } from '@/lib/utils'
 
 export default function App() {
   return (
-    <UnsavedChangesProvider>
-      <ToastProvider>
-        <AppContent />
-      </ToastProvider>
-    </UnsavedChangesProvider>
+    <AppErrorBoundary>
+      <UnsavedChangesProvider>
+        <ToastProvider>
+          <AppContent />
+        </ToastProvider>
+      </UnsavedChangesProvider>
+    </AppErrorBoundary>
   )
 }
 
@@ -146,6 +149,13 @@ function AppContent() {
     )
   }
 
+  // Identifies the page on show, so choosing another destination clears a page's error.
+  const pageKey = showAdminSettings ? 'admin'
+    : showMortgages ? 'mortgages'
+      : showCategories ? 'categories'
+        : selectedAccountId ? `${isImporting ? 'import' : 'account'}:${selectedAccountId}`
+          : 'accounts'
+
   return (
     <SignedInShell
       key={userId ?? 'anonymous'}
@@ -218,13 +228,14 @@ function AppContent() {
         {signOutMutation.isError && (
           <ErrorMessage className="mb-5">Unable to sign out. Please try again.</ErrorMessage>
         )}
-        {showAdminSettings ? (
-          <ImportLimitsPage onBack={() => setShowAdminSettings(false)} />
-        ) : showMortgages ? (
-          <MortgagesPage userId={sessionQuery.data.id} />
-        ) : showCategories ? (
-          <CategoriesPage />
-        ) : selectedAccountId ? (
+        <PageErrorBoundary key={pageKey}>
+          {showAdminSettings ? (
+            <ImportLimitsPage onBack={() => setShowAdminSettings(false)} />
+          ) : showMortgages ? (
+            <MortgagesPage userId={sessionQuery.data.id} />
+          ) : showCategories ? (
+            <CategoriesPage />
+          ) : selectedAccountId ? (
             isImporting ? (
               <ImportPage
                 accountId={selectedAccountId}
@@ -237,11 +248,16 @@ function AppContent() {
                 onImport={() => setIsImporting(true)}
               />
             )
-        ) : (
-          <AccountsPage onSelectAccount={setSelectedAccountId} />
-        )}
+          ) : (
+            <AccountsPage onSelectAccount={setSelectedAccountId} />
+          )}
+        </PageErrorBoundary>
       </ContentPanel>
-      {showCategories && !showMortgages && !showAdminSettings && <AddCategoryForm />}
+      {showCategories && !showMortgages && !showAdminSettings && (
+        <PageErrorBoundary panel>
+          <AddCategoryForm />
+        </PageErrorBoundary>
+      )}
     </SignedInShell>
   )
 }

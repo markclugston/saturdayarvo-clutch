@@ -1,6 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from 'react'
 import { formatCurrencyAmount } from '@/lib/formatCurrencyAmount'
-import { actualBalancePoints, useActualBalances, type ActualBalancePoint } from './actualBalances'
+import { balancePoints, useActualBalances, type BalancePoint } from './actualBalances'
 import { ENTER_DETAILS_MESSAGE } from './AmortizationSchedule'
 import {
   areaPath,
@@ -38,11 +38,13 @@ type Actual = {
   selected: boolean
   /** Ready balances with a schedule row each; empty while loading, after a failure or with none. */
   ready: boolean
-  points: ActualBalancePoint[]
+  points: BalancePoint[]
+  /** Forecast Balances after the last Actual Balance, each with a schedule row; empty without a forecast. */
+  forecast: BalancePoint[]
   currencyCode: string
 }
 
-const NO_ACTUAL: Actual = { selected: false, ready: false, points: [], currencyCode: '' }
+const NO_ACTUAL: Actual = { selected: false, ready: false, points: [], forecast: [], currencyCode: '' }
 
 const GUIDES = [60, 110, 160, 210]
 const PLOT_LEFT = 70
@@ -52,13 +54,12 @@ const PLOT_TOP = 30
 const PLOT_BOTTOM = 260
 const Y_INTERVALS = 4
 const X_TICKS = 5
-/** Strength of the hatch lines per series; the lines cover about a third of the area, so the fill stays soft. */
-const SCHEDULE_FILL_OPACITY = 0.6
 /** The Actual Balance area is a solid fill of its three-colour gradient, not hatched. */
 const ACTUAL_FILL_OPACITY = 0.5
-/** Diagonal hatch: tile size and line width in viewBox units. */
+/** The forecast area is fainter than the Actual Balance it continues. */
+const FORECAST_FILL_OPACITY = 0.25
+/** Diagonal hatch: tile size in viewBox units. Line width and strength are theme tokens in index.css. */
 const HATCH_SPACING = 5
-const HATCH_STROKE = 1.2
 /** The viewBox is always 300 units tall; its width follows the chart box, never narrower than 2:1. */
 const VIEW_HEIGHT = 300
 const MIN_VIEW_WIDTH = 600
@@ -118,7 +119,7 @@ type BalanceAxis = {
 }
 
 /** The balance axis in dollars: $0 to a nice maximum, extended below $0 for negative Actual Balances. */
-function balanceAxis(openingBalanceCents: number, points: ActualBalancePoint[]): BalanceAxis {
+function balanceAxis(openingBalanceCents: number, points: BalancePoint[]): BalanceAxis {
   let largest = openingBalanceCents / 100
   let smallest = 0
   for (const point of points) {
@@ -135,26 +136,70 @@ function balanceAxis(openingBalanceCents: number, points: ActualBalancePoint[]):
   return { upper, lower, ticks, y, guides: below === 0 ? GUIDES : ticks.map(y) }
 }
 
-type Series = 'schedule' | 'actual'
+type Series = 'schedule' | 'actual' | 'forecast'
 
 /** Element ids for one chart's gradients and clip path (unique per chart, R2). */
-type ChartIds = { schedule: string, actual: string, legendSchedule: string, legendActual: string, hatch: string, hatchMask: string, fade: string, fadeMask: string }
+type ChartIds = { schedule: string, actual: string, forecast: string, legendSchedule: string, legendActual: string, legendForecast: string, hatch: string, hatchMask: string, fade: string, fadeMask: string }
+
+/** Written out in full: Tailwind only generates class names it can read in the source. */
+const STOP_CLASSES: Record<Series, [string, string, string]> = {
+  schedule: ['text-chart-schedule-start', 'text-chart-schedule-mid', 'text-chart-schedule-end'],
+  actual: ['text-chart-actual-start', 'text-chart-actual-mid', 'text-chart-actual-end'],
+  forecast: ['text-chart-forecast-start', 'text-chart-forecast-mid', 'text-chart-forecast-end'],
+}
 
 function GradientStops({ series }: { series: Series }) {
+  const [start, mid, end] = STOP_CLASSES[series]
   return (
     <>
-      <stop className={`text-chart-${series}-start`} offset="0" stopColor="currentColor" />
-      <stop className={`text-chart-${series}-mid`} offset="0.5" stopColor="currentColor" />
-      <stop className={`text-chart-${series}-end`} offset="1" stopColor="currentColor" />
+      <stop className={start} offset="0" stopColor="currentColor" />
+      <stop className={mid} offset="0.5" stopColor="currentColor" />
+      <stop className={end} offset="1" stopColor="currentColor" />
     </>
   )
 }
 
-/** Series gradients run top to bottom over the plot so a colour means the same balance everywhere; legend gradients span each sample. */
-function Gradients({ ids, layout }: { ids: ChartIds, layout: Layout }) {
+/** Which series the legend lists besides Bank Schedule. */
+type Listed = { withActual: boolean, withForecast: boolean }
+
+/** Where each legend sample starts; the legend keeps its place relative to the right edge. */
+function legendPositions(width: number, { withActual, withForecast }: Listed): Record<Series, number> {
+  if (withForecast) {
+    return { schedule: width - 410, actual: width - 280, forecast: width - 150 }
+  }
+  const last = width - 200
+  return { schedule: withActual ? width - 330 : last, actual: last, forecast: last }
+}
+
+/** The Y range a series' line covers, highest point first. */
+type Span = { from: number, to: number }
+
+/** Each series' line range; null where it has no line. */
+type Spans = Record<Series, Span | null>
+
+const NO_SPANS: Spans = { schedule: null, actual: null, forecast: null }
+
+/** One pass rather than `Math.min(...ys)`: a long schedule has more points than a call can take as arguments. */
+function spanOf(points: ChartPoint[]): Span | null {
+  let from = Number.POSITIVE_INFINITY
+  let to = Number.NEGATIVE_INFINITY
+  for (const { y } of points) {
+    from = Math.min(from, y)
+    to = Math.max(to, y)
+  }
+  return points.length > 0 ? { from, to } : null
+}
+
+/**
+ * Each series gradient runs top to bottom over its own line, so all three colours show along every line and the area
+ * beneath matches it at each height. Legend gradients span each sample.
+ */
+function Gradients({ ids, layout, spans }: { ids: ChartIds, layout: Layout, spans: Spans }) {
+  const listed: Series[] = spans.forecast ? ['schedule', 'actual', 'forecast'] : ['schedule', 'actual']
+  const legendIds: Record<Series, string> = { schedule: ids.legendSchedule, actual: ids.legendActual, forecast: ids.legendForecast }
   return (
     <defs>
-      {(['schedule', 'actual'] as const).map((series) => (
+      {listed.map((series) => (
         <linearGradient
           data-series={series}
           gradientUnits="userSpaceOnUse"
@@ -162,18 +207,18 @@ function Gradients({ ids, layout }: { ids: ChartIds, layout: Layout }) {
           key={series}
           x1="0"
           x2="0"
-          y1={PLOT_TOP}
-          y2={PLOT_BOTTOM}
+          y1={spans[series]?.from ?? PLOT_TOP}
+          y2={spans[series]?.to ?? PLOT_BOTTOM}
         >
           <GradientStops series={series} />
         </linearGradient>
       ))}
-      {(['schedule', 'actual'] as const).map((series) => (
+      {listed.map((series) => (
         <linearGradient
           data-part="legend-gradient"
           data-series={series}
           gradientUnits="objectBoundingBox"
-          id={series === 'schedule' ? ids.legendSchedule : ids.legendActual}
+          id={legendIds[series]}
           key={`legend-${series}`}
           x1="0"
           x2="1"
@@ -191,7 +236,7 @@ function Gradients({ ids, layout }: { ids: ChartIds, layout: Layout }) {
         patternUnits="userSpaceOnUse"
         width={HATCH_SPACING}
       >
-        <line stroke="white" strokeWidth={HATCH_STROKE} x1="0" x2="0" y1="0" y2={HATCH_SPACING} />
+        <line className="[stroke-width:var(--chart-hatch-width)]" stroke="white" x1="0" x2="0" y1="0" y2={HATCH_SPACING} />
       </pattern>
       <mask height={VIEW_HEIGHT} id={ids.hatchMask} maskUnits="userSpaceOnUse" width={layout.width} x="0" y="0">
         <rect fill={`url(#${ids.hatch})`} height={VIEW_HEIGHT} width={layout.width} x="0" y="0" />
@@ -201,8 +246,9 @@ function Gradients({ ids, layout }: { ids: ChartIds, layout: Layout }) {
         <stop offset="0" stopColor="white" stopOpacity="1" />
         <stop offset="1" stopColor="white" stopOpacity="0" />
       </linearGradient>
+      {/* Wider than the area, so the mask never thins the edge two areas share. */}
       <mask id={ids.fadeMask} maskContentUnits="objectBoundingBox">
-        <rect fill={`url(#${ids.fade})`} height="1" width="1" x="0" y="0" />
+        <rect fill={`url(#${ids.fade})`} height="1" width="2" x="-0.5" y="0" />
       </mask>
     </defs>
   )
@@ -218,10 +264,8 @@ function Guides({ guides, layout }: { guides: number[], layout: Layout }) {
   )
 }
 
-function Frame({ withActual, ids, layout }: { withActual: boolean, ids: ChartIds, layout: Layout }) {
-  // The legend keeps its place relative to the right edge.
-  const actualLegendX = layout.width - 200
-  const scheduleLegendX = withActual ? layout.width - 330 : actualLegendX
+function Frame({ listed, ids, layout }: { listed: Listed, ids: ChartIds, layout: Layout }) {
+  const { schedule: scheduleLegendX, actual: actualLegendX, forecast: forecastLegendX } = legendPositions(layout.width, listed)
   return (
     <>
       <line stroke="currentColor" strokeWidth="1.5" x1={PLOT_LEFT} x2={layout.plotRight} y1={PLOT_BOTTOM} y2={PLOT_BOTTOM} />
@@ -238,11 +282,19 @@ function Frame({ withActual, ids, layout }: { withActual: boolean, ids: ChartIds
           Bank Schedule
         </text>
       </g>
-      {withActual && (
+      {listed.withActual && (
         <g data-part="legend" data-series="actual">
           <rect fill={`url(#${ids.legendActual})`} height="3" width="24" x={actualLegendX} y="13.5" />
           <text className="text-fg-secondary" fill="currentColor" fontSize="12" x={actualLegendX + 30} y="19">
             Actual Balance
+          </text>
+        </g>
+      )}
+      {listed.withForecast && (
+        <g data-part="legend" data-series="forecast">
+          <rect fill={`url(#${ids.legendForecast})`} height="3" width="24" x={forecastLegendX} y="13.5" />
+          <text className="text-fg-secondary" fill="currentColor" fontSize="12" x={forecastLegendX + 30} y="19">
+            Forecast Balance
           </text>
         </g>
       )}
@@ -258,7 +310,9 @@ type PlottedDate = {
   bankCents: number
   bankY: number
   /** The row's Actual Balance; never at the Disbursal Date. */
-  actual?: { point: ActualBalancePoint, y: number }
+  actual?: { point: BalancePoint, y: number }
+  /** The row's Forecast Balance; never at the Disbursal Date or on an Actual Balance row. */
+  forecast?: { point: BalancePoint, y: number }
 }
 
 /** Who moved the label last decides whether the pointer leaving hides it (FR-009a). */
@@ -276,6 +330,10 @@ type Plot = {
   scheduleArea: string
   actualLine: string
   actualArea: string
+  /** Both start at the last Actual Balance; empty without a forecast. */
+  forecastLine: string
+  forecastArea: string
+  spans: Spans
   /** The one Actual Balance, drawn as a dot. */
   single: ChartPoint | null
   yTicks: { value: number, y: number }[]
@@ -287,7 +345,8 @@ function plotGeometry(
   openingBalanceCents: number,
   disbursalDate: string,
   axis: BalanceAxis,
-  actualPoints: ActualBalancePoint[],
+  actualPoints: BalancePoint[],
+  forecastPoints: BalancePoint[],
   plotRight: number,
 ): Plot {
   const finalDate = schedule[schedule.length - 1]?.date ?? disbursalDate
@@ -317,13 +376,22 @@ function plotGeometry(
     }
   }
 
-  const actualByDate = new Map(actualPoints.map((point, index) => [point.date, { point, y: actual[index]?.y ?? 0 }]))
+  // The forecast continues from the last Actual Balance point.
+  const lastActual = actual[actual.length - 1]
+  const forecast = forecastPoints.map((point) => ({ x: x(point.date), y: y(point.value) }))
+  const forecastDrawn: ChartPoint[] = lastActual && forecast.length > 0 ? [lastActual, ...forecast] : []
+
+  const byDate = (points: BalancePoint[], drawn: ChartPoint[]) =>
+    new Map(points.map((point, index) => [point.date, { point, y: drawn[index]?.y ?? 0 }]))
+  const actualByDate = byDate(actualPoints, actual)
+  const forecastByDate = byDate(forecastPoints, forecast)
   const plottedDates: PlottedDate[] = dates.map((date, index) => ({
     date,
     x: xs[index] ?? PLOT_LEFT,
     bankCents: index === 0 ? openingBalanceCents : schedule[index - 1]?.closingCents ?? 0,
     bankY: bank[index]?.y ?? PLOT_BOTTOM,
     actual: index === 0 ? undefined : actualByDate.get(date),
+    forecast: index === 0 ? undefined : forecastByDate.get(date),
   }))
 
   return {
@@ -333,6 +401,9 @@ function plotGeometry(
     scheduleArea: areaPath(bank, zeroY),
     actualLine: actualDrawn.length >= 2 ? monotonePath(actualDrawn) : '',
     actualArea: areaPath(actualDrawn, zeroY),
+    forecastLine: forecastDrawn.length >= 2 ? monotonePath(forecastDrawn) : '',
+    forecastArea: areaPath(forecastDrawn, zeroY),
+    spans: { schedule: spanOf(bank), actual: spanOf(actualDrawn), forecast: spanOf(forecastDrawn) },
     single: actual.length === 1 ? actual[0] ?? null : null,
     yTicks: axis.ticks.map((value) => ({ value, y: y(value) })),
     xTicks,
@@ -361,11 +432,11 @@ function Areas({ plot, ids }: { plot: Plot, ids: ChartIds }) {
     <>
       <g mask={`url(#${ids.fadeMask})`}>
         <path
+          className="[fill-opacity:var(--chart-hatch-opacity)]"
           d={plot.scheduleArea}
           data-part="area"
           data-series="schedule"
           fill={`url(#${ids.schedule})`}
-          fillOpacity={SCHEDULE_FILL_OPACITY}
           mask={`url(#${ids.hatchMask})`}
         />
       </g>
@@ -377,6 +448,20 @@ function Areas({ plot, ids }: { plot: Plot, ids: ChartIds }) {
             data-series="actual"
             fill={`url(#${ids.actual})`}
             fillOpacity={ACTUAL_FILL_OPACITY}
+            // No antialiasing where it meets the forecast area, or the card shows through the join.
+            shapeRendering="crispEdges"
+          />
+        </g>
+      )}
+      {plot.forecastArea && (
+        <g mask={`url(#${ids.fadeMask})`}>
+          <path
+            d={plot.forecastArea}
+            data-part="area"
+            data-series="forecast"
+            fill={`url(#${ids.forecast})`}
+            fillOpacity={FORECAST_FILL_OPACITY}
+            shapeRendering="crispEdges"
           />
         </g>
       )}
@@ -417,6 +502,17 @@ function Lines({ plot, ids }: { plot: Plot, ids: ChartIds }) {
           r="3"
         />
       )}
+      {plot.forecastLine && (
+        <path
+          d={plot.forecastLine}
+          data-part="line"
+          data-series="forecast"
+          fill="none"
+          stroke={`url(#${ids.forecast})`}
+          strokeLinejoin="round"
+          strokeWidth="2"
+        />
+      )}
     </>
   )
 }
@@ -455,17 +551,21 @@ function Rings({ date, ids }: { date: PlottedDate, ids: ChartIds }) {
     <>
       {ring('schedule', date.bankY)}
       {date.actual && ring('actual', date.actual.y)}
+      {date.forecast && ring('forecast', date.forecast.y)}
     </>
   )
 }
 
 /** The hovered date's values as the label shows them and the announcer reads them (FR-007, FR-008). */
 function labelValues(date: PlottedDate, currencyCode: string) {
+  const row = (name: string, value: PlottedDate['actual']) =>
+    (value ? [{ name, amount: formatCurrencyAmount(value.point.amount, currencyCode) }] : [])
   return {
     date: formatDisplayDate(date.date),
     rows: [
       { name: 'Bank Schedule', amount: formatCents(date.bankCents) },
-      ...(date.actual ? [{ name: 'Actual Balance', amount: formatCurrencyAmount(date.actual.point.amount, currencyCode) }] : []),
+      ...row('Actual Balance', date.actual),
+      ...row('Forecast Balance', date.forecast),
     ],
   }
 }
@@ -499,7 +599,8 @@ function HoverLabel({ date, currencyCode, svgRef, viewWidth }: {
       : 0
     const offsetX = (rect.width - viewWidth * scale) / 2
     const offsetY = (rect.height - VIEW_HEIGHT * scale) / 2
-    const ys = [date.bankY, ...(date.actual ? [date.actual.y] : [])].map((y) => offsetY + y * scale)
+    const ringYs = [date.bankY, date.actual?.y, date.forecast?.y].filter((y) => y !== undefined)
+    const ys = ringYs.map((y) => offsetY + y * scale)
     const position = labelPosition(
       { width: rect.width, height: rect.height },
       { width: element.offsetWidth, height: element.offsetHeight },
@@ -530,20 +631,28 @@ function HoverLabel({ date, currencyCode, svgRef, viewWidth }: {
   )
 }
 
-/** Text alternative sentence for the Actual Balance series; '' when nothing is to be said. */
-function actualDescription({ ready, points, currencyCode }: Actual): string {
+/** " Name: from {amount} on {date} to {amount} on {date}.", or one value; '' without points. */
+function seriesSentence(name: string, points: BalancePoint[], currencyCode: string): string {
   const first = points[0]
   const last = points[points.length - 1]
+  if (!first || !last) {
+    return ''
+  }
+  const value = (point: BalancePoint) =>
+    `${formatCurrencyAmount(point.amount, currencyCode)} on ${formatDisplayDate(point.date)}`
+  return first === last ? ` ${name}: ${value(first)}.` : ` ${name}: from ${value(first)} to ${value(last)}.`
+}
+
+/** Text alternative sentences for the account's series; '' when nothing is to be said. */
+function accountDescription({ ready, points, forecast, currencyCode }: Actual): string {
   if (!ready) {
     return ''
   }
-  if (!first || !last) {
+  if (points.length === 0) {
     return ' Actual Balance: there are no actual balances to plot.'
   }
-  const amount = (value: string) => formatCurrencyAmount(value, currencyCode)
-  return first === last
-    ? ` Actual Balance: ${amount(first.amount)} on ${formatDisplayDate(first.date)}.`
-    : ` Actual Balance: from ${amount(first.amount)} on ${formatDisplayDate(first.date)} to ${amount(last.amount)} on ${formatDisplayDate(last.date)}.`
+  return seriesSentence('Actual Balance', points, currencyCode)
+    + seriesSentence('Forecast Balance', forecast, currencyCode)
 }
 
 /** Balance-over-time chart: the Bank Schedule line when calculated, otherwise the empty frame. */
@@ -560,14 +669,19 @@ function AccountChart({ accountId, ...props }: BurnDownChartProps & { accountId:
   const plotted = schedule !== undefined && schedule.length > 0
     && props.openingBalanceCents !== undefined && disbursalDate !== undefined
   const points = useMemo(
-    () => (balances.status === 'ready' && schedule ? actualBalancePoints(balances.balances, schedule) : []),
+    () => (balances.status === 'ready' && schedule ? balancePoints(balances.balances, schedule) : []),
     [balances.status, balances.balances, schedule],
+  )
+  const forecast = useMemo(
+    () => (balances.status === 'ready' && schedule ? balancePoints(balances.forecast, schedule) : []),
+    [balances.status, balances.forecast, schedule],
   )
   const actual: Actual = {
     // The Bank Schedule must be plotted for Actual Balance to appear (FR-005).
     selected: plotted && balances.status !== 'none',
     ready: plotted && balances.status === 'ready',
     points: plotted ? points : [],
+    forecast: plotted ? forecast : [],
     currencyCode: balances.currencyCode ?? '',
   }
   return <Chart {...props} actual={actual} />
@@ -584,8 +698,10 @@ function Chart({
   const ids = useMemo<ChartIds>(() => ({
     schedule: `${id}schedule`,
     actual: `${id}actual`,
+    forecast: `${id}forecast`,
     legendSchedule: `${id}legend-schedule`,
     legendActual: `${id}legend-actual`,
+    legendForecast: `${id}legend-forecast`,
     hatch: `${id}hatch`,
     hatchMask: `${id}hatch-mask`,
     fade: `${id}fade`,
@@ -602,9 +718,9 @@ function Chart({
   const layout = useMemo(() => layoutFor(viewWidth), [viewWidth])
   const plot = useMemo(
     () => (plotted && axis
-      ? plotGeometry(schedule, openingBalanceCents, disbursalDate, axis, actual.points, layout.plotRight)
+      ? plotGeometry(schedule, openingBalanceCents, disbursalDate, axis, actual.points, actual.forecast, layout.plotRight)
       : null),
-    [plotted, schedule, openingBalanceCents, disbursalDate, axis, actual.points, layout],
+    [plotted, schedule, openingBalanceCents, disbursalDate, axis, actual.points, actual.forecast, layout],
   )
   const [hover, setHover] = useState<HoverState>(null)
   const [announcement, setAnnouncement] = useState('')
@@ -614,15 +730,17 @@ function Chart({
 
   // The parts that do not move while hovering are memoised, so a pointer move redraws only the overlay (SC-003).
   const withActual = actual.selected
+  const withForecast = actual.forecast.length > 0
+  const listed = useMemo<Listed>(() => ({ withActual, withForecast }), [withActual, withForecast])
   const guides = plotted && axis ? axis.guides : GUIDES
   const areas = useMemo(() => plot && <Areas ids={ids} plot={plot} />, [plot, ids])
   const frame = useMemo(() => (
     <>
       <Guides guides={guides} layout={layout} />
-      <Frame ids={ids} layout={layout} withActual={withActual} />
+      <Frame ids={ids} layout={layout} listed={listed} />
       {plot && <AxisLabels plot={plot} />}
     </>
-  ), [guides, ids, withActual, plot, layout])
+  ), [guides, ids, listed, plot, layout])
   const lines = useMemo(() => plot && <Lines ids={ids} plot={plot} />, [plot, ids])
 
   function handlePointerMove(event: PointerEvent<SVGRectElement>) {
@@ -694,7 +812,7 @@ function Chart({
   }
 
   const label = plotted
-    ? `Line chart of the mortgage balance over time for the Bank Schedule, falling from ${formatCents(openingBalanceCents)} on ${formatDisplayDate(disbursalDate)} to $0.00 on ${formatDisplayDate(finalDate ?? disbursalDate)}.${actualDescription(actual)}`
+    ? `Line chart of the mortgage balance over time for the Bank Schedule, falling from ${formatCents(openingBalanceCents)} on ${formatDisplayDate(disbursalDate)} to $0.00 on ${formatDisplayDate(finalDate ?? disbursalDate)}.${accountDescription(actual)}`
     : 'Line chart of the mortgage balance over time for the Bank schedule. The values have not been calculated yet.'
 
   return (
@@ -712,7 +830,7 @@ function Chart({
                 tabIndex={0}
               >
                 <svg aria-label={label} className="absolute inset-0 size-full text-fg-secondary" ref={svgRef} role="img" viewBox={`0 0 ${layout.width} ${VIEW_HEIGHT}`}>
-                  <Gradients ids={ids} layout={layout} />
+                  <Gradients ids={ids} layout={layout} spans={plot.spans} />
                   {areas}
                   {hovered && <Band date={hovered} />}
                   {frame}
@@ -737,7 +855,7 @@ function Chart({
             )
           : (
               <svg aria-label={label} className="absolute inset-0 size-full text-fg-secondary" role="img" viewBox={`0 0 ${layout.width} ${VIEW_HEIGHT}`}>
-                <Gradients ids={ids} layout={layout} />
+                <Gradients ids={ids} layout={layout} spans={NO_SPANS} />
                 {frame}
               </svg>
             )}

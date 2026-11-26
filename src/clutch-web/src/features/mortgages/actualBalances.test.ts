@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createElement, type ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiRequest } from '@/lib/api/client'
-import { actualBalancePoints, useActualBalances } from './actualBalances'
+import { balancePoints, useActualBalances } from './actualBalances'
 import type { ScheduledPeriod } from './scheduleCalculation'
 import { installFakeApi, type FakeServer } from './testSupport'
 
@@ -19,29 +19,29 @@ const schedule: ScheduledPeriod[] = [
   { date: '2026-05-01', closingCents: 0 },
 ] as ScheduledPeriod[]
 
-describe('actualBalancePoints', () => {
+describe('balancePoints', () => {
   it('skips blank cells and dates each point from its schedule row', () => {
-    expect(actualBalancePoints([null, '980.00', null, '10.50'], schedule)).toEqual([
+    expect(balancePoints([null, '980.00', null, '10.50'], schedule)).toEqual([
       { date: '2026-03-01', amount: '980.00', value: 980 },
       { date: '2026-05-01', amount: '10.50', value: 10.5 },
     ])
   })
 
   it('never adds a point at the Disbursal Date', () => {
-    const points = actualBalancePoints(['1000.00'], schedule)
+    const points = balancePoints(['1000.00'], schedule)
 
     expect(points).toHaveLength(1)
     expect(points[0]?.date).toBe('2026-02-01')
   })
 
   it('ignores trailing blanks and balances past the schedule', () => {
-    expect(actualBalancePoints(['1.00', null, null, null], schedule)).toHaveLength(1)
-    expect(actualBalancePoints(['1', '2', '3', '4', '5', '6'], schedule)).toHaveLength(4)
-    expect(actualBalancePoints([], schedule)).toEqual([])
+    expect(balancePoints(['1.00', null, null, null], schedule)).toHaveLength(1)
+    expect(balancePoints(['1', '2', '3', '4', '5', '6'], schedule)).toHaveLength(4)
+    expect(balancePoints([], schedule)).toEqual([])
   })
 
   it('passes negative and large values through unchanged', () => {
-    expect(actualBalancePoints(['-250.75', '99999999.99'], schedule)).toEqual([
+    expect(balancePoints(['-250.75', '99999999.99'], schedule)).toEqual([
       { date: '2026-02-01', amount: '-250.75', value: -250.75 },
       { date: '2026-03-01', amount: '99999999.99', value: 99999999.99 },
     ])
@@ -129,5 +129,52 @@ describe('useActualBalances', () => {
 
     await waitFor(() => expect(server.balanceRequests).toHaveLength(1))
     expect(new URLSearchParams(server.balanceRequests[0]).has('duration')).toBe(false)
+  })
+
+  describe('forecast', () => {
+    beforeEach(() => {
+      server.balances = { currencyCode: 'AUD', periodCount: 3, balances: ['1000.00', '900.00'] }
+    })
+
+    it('projects the balances once ready', async () => {
+      const { result } = renderHook(() => useActualBalances(account.id, params), { wrapper })
+
+      await waitFor(() => expect(result.current.status).toBe('ready'))
+      expect(result.current.forecast).toEqual([null, null, '800.00'])
+    })
+
+    it('is empty without an account', () => {
+      const { result } = renderHook(() => useActualBalances(undefined, params), { wrapper })
+
+      expect(result.current.forecast).toEqual([])
+    })
+
+    it('is empty while loading', async () => {
+      const release = server.holdBalances()
+      const { result } = renderHook(() => useActualBalances(account.id, params), { wrapper })
+
+      await waitFor(() => expect(result.current.status).toBe('loading'))
+      expect(result.current.forecast).toEqual([])
+      release()
+    })
+
+    it('is empty when the request fails', async () => {
+      server.balancesError = new Error('boom')
+      const { result } = renderHook(() => useActualBalances(account.id, params), { wrapper })
+
+      await waitFor(() => expect(result.current.status).toBe('failed'))
+      expect(result.current.forecast).toEqual([])
+    })
+
+    it.each([
+      ['Duration', { ...params, duration: undefined }],
+      ['Disbursal Date', { ...params, disbursalDate: undefined }],
+      ['Payment Frequency', { ...params, paymentFrequency: undefined }],
+    ])('is empty without a %s', async (_, incomplete) => {
+      const { result } = renderHook(() => useActualBalances(account.id, incomplete), { wrapper })
+
+      await waitFor(() => expect(result.current.status).toBe('ready'))
+      expect(result.current.forecast).toEqual([])
+    })
   })
 })

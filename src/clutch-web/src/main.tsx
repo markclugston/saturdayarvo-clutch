@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { rootErrorOptions } from '@/components/error-boundary/rootErrorOptions'
 import { ThemeProvider } from '@/components/theme/ThemeProvider'
 import './index.css'
 import App from './App.tsx'
@@ -13,7 +14,7 @@ const queryClient = new QueryClient({
   },
 })
 
-createRoot(document.getElementById('root')!).render(
+createRoot(document.getElementById('root')!, rootErrorOptions).render(
   <StrictMode>
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>

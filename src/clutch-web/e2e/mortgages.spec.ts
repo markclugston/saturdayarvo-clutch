@@ -366,7 +366,7 @@ async function importBalanceStatement(page: Page) {
     name: 'balances.csv',
     mimeType: 'text/csv',
     buffer: Buffer.from(
-      ['Date,Description,Amount,Balance', '2000-01-15,First,10.00,1000.00', '2000-02-15,Second,20.00,1020.00'].join('\n'),
+      ['Date,Description,Amount,Balance', '2000-01-15,First,10.00,1000.00', '2000-02-15,Second,20.00,900.00'].join('\n'),
     ),
   })
   await page.getByLabel('Transaction Date Column').selectOption('0')
@@ -420,8 +420,15 @@ test('mortgage account: linking shows a balance column right of Bank Schedule an
 
     await timeline(page).getByRole('button', { name: 'Show Amortization Schedule' }).click()
     const headers = timeline(page).getByRole('columnheader')
-    await expect(headers).toHaveText(['Period', 'Date', 'Bank Schedule', 'Actual Balance'])
-    await expect(timeline(page).getByRole('cell', { name: '$1,020.00' }).first()).toBeVisible()
+    await expect(headers).toHaveText(['Period', 'Date', 'Bank Schedule', 'Actual Balance', 'Forecast Balance'])
+    await expect(timeline(page).getByRole('cell', { name: '$900.00' }).first()).toBeVisible()
+    // 027: the forecast falls by the 100.00 reduction from the row after the last Actual Balance.
+    const forecast = (period: number) => timeline(page).getByRole('row').nth(period).getByRole('cell').nth(4)
+    await expect(forecast(1)).toHaveText('')
+    await expect(forecast(2)).toHaveText('')
+    await expect(forecast(3)).toHaveText('$800.00')
+    await expect(forecast(11)).toHaveText('$0.00')
+    await expect(forecast(12)).toHaveText('')
 
     for (const mode of ['Light', 'Dark']) {
       await page.getByLabel('Theme').selectOption(mode)

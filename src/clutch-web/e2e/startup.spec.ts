@@ -106,6 +106,42 @@ test('keeps sign-in buttons keyboard-accessible and responsive across themes and
   }
 })
 
+test('centres the sign-in and sign-up card, and keeps its top reachable on a short screen', async ({ page }) => {
+  await page.route('**/api/security/session', (route) => route.fulfill({
+    status: 401,
+    contentType: 'application/problem+json',
+    body: JSON.stringify({ title: 'Authentication required', status: 401 }),
+  }))
+  await page.goto('/')
+
+  /** How far the card's centre is from the panel's centre, in pixels. */
+  const offCentre = async (name: string) => {
+    const panel = (await page.getByRole('main').boundingBox())!
+    const card = (await page.getByRole('region', { name }).boundingBox())!
+    return {
+      x: Math.abs((card.x + card.width / 2) - (panel.x + panel.width / 2)),
+      y: Math.abs((card.y + card.height / 2) - (panel.y + panel.height / 2)),
+    }
+  }
+
+  for (const name of ['Sign In', 'Create Your Account']) {
+    if (name === 'Create Your Account') {
+      await page.getByRole('button', { name: 'New Here? Create an Account' }).click()
+    }
+    for (const viewport of [{ width: 320, height: 812 }, { width: 1280, height: 720 }]) {
+      await page.setViewportSize(viewport)
+      // Polled: the panel and card can be read between two layouts just after a resize.
+      await expect.poll(() => offCentre(name), { message: `${name} at ${viewport.width} px is off centre` })
+        .toEqual({ x: expect.closeTo(0, 0), y: expect.closeTo(0, 0) })
+    }
+  }
+
+  await page.setViewportSize({ width: 320, height: 256 })
+  await page.evaluate(() => window.scrollTo(0, 0))
+  const card = (await page.getByRole('region', { name: 'Create Your Account' }).boundingBox())!
+  expect(card.y).toBeGreaterThanOrEqual(0)
+})
+
 test('allows retry after a non-transient startup error without reloading', async ({ page }) => {
   let attempts = 0
   let retrying = false

@@ -2,7 +2,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiRequest } from '@/lib/api/client'
 import type { PeriodBalances } from '@/lib/api/schemas'
+import { formatCurrencyAmount } from '@/lib/formatCurrencyAmount'
 import { BurnDownChart } from './BurnDownChart'
+import { forecastBalances } from './forecastBalances'
 import { formatCents } from './formatCents'
 import { calculateSchedule, type ScheduledPeriod } from './scheduleCalculation'
 import { installFakeApi, renderWithProviders, type FakeServer } from './testSupport'
@@ -136,7 +138,9 @@ describe('BurnDownChart with a schedule', () => {
     renderPlotted()
 
     const area = seriesPath(screen.getByRole('img'), 'schedule', 'area')
-    expect(area).toHaveAttribute('fill-opacity', '0.6')
+    // The stripes' strength and width come from the theme, so Dark can draw them stronger.
+    expect(area).toHaveClass('[fill-opacity:var(--chart-hatch-opacity)]')
+    expect(screen.getByRole('img').querySelector('pattern line')).toHaveClass('[stroke-width:var(--chart-hatch-width)]')
     const d = area?.getAttribute('d') ?? ''
     expect(d.endsWith('L 580,260 L 70,260 Z')).toBe(true)
     const line = seriesPath(screen.getByRole('img'), 'schedule', 'line')?.getAttribute('d') ?? ''
@@ -190,6 +194,23 @@ describe('BurnDownChart with a schedule', () => {
     expect(svg.querySelector('[data-part="area"]')).toBeNull()
     expect(screen.getByText('The burn down will appear once the schedule is calculated.')).toBeInTheDocument()
   })
+
+  it('draws a schedule with more rows than a function call can take as arguments', () => {
+    // A very large Duration is accepted while the final repayment date stays within 31 Dec 9999.
+    const rows = 200_000
+    const long: ScheduledPeriod[] = Array.from({ length: rows }, (_, index) => ({
+      period: index + 1,
+      date: new Date(Date.UTC(2023, 10, 29) + (index + 1) * 7 * 86_400_000).toISOString().slice(0, 10),
+      openingCents: 50000000,
+      interestCents: 0,
+      repaymentCents: 0,
+      closingCents: Math.round((50000000 * (rows - index - 1)) / rows),
+    }))
+
+    render(<BurnDownChart disbursalDate="2023-11-29" openingBalanceCents={50000000} saved schedule={long} />)
+
+    expect(seriesPath(screen.getByRole('img'), 'schedule', 'line')).not.toBeNull()
+  }, 20_000)
 
   it('renders no buttons, menus or selects (FR-012)', () => {
     renderPlotted()
@@ -347,7 +368,7 @@ describe('BurnDownChart with an Actual Balance', () => {
     setBalances([null, '480000.00', '470000.00', null, '450000.50'])
     renderChart()
 
-    await waitFor(() => expect(lines()).toHaveLength(2))
+    await waitFor(() => expect(lines()).toHaveLength(3))
     const [bank, actual] = Array.from(lines())
     expect(bank).toHaveAttribute('data-series', 'schedule')
     expect(bank).not.toHaveAttribute('stroke-dasharray')
@@ -365,7 +386,7 @@ describe('BurnDownChart with an Actual Balance', () => {
     expect(actualPoints[1]?.[1]).toBeCloseTo(260 - (230 * 480000) / 500000, 5)
     expect(actualPoints[3]?.[0]).toBe(bankPoints[5]?.[0])
     expect(svg().getAttribute('aria-label')).toMatch(
-      / Actual Balance: from \$480,000\.00 on 29 Jan 2024 to \$450,000\.50 on 29 Apr 2024\.$/,
+      / Actual Balance: from \$480,000\.00 on 29 Jan 2024 to \$450,000\.50 on 29 Apr 2024\. Forecast Balance: /,
     )
   })
 
@@ -373,21 +394,46 @@ describe('BurnDownChart with an Actual Balance', () => {
     setBalances(['480000.00', '470000.00'])
     renderChart()
 
-    await waitFor(() => expect(lines()).toHaveLength(2))
+    await waitFor(() => expect(lines()).toHaveLength(3))
     const gradient = svg().querySelector('linearGradient[data-series="actual"]:not([data-part])')
     expect(gradient).toHaveAttribute('gradientUnits', 'userSpaceOnUse')
     expect(gradient).toHaveAttribute('x1', '0')
     expect(gradient).toHaveAttribute('x2', '0')
+    // All three colours run along the line: from its highest point to its lowest, not over the whole plot.
     expect(gradient).toHaveAttribute('y1', '30')
-    expect(gradient).toHaveAttribute('y2', '260')
+    expect(Number(gradient?.getAttribute('y2'))).toBeCloseTo(260 - (230 * 470000) / 500000, 5)
     expect(Array.from(gradient?.querySelectorAll('stop') ?? []).map((stop) => stop.getAttribute('class')))
       .toEqual(['text-chart-actual-start', 'text-chart-actual-mid', 'text-chart-actual-end'])
+  })
+
+  it('runs each series gradient over that line alone, wherever the axis puts it', async () => {
+    // A balance above the Opening Balance raises the axis to $1M, so no line reaches the top of the plot but this one.
+    setBalances(['600000.00', '550000.00'])
+    renderChart()
+    await waitFor(() => expect(lines()).toHaveLength(3))
+
+    const span = (series: string) => {
+      const gradient = svg().querySelector(`linearGradient[data-series="${series}"]:not([data-part])`)
+      return [Number(gradient?.getAttribute('y1')), Number(gradient?.getAttribute('y2'))]
+    }
+    for (const series of ['schedule', 'actual', 'forecast']) {
+      const ys = lineVertices(seriesPath(svg(), series, 'line')?.getAttribute('d')).map(([, y]) => y)
+      const [from = Number.NaN, to = Number.NaN] = span(series)
+      expect(from).toBeCloseTo(Math.min(...ys), 5)
+      expect(to).toBeCloseTo(Math.max(...ys), 5)
+      // The line and its area share the gradient, so their colours match at every height.
+      const id = gradientId(series)
+      expect(seriesPath(svg(), series, 'line')).toHaveAttribute('stroke', `url(#${id})`)
+      expect(seriesPath(svg(), series, 'area')).toHaveAttribute('fill', `url(#${id})`)
+    }
+    // Bank Schedule starts at $500,000 on a $1M axis.
+    expect(span('schedule')).toEqual([145, 260])
   })
 
   it('does not name the Actual Balance line or dot inside the plot; the legend names it', async () => {
     setBalances(['480000.00', '470000.00', '460000.00'])
     const { unmount } = renderChart()
-    await waitFor(() => expect(lines()).toHaveLength(2))
+    await waitFor(() => expect(lines()).toHaveLength(3))
     expect(svg().querySelector('text[data-part="series-name"]')).toBeNull()
     expect(svg().querySelector('[data-part="legend"][data-series="actual"]')).toHaveTextContent('Actual Balance')
     unmount()
@@ -402,7 +448,7 @@ describe('BurnDownChart with an Actual Balance', () => {
     setBalances(['480000.00', '470000.00', '460000.00'])
     renderChart()
 
-    await waitFor(() => expect(lines()).toHaveLength(2))
+    await waitFor(() => expect(lines()).toHaveLength(3))
     const order = [
       seriesPath(svg(), 'schedule', 'area'),
       seriesPath(svg(), 'actual', 'area'),
@@ -415,11 +461,12 @@ describe('BurnDownChart with an Actual Balance', () => {
     })
     expect(seriesPath(svg(), 'actual', 'area')).toHaveAttribute('fill-opacity', '0.5')
     expect(seriesPath(svg(), 'actual', 'area')).toHaveAttribute('fill', `url(#${gradientId('actual')})`)
-    expect(seriesPath(svg(), 'schedule', 'area')).toHaveAttribute('fill-opacity', '0.6')
+    expect(seriesPath(svg(), 'schedule', 'area')).toHaveClass('[fill-opacity:var(--chart-hatch-opacity)]')
   })
 
   it('lays out both legend entries, each sampling its full gradient and line style (FR-006)', async () => {
-    setBalances(['480000.00', '470000.00'])
+    // A rising balance has no forecast, so only two entries are listed.
+    setBalances(['470000.00', '480000.00'])
     renderChart()
 
     await waitFor(() => expect(lines()).toHaveLength(2))
@@ -451,7 +498,7 @@ describe('BurnDownChart with an Actual Balance', () => {
     setBalances(['480000.00', '470000.00'])
     renderChart()
 
-    await waitFor(() => expect(lines()).toHaveLength(2))
+    await waitFor(() => expect(lines()).toHaveLength(3))
     for (const tick of ['$0', '$125K', '$250K', '$375K', '$500K']) {
       expect(svg()).toHaveTextContent(tick)
     }
@@ -473,7 +520,7 @@ describe('BurnDownChart with an Actual Balance', () => {
     setBalances(['480000.00', '-1000.00'])
     renderChart()
 
-    await waitFor(() => expect(lines()).toHaveLength(2))
+    await waitFor(() => expect(lines()).toHaveLength(3))
     for (const tick of ['-$125K', '$0', '$125K', '$250K', '$375K', '$500K']) {
       expect(svg()).toHaveTextContent(tick)
     }
@@ -490,7 +537,7 @@ describe('BurnDownChart with an Actual Balance', () => {
     setBalances(['480000.00', '-1000.00'])
     renderChart()
 
-    await waitFor(() => expect(lines()).toHaveLength(2))
+    await waitFor(() => expect(lines()).toHaveLength(3))
     // Axis -$125K to $500K: $0 sits one step of five above the bottom.
     const zeroY = 260 - 230 / 5
     const area = seriesPath(svg(), 'actual', 'area')?.getAttribute('d') ?? ''
@@ -511,7 +558,7 @@ describe('BurnDownChart with an Actual Balance', () => {
     setBalances(['700000.00', '480000.00', '-90000.00', '-1000.00'])
     renderChart()
 
-    await waitFor(() => expect(lines()).toHaveLength(2))
+    await waitFor(() => expect(lines()).toHaveLength(3))
     for (const path of Array.from(svg().querySelectorAll('path[data-series]'))) {
       for (const [x, y] of allCoordinates(path.getAttribute('d'))) {
         expect(x).toBeGreaterThanOrEqual(70 - 1e-6)
@@ -661,7 +708,7 @@ describe('BurnDownChart hover label', () => {
   it('shows the Opening Balance and no Actual Balance at the Disbursal Date (FR-007)', async () => {
     setBalances(['480000.00', '470000.00'])
     renderChart({ accountId: account.id })
-    await waitFor(() => expect(seriesLines(svg())).toHaveLength(2))
+    await waitFor(() => expect(seriesLines(svg())).toHaveLength(3))
 
     hover(0)
     expect(label()).toHaveTextContent('29 Nov 2023')
@@ -707,7 +754,7 @@ describe('BurnDownChart hover label', () => {
     // Bank Schedule near the top, Actual Balance well below the middle.
     setBalances(['480000.00', '100000.00', '100000.00'])
     renderChart({ accountId: account.id })
-    await waitFor(() => expect(seriesLines(svg())).toHaveLength(2))
+    await waitFor(() => expect(seriesLines(svg())).toHaveLength(3))
 
     hover(2)
     const [bankRing = 0, actualRing = 0] = rings().map((ring) => Number(ring.getAttribute('cy')))
@@ -841,7 +888,7 @@ describe('BurnDownChart hover label', () => {
   it('draws the band above both fills and below the guides, lines and rings (FR-004, R3)', async () => {
     setBalances(['480000.00', '470000.00'])
     renderChart({ accountId: account.id })
-    await waitFor(() => expect(seriesLines(svg())).toHaveLength(2))
+    await waitFor(() => expect(seriesLines(svg())).toHaveLength(3))
 
     hover(1)
     const order = [
@@ -909,5 +956,330 @@ describe('BurnDownChart hover label', () => {
     expect(label()).not.toBeNull()
     expect(performance.now() - start).toBeLessThan(100)
     expect(amounts()).toEqual([formatCents(weekly[1199]?.closingCents ?? 0)])
+  })
+})
+
+describe('BurnDownChart with a Forecast Balance', () => {
+  const account = { id: '11111111-1111-4111-8111-111111111111', description: 'Offset Account', currencyCode: 'AUD' }
+  const inputs = {
+    openingBalanceCents: 50000000,
+    disbursalDate: '2023-11-29',
+    duration: 360,
+    paymentFrequency: 'Monthly' as const,
+    rateChanges: [{ annualRatePercent: 6, effectiveDate: '2023-11-29' }],
+  }
+  const schedule = calculateSchedule(inputs) ?? []
+  // Two balances $10,000 apart: rows 3 to 48 fall by $10,000 from $460,000.00, and row 49 is $0.00.
+  const falling = ['480000.00', '470000.00']
+  let server: FakeServer
+
+  beforeEach(() => {
+    vi.resetAllMocks()
+    server = installFakeApi([])
+    server.accounts = [account]
+    // The chart box is exactly the viewBox, so clientX equals the viewBox x.
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue(
+      { left: 0, top: 0, right: 600, bottom: 300, width: 600, height: 300, x: 0, y: 0, toJSON: () => ({}) },
+    )
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(180)
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(60)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  function renderChart(options: { plotted?: boolean, periods?: ScheduledPeriod[], frequency?: 'Monthly' | 'Weekly' } = {}) {
+    const rows = options.periods ?? schedule
+    return renderWithProviders(
+      <BurnDownChart
+        accountId={account.id}
+        disbursalDate={inputs.disbursalDate}
+        duration={rows.length}
+        openingBalanceCents={inputs.openingBalanceCents}
+        paymentFrequency={options.frequency ?? 'Monthly'}
+        saved
+        schedule={options.plotted === false ? undefined : rows}
+      />,
+    )
+  }
+
+  function setBalances(balances: PeriodBalances['balances']) {
+    server.balances = { currencyCode: 'AUD', periodCount: 360, balances }
+  }
+
+  const svg = () => screen.getByRole('img')
+  const forecastPath = (part: string) => seriesPath(svg(), 'forecast', part)
+  const d = (series: string, part: string) => seriesPath(svg(), series, part)?.getAttribute('d')
+  const legend = (series: string) => svg().querySelector(`[data-part="legend"][data-series="${series}"]`)
+  const group = () => screen.getByRole('group', { name: 'Burndown Values' })
+  const plotArea = () => svg().querySelector('rect[data-part="pointer-area"]') as Element
+  const label = () => document.querySelector('[data-slot="burndown-label"]')
+  const rings = () => Array.from(svg().querySelectorAll('circle[data-part="ring"]'))
+  const names = () => Array.from(label()?.querySelectorAll('dt') ?? []).map((cell) => cell.textContent)
+  const amounts = () => Array.from(label()?.querySelectorAll('dd') ?? []).map((cell) => cell.textContent)
+  const xOf = (index: number) => lineVertices(d('schedule', 'line'))[index]?.[0] ?? 0
+  const hover = (index: number) => fireEvent.pointerMove(plotArea(), { clientX: xOf(index), clientY: 150 })
+  const key = (name: string) => fireEvent.keyDown(group(), { key: name })
+  const drawn = () => waitFor(() => expect(forecastPath('line')).not.toBeNull())
+
+  function expectInOrder(elements: (Element | null | undefined)[]) {
+    elements.slice(1).forEach((element, index) => {
+      expect(elements[index]?.compareDocumentPosition(element as Node)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    })
+  }
+
+  it('draws the line from the last Actual Balance through every forecast row to $0 (FR-009)', async () => {
+    setBalances(falling)
+    renderChart()
+    await drawn()
+
+    const points = lineVertices(d('forecast', 'line'))
+    expect(points).toHaveLength(48)
+    expect(points[0]).toEqual(lineVertices(d('actual', 'line')).at(-1))
+    const bank = lineVertices(d('schedule', 'line'))
+    points.slice(1).forEach((point, index) => {
+      // Vertex index + 1 is row index + 3.
+      const value = Math.max(0, 460000 - index * 10000)
+      expect(point[0]).toBeCloseTo(bank[index + 3]?.[0] ?? Number.NaN, 5)
+      expect(point[1]).toBeCloseTo(260 - (230 * value) / 500000, 5)
+    })
+    expect(points.at(-1)?.[1]).toBeCloseTo(260, 5)
+  })
+
+  it('fills the forecast area with its own gradient at 0.25, in the fade mask, closed at $0 (FR-010)', async () => {
+    setBalances(falling)
+    renderChart()
+    await drawn()
+
+    const gradient = svg().querySelector('linearGradient[data-series="forecast"]:not([data-part])')
+    expect(gradient).toHaveAttribute('gradientUnits', 'userSpaceOnUse')
+    expect(gradient).toHaveAttribute('x1', '0')
+    expect(gradient).toHaveAttribute('x2', '0')
+    // All three colours show along the forecast: from the last Actual Balance to its last value, here $0.
+    expect(Number(gradient?.getAttribute('y1'))).toBeCloseTo(260 - (230 * 470000) / 500000, 5)
+    expect(Number(gradient?.getAttribute('y2'))).toBeCloseTo(260, 5)
+    expect(Array.from(gradient?.querySelectorAll('stop') ?? []).map((stop) => stop.getAttribute('class')))
+      .toEqual(['text-chart-forecast-start', 'text-chart-forecast-mid', 'text-chart-forecast-end'])
+    const area = forecastPath('area')
+    expect(area).toHaveAttribute('fill', `url(#${gradient?.getAttribute('id')})`)
+    expect(area).toHaveAttribute('fill-opacity', '0.25')
+    expect(area?.parentElement?.getAttribute('mask'))
+      .toBe(seriesPath(svg(), 'actual', 'area')?.parentElement?.getAttribute('mask'))
+    const line = d('forecast', 'line') ?? ''
+    expect(d('forecast', 'area')?.startsWith(line)).toBe(true)
+    expect(d('forecast', 'area')?.endsWith('Z')).toBe(true)
+    for (const [, y] of lineVertices(d('forecast', 'area')).slice(-2)) {
+      expect(y).toBeCloseTo(260, 5)
+    }
+  })
+
+  it('draws a solid line with no card-coloured outline around it (FR-011)', async () => {
+    setBalances(falling)
+    renderChart()
+    await drawn()
+
+    const line = forecastPath('line')
+    expect(line).toHaveAttribute('stroke-width', '2')
+    expect(line).not.toHaveAttribute('stroke-dasharray')
+    expect(line).toHaveAttribute('fill', 'none')
+    const gradient = svg().querySelector('linearGradient[data-series="forecast"]:not([data-part])')
+    expect(line).toHaveAttribute('stroke', `url(#${gradient?.getAttribute('id')})`)
+    expect(svg().querySelector('.stroke-card')).toBeNull()
+  })
+
+  it('leaves no gap between the Actual Balance and forecast areas (FR-010)', async () => {
+    setBalances(falling)
+    renderChart()
+    await drawn()
+
+    const actual = seriesPath(svg(), 'actual', 'area')
+    const forecast = forecastPath('area')
+    // The areas share an edge; antialiasing either side of it would let the card show through.
+    const [joinX] = lineVertices(d('forecast', 'line'))[0] ?? [Number.NaN]
+    expect(lineVertices(d('actual', 'line')).at(-1)?.[0]).toBe(joinX)
+    expect(actual).toHaveAttribute('shape-rendering', 'crispEdges')
+    expect(forecast).toHaveAttribute('shape-rendering', 'crispEdges')
+    // Nor may the fade mask thin the shared edge: it reaches well past each area's sides.
+    const maskId = forecast?.parentElement?.getAttribute('mask')?.match(/url\(#(.*)\)/)?.[1] ?? ''
+    const rect = svg().querySelector(`mask[id="${maskId}"] rect`)
+    expect(rect).toHaveAttribute('x', '-0.5')
+    expect(rect).toHaveAttribute('width', '2')
+  })
+
+  it('paints every area beneath the guides and the forecast line and rings last (contract Paint order)', async () => {
+    setBalances(falling)
+    renderChart()
+    await drawn()
+    hover(5)
+
+    expectInOrder([
+      seriesPath(svg(), 'schedule', 'area'),
+      seriesPath(svg(), 'actual', 'area'),
+      forecastPath('area'),
+      svg().querySelector('rect[data-part="band"]'),
+      svg().querySelector('line.opacity-30'),
+      seriesPath(svg(), 'schedule', 'line'),
+      seriesPath(svg(), 'actual', 'line'),
+      forecastPath('line'),
+      rings()[0],
+      rings()[1],
+      plotArea(),
+    ])
+  })
+
+  it('keeps the forecast inside the plot and leaves the axis unchanged (FR-009)', async () => {
+    setBalances(falling)
+    renderChart()
+    await drawn()
+
+    for (const tick of ['$0', '$125K', '$250K', '$375K', '$500K']) {
+      expect(svg()).toHaveTextContent(tick)
+    }
+    expect(Array.from(svg().querySelectorAll('line.opacity-30')).map((guide) => guide.getAttribute('y1')))
+      .toEqual(['60', '110', '160', '210'])
+    for (const part of ['area', 'line']) {
+      for (const [x, y] of allCoordinates(d('forecast', part))) {
+        expect(x).toBeGreaterThanOrEqual(70 - 1e-6)
+        expect(x).toBeLessThanOrEqual(580 + 1e-6)
+        expect(y).toBeGreaterThanOrEqual(30 - 1e-6)
+        expect(y).toBeLessThanOrEqual(260 + 1e-6)
+      }
+    }
+  })
+
+  it('adds a solid legend entry and moves the others to make room (FR-012, R6)', async () => {
+    setBalances(falling)
+    renderChart()
+    await drawn()
+
+    expect(legend('schedule')?.querySelector('rect')).toHaveAttribute('x', '190')
+    expect(legend('schedule')?.querySelector('text')).toHaveAttribute('x', '220')
+    expect(legend('actual')?.querySelector('rect')).toHaveAttribute('x', '320')
+    expect(legend('actual')?.querySelector('text')).toHaveAttribute('x', '350')
+    const sample = legend('forecast')?.querySelector('rect')
+    expect(sample).toHaveAttribute('x', '450')
+    expect(sample).toHaveAttribute('width', '24')
+    expect(legend('forecast')?.querySelector('text')).toHaveAttribute('x', '480')
+    expect(legend('forecast')).toHaveTextContent('Forecast Balance')
+    const gradient = svg().querySelector('linearGradient[data-part="legend-gradient"][data-series="forecast"]')
+    expect(gradient).toHaveAttribute('gradientUnits', 'objectBoundingBox')
+    expect(Array.from(gradient?.querySelectorAll('stop') ?? []).map((stop) => stop.getAttribute('class')))
+      .toEqual(['text-chart-forecast-start', 'text-chart-forecast-mid', 'text-chart-forecast-end'])
+    expect(sample).toHaveAttribute('fill', `url(#${gradient?.getAttribute('id')})`)
+  })
+
+  it('shows the forecast amount and ring on forecast dates only (FR-012)', async () => {
+    setBalances(falling)
+    renderChart()
+    await drawn()
+
+    hover(3)
+    expect(label()).toHaveTextContent('29 Feb 2024')
+    expect(names()).toEqual(['Bank Schedule', 'Forecast Balance'])
+    expect(amounts()).toEqual([formatCents(schedule[2]?.closingCents ?? 0), '$460,000.00'])
+    expect(rings().map((ring) => ring.getAttribute('data-series'))).toEqual(['schedule', 'forecast'])
+    expect(svg().querySelector('.stroke-card')).toBeNull()
+    expect(rings()[1]).toHaveClass('pointer-events-none')
+
+    // An Actual Balance date, and the first date after the forecast reaches $0.00.
+    for (const [index, series] of [[2, ['schedule', 'actual']], [50, ['schedule']]] as const) {
+      hover(index)
+      expect(names()).not.toContain('Forecast Balance')
+      expect(rings().map((ring) => ring.getAttribute('data-series'))).toEqual(series)
+    }
+  })
+
+  it('shows on every forecast date the amount the schedule table shows (SC-002)', async () => {
+    setBalances(falling)
+    renderChart()
+    await drawn()
+
+    const forecast = forecastBalances(falling, 'Monthly', 360)
+    for (let row = 3; row <= 49; row += 1) {
+      hover(row)
+      expect(amounts()[1]).toBe(formatCurrencyAmount(forecast[row - 1] ?? '', 'AUD'))
+    }
+  })
+
+  it('announces the forecast amount on keyboard moves (FR-013)', async () => {
+    setBalances(falling)
+    renderChart()
+    await drawn()
+
+    group().focus()
+    for (const name of ['Home', 'ArrowRight', 'ArrowRight', 'ArrowRight']) {
+      key(name)
+    }
+    expect(screen.getByRole('status')).toHaveTextContent(
+      `29 Feb 2024. Bank Schedule ${formatCents(schedule[2]?.closingCents ?? 0)}. Forecast Balance $460,000.00.`,
+    )
+  })
+
+  it('places the label between the Bank Schedule and forecast rings (FR-012)', async () => {
+    setBalances(['420000.00', '300000.00'])
+    renderChart()
+    await drawn()
+
+    hover(3)
+    const [bankRing = 0, forecastRing = 0] = rings().map((ring) => Number(ring.getAttribute('cy')))
+    expect(forecastRing - bankRing).toBeGreaterThan(100)
+    expect(Number((label() as HTMLElement).style.top.replace('px', '')))
+      .toBeCloseTo((bankRing + forecastRing) / 2 - 30, 5)
+  })
+
+  it('appends the forecast range to the text alternative (FR-013)', async () => {
+    setBalances(falling)
+    renderChart()
+    await drawn()
+
+    expect(svg().getAttribute('aria-label')).toMatch(
+      /29 Jan 2024\. Forecast Balance: from \$460,000\.00 on 29 Feb 2024 to \$0\.00 on 29 Dec 2027\.$/,
+    )
+  })
+
+  it('describes a single forecast value, below $0 to $0.00 (FR-013)', async () => {
+    setBalances(['480000.00', '-1000.00'])
+    renderChart()
+    await drawn()
+
+    expect(svg().getAttribute('aria-label')).toMatch(/ Forecast Balance: \$0\.00 on 29 Feb 2024\.$/)
+    expect(lineVertices(d('forecast', 'line'))).toHaveLength(2)
+  })
+
+  it('is unchanged without forecast values (US2 scenario 5)', async () => {
+    // A rising balance gives no forecast.
+    setBalances(['470000.00', '480000.00'])
+    const { container } = renderChart()
+    await waitFor(() => expect(seriesLines(svg())).toHaveLength(2))
+
+    expect(container.querySelector('[data-series="forecast"]')).toBeNull()
+    expect(svg()).not.toHaveTextContent('Forecast Balance')
+    expect(svg().getAttribute('aria-label')).not.toMatch(/Forecast/)
+    expect(legend('schedule')?.querySelector('rect')).toHaveAttribute('x', '270')
+    expect(legend('actual')?.querySelector('rect')).toHaveAttribute('x', '400')
+    hover(3)
+    expect(names()).toEqual(['Bank Schedule'])
+  })
+
+  it('draws no forecast without a Bank Schedule (US2 scenario 5)', async () => {
+    setBalances(falling)
+    const { container } = renderChart({ plotted: false })
+    await waitFor(() => expect(server.balanceRequests.length).toBeGreaterThan(0))
+
+    expect(container.querySelector('[data-series="forecast"]')).toBeNull()
+    expect(svg()).not.toHaveTextContent('Forecast Balance')
+  })
+
+  it('draws 1,560 periods with most rows forecast within 500 ms (SC-003)', async () => {
+    const weekly = calculateSchedule({ ...inputs, duration: 1560, paymentFrequency: 'Weekly' }) ?? []
+    setBalances(Array.from({ length: 60 }, (_, index) => (500000 - (index + 1) * 100).toFixed(2)))
+
+    const start = performance.now()
+    renderChart({ periods: weekly, frequency: 'Weekly' })
+    await drawn()
+
+    expect(lineVertices(d('forecast', 'line'))).toHaveLength(1501)
+    expect(performance.now() - start).toBeLessThan(500)
   })
 })

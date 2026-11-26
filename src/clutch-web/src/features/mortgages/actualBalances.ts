@@ -1,11 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
+import { useMemo } from 'react'
 import { getAccounts } from '@/features/accounts/api'
 import { usePeriodBalances, type PeriodBalanceRequest } from './api'
+import { forecastBalances } from './forecastBalances'
 import type { PaymentFrequency } from './repaymentDates'
 import type { ScheduledPeriod } from './scheduleCalculation'
 
-/** One plotted Actual Balance: a non-blank balance at its schedule row's date. */
-export type ActualBalancePoint = {
+/** One plotted Actual or Forecast Balance: a non-blank balance at its schedule row's date. */
+export type BalancePoint = {
   /** yyyy-MM-dd of the schedule row. */
   date: string
   /** The balance as the server sent it; formatted for text. */
@@ -15,11 +17,11 @@ export type ActualBalancePoint = {
 }
 
 /** One point per non-blank balance that has a schedule row; never one at the Disbursal Date. */
-export function actualBalancePoints(
+export function balancePoints(
   balances: readonly (string | null | undefined)[],
   schedule: readonly ScheduledPeriod[],
-): ActualBalancePoint[] {
-  const points: ActualBalancePoint[] = []
+): BalancePoint[] {
+  const points: BalancePoint[] = []
   for (let index = 0; index < balances.length; index += 1) {
     const amount = balances[index]
     const period = schedule[index]
@@ -35,6 +37,8 @@ export type ActualBalances = {
   status: 'none' | 'loading' | 'failed' | 'ready'
   /** Index i is period i + 1; null or missing is a blank cell. Empty unless ready. */
   balances: (string | null)[]
+  /** Forecast Balance cells, indexed like `balances`. Empty unless ready with complete Details. */
+  forecast: (string | null)[]
   currencyCode?: string
   /** Monthly fallback row count (the table only). */
   periodCount?: number
@@ -60,19 +64,28 @@ export function useActualBalances(accountId: string | undefined, params: Schedul
       }
     : null
   const balances = usePeriodBalances(request)
+  const values = balances.data?.balances
+  // Both views read this one calculation, so they cannot disagree.
+  const forecast = useMemo(
+    () => values === undefined || duration === undefined || disbursalDate === undefined || paymentFrequency === undefined
+      ? []
+      : forecastBalances(values, paymentFrequency, duration),
+    [values, duration, disbursalDate, paymentFrequency],
+  )
 
   if (!account) {
-    return { status: 'none', balances: [] }
+    return { status: 'none', balances: [], forecast: [] }
   }
   if (balances.isPending) {
-    return { status: 'loading', balances: [], currencyCode: account.currencyCode }
+    return { status: 'loading', balances: [], forecast: [], currencyCode: account.currencyCode }
   }
   if (balances.isError) {
-    return { status: 'failed', balances: [], currencyCode: account.currencyCode }
+    return { status: 'failed', balances: [], forecast: [], currencyCode: account.currencyCode }
   }
   return {
     status: 'ready',
     balances: balances.data.balances,
+    forecast,
     currencyCode: balances.data.currencyCode,
     periodCount: balances.data.periodCount,
   }

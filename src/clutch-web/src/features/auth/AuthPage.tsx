@@ -33,11 +33,12 @@ export function AuthPage({ inert = false }: { inert?: boolean }) {
 
   return (
     <div className="flex min-h-svh bg-canvas">
-      <ContentPanel className="flex items-center justify-center" inert={inert}>
+      <ContentPanel inert={inert}>
+        {/* Auto margins centre the card in the panel's full-height column and never push its top off a short screen. */}
         <Card
           aria-labelledby="auth-heading"
           as="section"
-          className="mx-auto w-full max-w-md space-y-6 p-6"
+          className="m-auto w-full max-w-md space-y-6 p-6"
         >
           <div>
             <h1

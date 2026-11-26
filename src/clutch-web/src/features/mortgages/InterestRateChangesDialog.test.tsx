@@ -8,6 +8,11 @@ import { listedRates } from './testSupport'
 
 const today = '2025-06-15'
 
+// No timer wait between simulated keystrokes, which otherwise dominates the typing tests.
+function setupUser() {
+  return userEvent.setup({ delay: null })
+}
+
 function makeDraft(rows: RateRowDraft[], patch: Partial<LoanDraft> = {}): LoanDraft {
   return {
     ...emptyDraft(),
@@ -59,7 +64,7 @@ const opening = () => newRow('5.25', '2000-01-01')
 
 describe('InterestRateChangesDialog', () => {
   it('opens titled "Interest Rates" with focus on New Interest Rate and no Save or Cancel', async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     render(<Harness initial={makeDraft([opening()])} />)
     const dialog = await openDialog(user)
 
@@ -70,7 +75,7 @@ describe('InterestRateChangesDialog', () => {
   })
 
   it('lists changes in Effective Date order and marks the opening rate in text', async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     render(<Harness initial={makeDraft([newRow('7', '2003-01-01'), opening(), newRow('6', '2001-06-01')])} />)
     const dialog = await openDialog(user)
 
@@ -81,7 +86,7 @@ describe('InterestRateChangesDialog', () => {
   })
 
   it('titles the opening row "Opening Interest Rate" and every other row "Interest Rate Change", with no extra Opening Rate text', async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     render(<Harness initial={makeDraft([opening(), newRow('6', '2001-06-01'), newRow('7', '2003-01-01')])} />)
     const dialog = await openDialog(user)
 
@@ -95,7 +100,7 @@ describe('InterestRateChangesDialog', () => {
   })
 
   it('left aligns the opening rate value', async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     render(<Harness initial={makeDraft([opening()])} />)
     const dialog = await openDialog(user)
 
@@ -104,7 +109,7 @@ describe('InterestRateChangesDialog', () => {
   })
 
   it('shows "No interest rate changes yet" when empty', async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     render(<Harness initial={makeDraft([])} />)
     const dialog = await openDialog(user)
 
@@ -113,7 +118,7 @@ describe('InterestRateChangesDialog', () => {
   })
 
   it('adds a valid change in date order, clears the inputs and refocuses New Interest Rate', async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     render(<Harness initial={makeDraft([opening(), newRow('7', '2003-01-01')])} />)
     const dialog = await openDialog(user)
 
@@ -131,7 +136,7 @@ describe('InterestRateChangesDialog', () => {
     ['rate above 100', '100.5', '2001-01-01', 'New Interest Rate', 'Enter an interest rate from 0 to 100'],
     ['date out of range', '6', '2010-01-02', 'Effective Date', 'Choose a date from 1 Jan 2000 to 1 Jan 2010'],
   ])('refuses an invalid add (%s) with the field flagged and nothing added', async (_label, rate, date, field, message) => {
-    const user = userEvent.setup()
+    const user = setupUser()
     const rowsSeen: RateRowDraft[][] = []
     render(<Harness initial={makeDraft([opening()])} onRows={(rows) => rowsSeen.push(rows)} />)
     const dialog = await openDialog(user)
@@ -146,7 +151,7 @@ describe('InterestRateChangesDialog', () => {
   })
 
   it('disables adding with the header hint until the header is valid; removing stays available', async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     render(<Harness initial={makeDraft([opening()], { duration: '' })} />)
     const dialog = await openDialog(user)
 
@@ -158,7 +163,7 @@ describe('InterestRateChangesDialog', () => {
   })
 
   it('disables adding at 60 changes with the limit hint; removing stays available', async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     const rows = Array.from({ length: 60 }, (_, index) =>
       newRow('5', `2000-${String((index % 12) + 1).padStart(2, '0')}-0${Math.floor(index / 12) + 1}`))
     render(<Harness initial={makeDraft(rows)} />)
@@ -171,7 +176,7 @@ describe('InterestRateChangesDialog', () => {
   })
 
   it('removes a change by its named control, focuses the dialog, and the next Tab reaches Close', async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     render(<Harness initial={makeDraft([opening(), newRow('6', '2001-06-01')])} />)
     const dialog = await openDialog(user)
 
@@ -184,7 +189,7 @@ describe('InterestRateChangesDialog', () => {
   })
 
   it('traps focus: Tab from the last control wraps to the first and Shift+Tab from the first wraps to the last', async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     render(<Harness initial={makeDraft([opening()])} />)
     const dialog = await openDialog(user)
     const close = within(dialog).getByRole('button', { name: 'Close' })
@@ -198,7 +203,7 @@ describe('InterestRateChangesDialog', () => {
   })
 
   it.each(['Escape', 'Close'])('%s closes it and returns focus to Interest Rates', async (how) => {
-    const user = userEvent.setup()
+    const user = setupUser()
     render(<Harness initial={makeDraft([opening()])} />)
     const dialog = await openDialog(user)
 
@@ -213,7 +218,7 @@ describe('InterestRateChangesDialog', () => {
   })
 
   it('discards typed values that were not added and opens with empty inputs', async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     const rowsSeen: RateRowDraft[][] = []
     render(<Harness initial={makeDraft([opening()])} onRows={(rows) => rowsSeen.push(rows)} />)
     let dialog = await openDialog(user)
@@ -235,7 +240,7 @@ describe('InterestRateChangesDialog', () => {
 
   describe('opening rate and disbursal date', () => {
     it('prefills and disables Effective Date with the Disbursal Date when there are no rows, and adds on that date', async () => {
-      const user = userEvent.setup()
+      const user = setupUser()
       render(<Harness initial={makeDraft([])} />)
       const dialog = await openDialog(user)
 
@@ -252,7 +257,7 @@ describe('InterestRateChangesDialog', () => {
     })
 
     it('prefills again after every rate is removed', async () => {
-      const user = userEvent.setup()
+      const user = setupUser()
       render(<Harness initial={makeDraft([opening()])} />)
       const dialog = await openDialog(user)
 
@@ -263,7 +268,7 @@ describe('InterestRateChangesDialog', () => {
     })
 
     it('rejects a later rate dated on or before the Disbursal Date', async () => {
-      const user = userEvent.setup()
+      const user = setupUser()
       render(<Harness initial={makeDraft([opening()])} />)
       const dialog = await openDialog(user)
 
@@ -274,7 +279,7 @@ describe('InterestRateChangesDialog', () => {
     })
 
     it('disables removing the Opening Rate while other rows exist, with a hint, and enables it when sole', async () => {
-      const user = userEvent.setup()
+      const user = setupUser()
       render(<Harness initial={makeDraft([opening(), newRow('6', '2001-06-01')])} />)
       const dialog = await openDialog(user)
 
@@ -288,7 +293,7 @@ describe('InterestRateChangesDialog', () => {
     })
 
     it('edits the Opening Rate on blur with restricted entry, and no date edit', async () => {
-      const user = userEvent.setup()
+      const user = setupUser()
       render(<Harness initial={makeDraft([opening(), newRow('6', '2001-06-01')])} />)
       const dialog = await openDialog(user)
 
@@ -305,7 +310,7 @@ describe('InterestRateChangesDialog', () => {
     })
 
     it('rejects an invalid Opening Rate edit with a row error and keeps the previous rate', async () => {
-      const user = userEvent.setup()
+      const user = setupUser()
       render(<Harness initial={makeDraft([opening()])} />)
       const dialog = await openDialog(user)
 
@@ -321,7 +326,7 @@ describe('InterestRateChangesDialog', () => {
 
   describe('disbursal date not entered', () => {
     it('disables rate, date and Add with the specific hint, even when other headers are missing', async () => {
-      const user = userEvent.setup()
+      const user = setupUser()
       render(<Harness initial={makeDraft([], { disbursalDate: '', duration: '' })} />)
       const dialog = await openDialog(user)
 
@@ -336,7 +341,7 @@ describe('InterestRateChangesDialog', () => {
     })
 
     it('keeps the general header hint when the Disbursal Date is entered but another header is missing', async () => {
-      const user = userEvent.setup()
+      const user = setupUser()
       render(<Harness initial={makeDraft([], { duration: '' })} />)
       const dialog = await openDialog(user)
 
@@ -347,7 +352,7 @@ describe('InterestRateChangesDialog', () => {
 
   describe('errors after a refused save', () => {
     it('shows row errors under their row and the set-level message above the list as an alert', async () => {
-      const user = userEvent.setup()
+      const user = setupUser()
       const bad = newRow('6', '2001-06-01')
       const errors = {
         [`${bad.key}.effectiveDate`]: 'This effective date is already used',
@@ -365,7 +370,7 @@ describe('InterestRateChangesDialog', () => {
     })
 
     it('drops a removed row\'s errors and keeps the set-level message after the problem is fixed until the next Save', async () => {
-      const user = userEvent.setup()
+      const user = setupUser()
       const bad = newRow('6', '2001-06-01')
       const errors = {
         [`${bad.key}.effectiveDate`]: 'This effective date is already used',

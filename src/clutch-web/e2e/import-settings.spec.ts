@@ -59,9 +59,8 @@ test.describe('account import settings', () => {
       buffer: Buffer.from('Date,Description,Amount\n2025-01-16,Market second,20.00'),
     })
 
-    await expect(page.getByRole('status')).toContainText(
-      'Using this account’s saved import settings.',
-    )
+    // By its text: "Checking Import Availability…" can be a second status while this one shows.
+    await expect(page.getByRole('status').filter({ hasText: 'Using this account’s saved import settings.' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Map CSV Columns' })).toHaveCount(0)
     await page.setViewportSize({ width: 375, height: 812 })
     await page.emulateMedia({ colorScheme: 'dark' })
@@ -407,9 +406,7 @@ test.describe('account import settings', () => {
     })
     await expect(page.getByLabel('Incoming Transactions Use')).toHaveValue('Negative')
     await page.getByRole('button', { name: 'Use Saved Settings' }).click()
-    await expect(page.getByRole('status')).toContainText(
-      'Using this account’s saved import settings.',
-    )
+    await expect(page.getByRole('status').filter({ hasText: 'Using this account’s saved import settings.' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Map CSV Columns' })).toHaveCount(0)
     await expect(page.getByText('Selected file: second-import.csv')).toBeVisible()
     await expectAccessibleAcrossThemeAndViewports(page)
