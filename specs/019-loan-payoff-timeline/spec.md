@@ -1,4 +1,4 @@
-# Feature Specification: Loan Payoff Timeline Group
+# Feature Specification: Amortization Schedule Group
 
 **Feature Branch**: `019-loan-payoff-timeline`
 
@@ -6,12 +6,12 @@
 
 **Status**: Draft
 
-**Input**: User description: "currently on the mortgage screen the amortization schedule and the burn down are side by side.  put them in the one group that allows you to switch is showing.  default to showing the burndown but have a little button top right of the group that allows to switch between the two.  save this value under the user and reload it every time the user logs in.  every time the page is loaded adhere to the preference.  The title of the group should be "Loan Payoff Timeline""
+**Input**: User description: "currently on the mortgage screen the amortization schedule and the burn down are side by side.  put them in the one group that allows you to switch is showing.  default to showing the burndown but have a little button top right of the group that allows to switch between the two.  save this value under the user and reload it every time the user logs in.  every time the page is loaded adhere to the preference.  The title of the group should be "Amortization Schedule""
 
 <!--
   Builds on 016-mortgage-tracking, which places the "Mortgage Burndown" group and the
   "Amortization Schedule" group side by side (stacked, chart first, below 768px). This feature
-  replaces those two groups with one "Loan Payoff Timeline" group that shows one view at a time.
+  replaces those two groups with one "Amortization Schedule" group that shows one view at a time.
   The chart and table contents themselves are unchanged. The per-user preference follows the
   pattern of 003-theme-selector and 018-persist-nav-state.
 -->
@@ -20,12 +20,12 @@
 
 ### Session 2026-11-22
 
-- Q: When the user switches the Loan Payoff Timeline view, should every switch be saved straight away, even when the user switches several times in a row? → A: Yes. Every switch starts a save straight away. No switch is skipped, delayed or merged, and if saves overlap the last view the user chose is the one that ends up saved.
+- Q: When the user switches the Amortization Schedule view, should every switch be saved straight away, even when the user switches several times in a row? → A: Yes. Every switch starts a save straight away. No switch is skipped, delayed or merged, and if saves overlap the last view the user chose is the one that ends up saved.
 - Q: What should the switch button look like, and how should it tell users which view is showing? → A: A small icon-only button, the same size as the trash can (delete) icon buttons used across the app, showing the familiar circular arrows "switch" icon. Its accessible name and tooltip say which view it will show. It has no pressed state; a visually hidden status line tells screen readers which view is showing.
 
 ### Session 2026-11-22 (convergence)
 
-- Q: The working tree makes the Loan Payoff Timeline group fill the page height (shared content area becomes a flex column; the schedule scrolls with the page instead of in its own box). Keep it? → A: Keep it, and record it as FR-013.
+- Q: The working tree makes the Amortization Schedule group fill the page height (shared content area becomes a flex column; the schedule scrolls with the page instead of in its own box). Keep it? → A: Keep it, and record it as FR-013.
 
 ### Session 2026-11-22 (implementation review)
 
@@ -36,15 +36,15 @@
 
 ### User Story 1 - One group, switchable view (Priority: P1)
 
-As a signed-in user on the Mortgages screen, I see a single "Loan Payoff Timeline" group showing the burndown chart by default, and a small button at its top right switches it to the amortization schedule and back.
+As a signed-in user on the Mortgages screen, I see a single "Amortization Schedule" group showing the burndown chart by default, and a small button at its top right switches it to the amortization schedule and back.
 
 **Why this priority**: This is the layout change itself and gives the selected view the full width of the screen.
 
-**Independent Test**: Open the Mortgages screen, confirm one "Loan Payoff Timeline" group shows the burndown chart, press the switch button and confirm the schedule replaces the chart, press it again and confirm the chart returns.
+**Independent Test**: Open the Mortgages screen, confirm one "Amortization Schedule" group shows the burndown chart, press the switch button and confirm the schedule replaces the chart, press it again and confirm the chart returns.
 
 **Acceptance Scenarios**:
 
-1. **Given** the Mortgages screen has loaded, **When** the user views it, **Then** below the Details group there is one group titled "Loan Payoff Timeline" in place of the separate Mortgage Burndown and Amortization Schedule groups, spanning the full width they used to share.
+1. **Given** the Mortgages screen has loaded, **When** the user views it, **Then** below the Details group there is one group titled "Amortization Schedule" in place of the separate Mortgage Burndown and Amortization Schedule groups, spanning the full width they used to share.
 2. **Given** a user with no saved preference, **When** the screen loads, **Then** the group shows the burndown chart.
 3. **Given** the group shows the burndown chart, **When** the user activates the switch button at the group's top right, **Then** the group shows the amortization schedule instead, and activating it again shows the chart.
 4. **Given** either view is shown, **When** a screen reader or keyboard user reaches the switch button, **Then** it is reachable by keyboard, its accessible name says which view it will show ("Show Amortization Schedule" or "Show Burndown Chart"), and a visually hidden status line announces which view is currently shown.
@@ -83,7 +83,7 @@ As a signed-in user, the view I last chose is saved against my account, so every
 
 ### Functional Requirements
 
-- **FR-001**: The Mortgages screen MUST replace the separate Mortgage Burndown and Amortization Schedule groups with one group titled "Loan Payoff Timeline", placed below the Details group and spanning the full width the two groups shared (supersedes the side-by-side layout of 016 FR-011 and the narrow-screen stacking in 016 Edge Cases).
+- **FR-001**: The Mortgages screen MUST replace the separate Mortgage Burndown and Amortization Schedule groups with one group titled "Amortization Schedule", placed below the Details group and spanning the full width the two groups shared (supersedes the side-by-side layout of 016 FR-011 and the narrow-screen stacking in 016 Edge Cases).
 - **FR-002**: The group MUST show exactly one view at a time: the burndown chart or the amortization schedule. Each view's content (chart series, axes, legend, table columns, rows and messages) MUST be unchanged from 016.
 - **FR-003**: The group MUST have a switch button at its top right, aligned with the title, that toggles between the two views. It MUST be icon-only, the same size as the trash can (delete) icon buttons used across the app, and show a circular arrows "switch" icon.
 - **FR-004**: The switch button MUST be keyboard operable, have an accessible name naming the view it will show ("Show Amortization Schedule" or "Show Burndown Chart"), and show a tooltip with the same wording on hover and focus. It MUST NOT use a pressed state; instead a visually hidden status line MUST tell screen readers which view is currently shown, and announce the new view after each switch.
@@ -95,11 +95,11 @@ As a signed-in user, the view I last chose is saved against my account, so every
 - **FR-010**: A failure to save MUST NOT block the screen and MUST NOT show a message (toasts are only for saving data); the chosen view MUST remain in effect for the current session.
 - **FR-011**: The saved preference MUST only accept the values Burndown or Schedule; any other value MUST be rejected.
 - **FR-012**: The switch button MUST change the view visibly within 500 milliseconds of activation, regardless of how long saving takes.
-- **FR-013**: The Loan Payoff Timeline group MUST grow to fill the height left in the content area below the Details group. The burndown chart fills the group; the amortization schedule scrolls with the content area (not in a separate scroll box) and keeps its header row, columns and rows unchanged (FR-002). The shared content area change MUST NOT alter the layout of other screens.
+- **FR-013**: The Amortization Schedule group MUST grow to fill the height left in the content area below the Details group. The burndown chart fills the group; the amortization schedule scrolls with the content area (not in a separate scroll box) and keeps its header row, columns and rows unchanged (FR-002). The shared content area change MUST NOT alter the layout of other screens.
 
 ### Key Entities *(include if feature involves data)*
 
-- **Loan payoff timeline preference**: A signed-in user's chosen view for the Loan Payoff Timeline group (Burndown or Schedule) and when it was last saved; one per user.
+- **Amortization Schedule preference**: A signed-in user's chosen view for the Amortization Schedule group (Burndown or Schedule) and when it was last saved; one per user.
 
 ### Constitution Scope
 
@@ -113,7 +113,7 @@ Tick each that applies, so plan can pick requirement IDs without rereading the s
 
 ## Success Criteria *(mandatory)*
 
-- **SC-001**: In 100% of checks the Mortgages screen shows one "Loan Payoff Timeline" group and never both views at once.
+- **SC-001**: In 100% of checks the Mortgages screen shows one "Amortization Schedule" group and never both views at once.
 - **SC-002**: Users with no saved preference see the burndown chart in 100% of loads.
 - **SC-003**: In 100% of return visits (reload, sign out/in, sign-in or reload on another device) the group shows the user's most recently saved view, and in 100% of navigations back within a visit it shows the view last chosen in that visit, with no visible swap from the other view in either case.
 - **SC-004**: In 100% of checks one user's saved view is never applied to another user.
@@ -124,7 +124,7 @@ Tick each that applies, so plan can pick requirement IDs without rereading the s
 ## Assumptions
 
 - "Burndown" is the existing "Mortgage Burndown" chart group and "amortization schedule" is the existing "Amortization Schedule" group from 016; only their container and placement change.
-- The two former group headings are replaced by the single "Loan Payoff Timeline" title; the visible content shows sighted users which view is on screen, and the hidden status line tells screen reader users.
+- The two former group headings are replaced by the single "Amortization Schedule" title; the visible content shows sighted users which view is on screen, and the hidden status line tells screen reader users.
 - The preference is synced per account like the theme (003) and navigation (018) preferences: applied on next sign-in or reload, last save wins (across devices, "most recent save" means the save the server stored last), not pushed live to other already-open devices, and not re-read when navigating within an open visit.
 - While the saved view loads, the Mortgages screen stays in its existing loading state (waiting at most 2 seconds for the saved view, alongside the mortgages themselves) rather than showing a default view first.
 - Preference changes are not audit events, consistent with the theme and navigation preferences.

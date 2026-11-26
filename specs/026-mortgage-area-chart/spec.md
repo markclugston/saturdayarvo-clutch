@@ -38,7 +38,7 @@
 
 ### User Story 1 - Read the burndown as a coloured area chart (Priority: P1)
 
-As a signed-in user viewing a mortgage's Loan Payoff Timeline, I see the Bank Schedule and the Actual Balance drawn as lines whose colour changes over time, with the area beneath each line coloured in, so the payoff reads at a glance.
+As a signed-in user viewing a mortgage's Amortization Schedule, I see the Bank Schedule and the Actual Balance drawn as lines whose colour changes over time, with the area beneath each line coloured in, so the payoff reads at a glance.
 
 **Why this priority**: This is the visual change the user asked for and the base the hover labels sit on.
 

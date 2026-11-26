@@ -70,7 +70,7 @@ const tab = (page: Page, name: string) =>
 
 const PREFERENCE_PATH = '/api/preferences/loan-payoff-timeline'
 
-const timeline = (page: Page) => page.getByRole('region', { name: 'Loan Payoff Timeline' })
+const timeline = (page: Page) => page.getByRole('region', { name: 'Amortization Schedule' })
 
 /** Clicks the switch and waits for that switch's save to be answered. */
 async function switchView(page: Page, name: 'Show Amortization Schedule' | 'Show Burndown Chart') {
@@ -119,7 +119,7 @@ async function signInThroughUi(page: Page, email: string) {
   await page.getByRole('button', { name: 'Sign In' }).click()
 }
 
-test('loan payoff timeline view is saved per user and shown on every load without a swap', async ({ browser }) => {
+test('Amortization Schedule view is saved per user and shown on every load without a swap', async ({ browser }) => {
   const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:5173'
   const context = await browser.newContext({ baseURL })
   const otherContext = await browser.newContext({ baseURL })

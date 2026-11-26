@@ -28,7 +28,7 @@ export const GONE_MESSAGE = 'This mortgage was deleted elsewhere'
 export const SAVED_MESSAGE = 'Mortgage saved'
 
 type MortgagesPageProps = {
-  /** The signed-in user's id; keys the saved Loan Payoff Timeline view. */
+  /** The signed-in user's id; keys the saved Amortization Schedule view. */
   userId: string
 }
 

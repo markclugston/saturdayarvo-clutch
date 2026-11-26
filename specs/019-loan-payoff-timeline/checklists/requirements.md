@@ -1,4 +1,4 @@
-# Specification Quality Checklist: Loan Payoff Timeline Group
+# Specification Quality Checklist: Amortization Schedule Group
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-11-22

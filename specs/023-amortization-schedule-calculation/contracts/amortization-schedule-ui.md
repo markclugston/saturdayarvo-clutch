@@ -1,6 +1,6 @@
 # UI Contract: Amortization Schedule Calculation
 
-No API change. This contract covers the calculation module's interface and what the Loan Payoff Timeline shows.
+No API change. This contract covers the calculation module's interface and what the Amortization Schedule shows.
 
 ## Module `src/features/mortgages/scheduleCalculation.ts`
 

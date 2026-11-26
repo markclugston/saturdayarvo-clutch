@@ -1,4 +1,4 @@
-# Research: Loan Payoff Timeline Group
+# Research: Amortization Schedule Group
 
 No NEEDS CLARIFICATION items remained after the 2026-11-22 clarifications. Each entry records a
 design decision taken against the existing code. Settled behaviour (auth, ownership, error format,

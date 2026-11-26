@@ -1,4 +1,4 @@
-# Quickstart: Loan Payoff Timeline Validation
+# Quickstart: Amortization Schedule Validation
 
 ## Prerequisites
 
@@ -48,7 +48,7 @@ API integration (see [contract](./contracts/loan-payoff-timeline-preferences.md)
 - `view` missing, null, `"schedule"`, `"Table"`, `5`, `{}`; `clientId` missing, malformed or all zeros; `clientSequence` 0, negative, > 2^53 − 1, string or fractional; empty, malformed or > 1024-byte body → 400 with the contract title and detail, nothing saved, outcome `invalid` (FR-011).
 - Migration applies cleanly; `Down` drops the table.
 
-Unit: `PreferenceMetricsTests` records each loan payoff timeline outcome with duration.
+Unit: `PreferenceMetricsTests` records each Amortization Schedule outcome with duration.
 
 Frontend unit (Vitest):
 
@@ -66,7 +66,7 @@ Frontend unit (Vitest):
 
 Browser (Playwright):
 
-- Mocked API (`style-guide.spec.ts`): the old side-by-side layout test is replaced by a full-width single-group test (FR-001); one "Loan Payoff Timeline" group, never both views (SC-001); switch button same size as the trash button, at the group's top right and aligned with the title at 320 px and 1280 px (FR-003); axe passes and screenshots in light and dark for both views and for the tooltip; at 320 px no page-level horizontal scroll and the button stays visible; preference delayed 5 s → group shows Burndown 2,000 to 2,250 ms after the mocked route receives the request (SC-006).
+- Mocked API (`style-guide.spec.ts`): the old side-by-side layout test is replaced by a full-width single-group test (FR-001); one "Amortization Schedule" group, never both views (SC-001); switch button same size as the trash button, at the group's top right and aligned with the title at 320 px and 1280 px (FR-003); axe passes and screenshots in light and dark for both views and for the tooltip; at 320 px no page-level horizontal scroll and the button stays visible; preference delayed 5 s → group shows Burndown 2,000 to 2,250 ms after the mocked route receives the request (SC-006).
 - Real API (`mortgages.spec.ts`, integration config): switch to Schedule, reload → Schedule; sign out and in → Schedule; sign out and sign in as a second user in the same tab → Burndown; sign back in as the first user → Schedule; switch back, reload → Burndown; three rapid switches then an immediate reload → the last view; navigate away and back → the view last chosen (US2-1, US2-2, US2-4, US2-6, SC-003, SC-004, SC-007).
 
 Reviews (final phase): independent EF query + migration review, independent OWASP Top 10 and
@@ -95,7 +95,7 @@ Notes:
   The browser test asserts 1,950 to 2,250 ms after the route received the request and passed 6 of 6
   repeats. A failed view save shows no toast (FR-010, amended 2026-11-22).
 - Screenshots (`STYLE_SCREENSHOTS=1`) are opt-in. New baselines were added for every mortgage
-  state, including the four Loan Payoff Timeline states. Baselines for screens this feature does
+  state, including the four Amortization Schedule states. Baselines for screens this feature does
   not touch (for example `sign-in`) already differ by about 3% from the committed images; they were
   left unchanged.
 - The tooltip's "stays while the pointer is over it" behaviour needs real layout, so it is

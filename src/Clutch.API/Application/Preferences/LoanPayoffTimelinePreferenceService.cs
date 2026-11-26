@@ -79,7 +79,7 @@ public sealed class LoanPayoffTimelinePreferenceService(
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            logger.LogError(exception, "Saving the loan payoff timeline preference failed.");
+            logger.LogError(exception, "Saving the Amortization Schedule preference failed.");
             throw;
         }
         finally

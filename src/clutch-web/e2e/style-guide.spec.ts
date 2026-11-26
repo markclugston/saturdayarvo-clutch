@@ -118,7 +118,7 @@ type Mock = {
   failWrites: boolean
   ended: boolean
   mortgages: MortgagesMode
-  /** The saved Loan Payoff Timeline view, or 'delay' to answer only after 5 s. */
+  /** The saved Amortization Schedule view, or 'delay' to answer only after 5 s. */
   loanPayoffTimeline: 'Burndown' | 'Schedule' | 'delay'
   /** Link the first mortgage to an account whose balances (some blank, the last below $0) are plotted (024). */
   actualBalances: boolean
@@ -303,7 +303,7 @@ async function fillNewMortgage(page: Page) {
 
 const rateDialog = (page: Page) => page.getByRole('dialog', { name: 'Interest Rates' })
 
-const timelineGroup = (page: Page) => page.getByRole('region', { name: 'Loan Payoff Timeline' })
+const timelineGroup = (page: Page) => page.getByRole('region', { name: 'Amortization Schedule' })
 
 const timelineTooltip = (page: Page) => page.locator('[data-slot="tooltip-popup"]')
 
@@ -1435,7 +1435,7 @@ test.describe('Mortgages layout and motion', () => {
     })
   }
 
-  test('one Loan Payoff Timeline group spans the content width with its switch top right at 320 px and 1280 px (019 FR-001, FR-003, SC-001)', async ({ page }) => {
+  test('one Amortization Schedule group spans the content width with its switch top right at 320 px and 1280 px (019 FR-001, FR-003, SC-001)', async ({ page }) => {
     await mockApi(page, { theme: 'Light' })
     for (const width of [320, 1280]) {
       // Taller than before: the locked Disbursal Date shows a hint (021), which lengthens Details.
@@ -1460,7 +1460,7 @@ test.describe('Mortgages layout and motion', () => {
         await expect(button).toBeInViewport()
         const buttonBox = (await button.boundingBox())!
         const trashBox = (await page.getByRole('button', { name: /^Delete / }).boundingBox())!
-        const titleBox = (await group.getByRole('heading', { name: 'Loan Payoff Timeline' }).boundingBox())!
+        const titleBox = (await group.getByRole('heading', { name: 'Amortization Schedule' }).boundingBox())!
         expect(buttonBox.width).toBeCloseTo(trashBox.width, 0)
         expect(buttonBox.height).toBeCloseTo(trashBox.height, 0)
         expect(groupBox.x + groupBox.width - (buttonBox.x + buttonBox.width)).toBeLessThanOrEqual(24)

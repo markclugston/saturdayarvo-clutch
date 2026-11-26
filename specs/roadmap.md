@@ -19,3 +19,4 @@
 [] need to have resiliance in the front end if the server is not available
 [] need to have resiliance on the server if the database is not available
 [x] run converge over the entire workspace to enforce compliance.
+[] remove name from mortgage and just require linking to an account.  use the account name as the name of the mortgage.

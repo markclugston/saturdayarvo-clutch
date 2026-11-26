@@ -17,7 +17,7 @@ public sealed class LoanPayoffTimelinePreferenceTests(SqlServerFixture fixture)
 {
     private const string Path = "/api/preferences/loan-payoff-timeline";
     private const string PrecedingMigration = "20261121084453_RenameMortgageDetailFields";
-    private const string InvalidTitle = "The loan payoff timeline view is invalid.";
+    private const string InvalidTitle = "The Amortization Schedule view is invalid.";
     private const string InvalidDetail = "Choose Burndown or Schedule.";
     private const string ValidClientId = "3f2b8c1e-5d7a-4c2e-9b1f-0a6d4e8c7b21";
 
@@ -407,7 +407,7 @@ public sealed class LoanPayoffTimelinePreferenceTests(SqlServerFixture fixture)
         return csrfToken.RequestToken;
     }
 
-    /// <summary>Collects loan payoff timeline save outcomes recorded while it is alive.</summary>
+    /// <summary>Collects Amortization Schedule save outcomes recorded while it is alive.</summary>
     private sealed class OutcomeRecorder : IDisposable
     {
         private readonly MeterListener _listener = new();

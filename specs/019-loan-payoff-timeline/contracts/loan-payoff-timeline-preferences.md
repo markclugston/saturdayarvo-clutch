@@ -1,4 +1,4 @@
-# Contract: Loan Payoff Timeline Preference API
+# Contract: Amortization Schedule Preference API
 
 Base path: `/api/preferences/loan-payoff-timeline`. Both operations require an authenticated
 session cookie (`RequireAuthorization`). The user is taken from the principal; no user ID is
@@ -28,7 +28,7 @@ Request (JSON, at most 1024 bytes):
 | Status | Body | When |
 |---|---|---|
 | 200 | `{ "view": "Burndown" \| "Schedule" }` (the stored value; may differ from the request when superseded) | Valid request |
-| 400 | ProblemDetails, title `The loan payoff timeline view is invalid.`, detail `Choose Burndown or Schedule.` | Missing, null, wrong-case or other `view`; missing or invalid `clientId`/`clientSequence`; non-JSON or oversized body |
+| 400 | ProblemDetails, title `The Amortization Schedule view is invalid.`, detail `Choose Burndown or Schedule.` | Missing, null, wrong-case or other `view`; missing or invalid `clientId`/`clientSequence`; non-JSON or oversized body |
 | 400/403 | ProblemDetails | Missing or invalid antiforgery token (existing behaviour) |
 | 401 | ProblemDetails | No session |
 
@@ -53,7 +53,7 @@ LoanPayoffTimelinePreferenceSchema = z.object({ view: LoanPayoffTimelineViewSche
 
 | Element | Contract |
 |---|---|
-| Group | `section` card, `aria-labelledby` the `h2` "Loan Payoff Timeline"; full content width below Details |
+| Group | `section` card, `aria-labelledby` the `h2` "Amortization Schedule"; full content width below Details |
 | Switch button | `Button variant="icon" size="icon"`, top right beside the title; `RefreshCw` icon `aria-hidden`; `aria-label` "Show Amortization Schedule" when Burndown is shown, "Show Burndown Chart" when Schedule is shown; no `aria-pressed` |
 | Tooltip | Same text as `aria-label`; on hover and focus; Escape dismisses; hoverable |
 | Status | Visually hidden `role="status"`: "Showing Burndown Chart" / "Showing Amortization Schedule" |

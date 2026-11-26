@@ -55,7 +55,7 @@ export function LoanPayoffTimeline({
   return (
     <section aria-labelledby="loan-payoff-timeline-heading" className="flex min-w-0 flex-1 flex-col rounded-card bg-card p-4 xl:p-5">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold" id="loan-payoff-timeline-heading">Loan Payoff Timeline</h2>
+        <h2 className="text-base font-semibold" id="loan-payoff-timeline-heading">Amortization Schedule</h2>
         <Tooltip content={label}>
           <Button aria-label={label} onClick={onSwitch} size="icon" type="button" variant="icon">
             <RefreshCw aria-hidden="true" className="size-4" />

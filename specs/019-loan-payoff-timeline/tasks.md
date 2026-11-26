@@ -1,9 +1,9 @@
 ---
 
-description: "Task list for 019 Loan Payoff Timeline Group"
+description: "Task list for 019 Amortization Schedule Group"
 ---
 
-# Tasks: Loan Payoff Timeline Group
+# Tasks: Amortization Schedule Group
 
 **Input**: `specs/019-loan-payoff-timeline/` (plan.md, spec.md, research.md, data-model.md, contracts/loan-payoff-timeline-preferences.md, quickstart.md)
 
@@ -36,16 +36,16 @@ None. No new packages or config (lucide-react `RefreshCw` already available).
 
 ## Phase 3: User Story 1 - One group, switchable view (Priority: P1) 🎯 MVP
 
-**Goal**: One full-width "Loan Payoff Timeline" card shows Burndown or Schedule, switched by a top-right icon button. | **Independent Test**: Open Mortgages → one group shows the chart; switch → schedule; switch → chart.
+**Goal**: One full-width "Amortization Schedule" card shows Burndown or Schedule, switched by a top-right icon button. | **Independent Test**: Open Mortgages → one group shows the chart; switch → schedule; switch → chart.
 
 View state here is page-local (`useState`, default `Burndown`) in `MortgagesPage`; US2 replaces it with the persisted preference.
 
 ### Tests (write first, confirm failing)
 
 - [X] T006 [P] [US1] Tooltip primitive tests: shows on hover and keyboard focus, stays while pointer is over the tooltip, hides on Escape, blur and pointer leave; `aria-hidden` when text equals the trigger's accessible name, `aria-describedby` otherwise, in `src/clutch-web/src/components/ui/tooltip.test.tsx`
-- [X] T007 [P] [US1] Group tests: `section` labelled by `h2` "Loan Payoff Timeline"; exactly one of chart/schedule rendered; button `aria-label` "Show Amortization Schedule"/"Show Burndown Chart", same tooltip text, no `aria-pressed`, `RefreshCw` `aria-hidden`; hidden `role="status"` "Showing Burndown Chart"/"Showing Amortization Schedule"; keyboard Enter/Space calls `onSwitch` (FR-003, FR-004) in `src/clutch-web/src/features/mortgages/LoanPayoffTimeline.test.tsx`
+- [X] T007 [P] [US1] Group tests: `section` labelled by `h2` "Amortization Schedule"; exactly one of chart/schedule rendered; button `aria-label` "Show Amortization Schedule"/"Show Burndown Chart", same tooltip text, no `aria-pressed`, `RefreshCw` `aria-hidden`; hidden `role="status"` "Showing Burndown Chart"/"Showing Amortization Schedule"; keyboard Enter/Space calls `onSwitch` (FR-003, FR-004) in `src/clutch-web/src/features/mortgages/LoanPayoffTimeline.test.tsx`
 - [X] T008 [P] [US1] Update chart and schedule tests: no own card `section` or `h2` ("Mortgage Burndown"/"Amortization Schedule"); content, series, columns and messages unchanged (FR-002) in `src/clutch-web/src/features/mortgages/BurnDownChart.test.tsx` and `AmortizationSchedule.test.tsx`
-- [X] T009 [US1] Page tests: one "Loan Payoff Timeline" group below Details, never both views (SC-001); default Burndown; switch changes view synchronously (FR-012) and the hidden `role="status"` text changes to the new view after each switch (FR-004); view kept across mortgage tabs and "Add mortgage" (US1-5); unsaved mortgage shows "Please enter your mortgage details" in both views and switch still works (US1-6) in `src/clutch-web/src/features/mortgages/MortgagesPage.test.tsx`
+- [X] T009 [US1] Page tests: one "Amortization Schedule" group below Details, never both views (SC-001); default Burndown; switch changes view synchronously (FR-012) and the hidden `role="status"` text changes to the new view after each switch (FR-004); view kept across mortgage tabs and "Add mortgage" (US1-5); unsaved mortgage shows "Please enter your mortgage details" in both views and switch still works (US1-6) in `src/clutch-web/src/features/mortgages/MortgagesPage.test.tsx`
 
 ### Implementation
 
@@ -66,8 +66,8 @@ View state here is page-local (`useState`, default `Burndown`) in `MortgagesPage
 
 - [X] T014 [P] [US2] Integration tests (SQL Server fixture): no row → `Burndown`; PUT `Schedule` then GET from a second client of the same user → `Schedule`; GET and PUT without a session → 401; PUT without a valid antiforgery token → existing 400/403 and nothing saved (SEC-001); user B never reads user A's view; user delete cascades the row; migration applies and `Down` drops the table, in `tests/Clutch.API.Tests/Integration/Preferences/LoanPayoffTimelinePreferenceTests.cs`
 - [X] T015 [US2] Integration tests, same file: same `clientId` seq 2 then seq 1 → stored stays seq 2's view, 200 returns stored view, outcome `superseded`; many parallel PUTs one `clientId` increasing seq → highest seq wins; different `clientId`s → last committed wins (FR-006, FR-008, SC-007)
-- [X] T016 [US2] Integration tests, same file: `view` missing/null/`"schedule"`/`"Table"`/`5`/`{}`; `clientId` missing, malformed or all zeros; `clientSequence` 0, negative, > 2^53 − 1, string, fractional; empty, malformed and > 1024-byte body → 400 with title `The loan payoff timeline view is invalid.`, detail `Choose Burndown or Schedule.`, nothing saved, outcome `invalid` (FR-011)
-- [X] T017 [P] [US2] Unit tests: loan payoff timeline counter `clutch.preference.loan_payoff_timeline.save.outcomes` records `success`/`superseded`/`invalid`/`failure` with duration histogram in `tests/Clutch.API.Tests/Unit/Preferences/PreferenceMetricsTests.cs`
+- [X] T016 [US2] Integration tests, same file: `view` missing/null/`"schedule"`/`"Table"`/`5`/`{}`; `clientId` missing, malformed or all zeros; `clientSequence` 0, negative, > 2^53 − 1, string, fractional; empty, malformed and > 1024-byte body → 400 with title `The Amortization Schedule view is invalid.`, detail `Choose Burndown or Schedule.`, nothing saved, outcome `invalid` (FR-011)
+- [X] T017 [P] [US2] Unit tests: Amortization Schedule counter `clutch.preference.loan_payoff_timeline.save.outcomes` records `success`/`superseded`/`invalid`/`failure` with duration histogram in `tests/Clutch.API.Tests/Unit/Preferences/PreferenceMetricsTests.cs`
 - [X] T018 [P] [US2] Client API tests: GET/PUT path and schema parse; query key `['loanPayoffTimelinePreference', userId]` disabled (no request, no timer) until `userId`; 2000 ms abort; `retry: false`; `staleTime: Infinity` and no refetch on window focus, reconnect or remount, so another device's save is never pulled into an open visit (FR-008, US2-5); after a GET error or 2000 ms timeout, unmounting and remounting the query hook sends no second GET and the view stays `Burndown` for the visit (FR-005, edge case "Loading the saved view fails"); save mutation has no `scope`, so three rapid saves start three PUTs at once with the same `clientId` and `clientSequence` 1, 2, 3; every PUT is sent with `keepalive: true`; unmounting and remounting the save hook (leave Mortgages and return) keeps the same `clientId` and the next save continues the sequence (4, not 1) in `src/clutch-web/src/features/preferences/api.test.ts`
 - [X] T019 [US2] Page tests: `Loading...` while preference pending; saved `Schedule` → first render shows schedule, never the chart (FR-007, US2-3); error or no response in 2 s (fake timers) → Burndown and late response ignored (FR-005, SC-006); remounting the page with `Schedule` already cached renders the schedule on first render with no `Loading...` and no chart (SC-003 navigation back within a visit); switch writes cache synchronously then PUTs; an older save response arriving last does not change the view; save failure → toast, view kept (FR-010); a PUT that never resolves still switches at once (FR-012) in `src/clutch-web/src/features/mortgages/MortgagesPage.test.tsx`
 
@@ -90,7 +90,7 @@ View state here is page-local (`useState`, default `Burndown`) in `MortgagesPage
 
 ## Phase 5: Completion Gates
 
-- [X] T030 Browser tests (mocked) in `src/clutch-web/e2e/style-guide.spec.ts`: replace the 016 test "Burndown sits above the schedule at 320 px and to its left on desktop (FR-011)" (it locates the removed "Mortgage Burndown"/"Amortization Schedule" headings) with one asserting the single "Loan Payoff Timeline" group spans the content width at 320 px and 1280 px (FR-001); one group, never both views (SC-001); switch button same size as the trash button, at the group's top right and vertically aligned with the `h2` at 320 px and 1280 px (FR-003); axe WCAG 2.2 AA and screenshots for both views in light and dark; tooltip shown (hover and keyboard focus) with axe WCAG 2.2 AA and a screenshot in light and dark; 320 px no page-level horizontal scroll, button visible; preference delayed 5 s → group shows Burndown no more than 2,000 ms after the preference request starts, timed from the mocked route receiving it (SC-006) (WEB-001); update snapshots in `style-guide.spec.ts-snapshots/`
+- [X] T030 Browser tests (mocked) in `src/clutch-web/e2e/style-guide.spec.ts`: replace the 016 test "Burndown sits above the schedule at 320 px and to its left on desktop (FR-011)" (it locates the removed "Mortgage Burndown"/"Amortization Schedule" headings) with one asserting the single "Amortization Schedule" group spans the content width at 320 px and 1280 px (FR-001); one group, never both views (SC-001); switch button same size as the trash button, at the group's top right and vertically aligned with the `h2` at 320 px and 1280 px (FR-003); axe WCAG 2.2 AA and screenshots for both views in light and dark; tooltip shown (hover and keyboard focus) with axe WCAG 2.2 AA and a screenshot in light and dark; 320 px no page-level horizontal scroll, button visible; preference delayed 5 s → group shows Burndown no more than 2,000 ms after the preference request starts, timed from the mocked route receiving it (SC-006) (WEB-001); update snapshots in `style-guide.spec.ts-snapshots/`
 - [X] T031 Independent query review of `LoanPayoffTimelinePreferenceService` read and sequenced upsert (DOT-002, `clutch-data-access`)
 - [X] T032 Migration review of `AddLoanPayoffTimelinePreferences` with drop-table rollback, no backfill (OPS-001, `clutch-data-access`)
 - [X] T033 Independent OWASP Top 10 + dependency vulnerability review of the full diff, including the new tooltip primitive, and confirm the save-failure log and 400 ProblemDetails carry no request body (SEC-001, OPS-001; also confirms the plan's SEC-003 N/A rationale, `clutch-security-review`)
@@ -101,7 +101,7 @@ View state here is page-local (`useState`, default `Burndown`) in `MortgagesPage
 
 ## Phase 6: Convergence
 
-- [X] T038 Keep the loaded or switched Loan Payoff Timeline view for the whole visit: set `gcTime: Infinity` on `useLoanPayoffTimelinePreference` in `src/clutch-web/src/features/preferences/api.ts` (the app `QueryClient` keeps the 5-minute default, so leaving Mortgages for over 5 minutes drops the unobserved entry and returning re-shows `Loading...`, re-requests the saved view, can pull in another device's save, and after a failed save shows the old saved view instead of the one last chosen), and add tests in `src/clutch-web/src/features/preferences/api.test.ts` that advance fake timers past 5 minutes between unmount and remount for the loaded, errored and switched-then-save-failed cases and assert no second GET and the same view per FR-008, FR-010, SC-003 and edge case "Loading the saved view fails" (partial)
+- [X] T038 Keep the loaded or switched Amortization Schedule view for the whole visit: set `gcTime: Infinity` on `useLoanPayoffTimelinePreference` in `src/clutch-web/src/features/preferences/api.ts` (the app `QueryClient` keeps the 5-minute default, so leaving Mortgages for over 5 minutes drops the unobserved entry and returning re-shows `Loading...`, re-requests the saved view, can pull in another device's save, and after a failed save shows the old saved view instead of the one last chosen), and add tests in `src/clutch-web/src/features/preferences/api.test.ts` that advance fake timers past 5 minutes between unmount and remount for the loaded, errored and switched-then-save-failed cases and assert no second GET and the same view per FR-008, FR-010, SC-003 and edge case "Loading the saved view fails" (partial)
 
 ---
 

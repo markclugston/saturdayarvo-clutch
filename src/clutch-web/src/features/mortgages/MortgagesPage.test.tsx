@@ -43,7 +43,7 @@ function setupUser() {
 
 const PLEASE_ENTER = 'Please enter your mortgage details'
 
-const timeline = () => screen.getByRole('region', { name: 'Loan Payoff Timeline' })
+const timeline = () => screen.getByRole('region', { name: 'Amortization Schedule' })
 // The timeline's own view announcer, not the chart's hover announcer inside "Burndown Values".
 const timelineStatus = () => {
   const [status] = within(timeline()).getAllByRole('status').filter((element) => !element.closest('[aria-label="Burndown Values"]'))
@@ -110,24 +110,24 @@ describe('MortgagesPage', () => {
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     })
 
-    it('lays out the tab strip, Details, then one Loan Payoff Timeline group showing only the chart', async () => {
+    it('lays out the tab strip, Details, then one Amortization Schedule group showing only the chart', async () => {
       server = installFakeApi([makeMortgage({ name: 'Home' })])
       renderWithProviders(<MortgagesPage userId="user-1" />)
 
       const strip = await screen.findByRole('navigation', { name: 'Mortgages' })
       const details = screen.getByRole('heading', { name: 'Details' })
-      const timeline = screen.getByRole('region', { name: 'Loan Payoff Timeline' })
+      const timeline = screen.getByRole('region', { name: 'Amortization Schedule' })
       const follows = (a: Node, b: Node) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
       expect(follows(strip, details)).toBe(true)
       expect(follows(details, timeline)).toBe(true)
-      expect(screen.getAllByRole('region', { name: 'Loan Payoff Timeline' })).toHaveLength(1)
+      expect(screen.getAllByRole('region', { name: 'Amortization Schedule' })).toHaveLength(1)
       expect(screen.queryByRole('heading', { name: 'Mortgage Burndown' })).not.toBeInTheDocument()
       expect(screen.queryByRole('heading', { name: 'Amortization Schedule' })).not.toBeInTheDocument()
       expectOnlyChart()
     })
   })
 
-  describe('loan payoff timeline view', () => {
+  describe('Amortization Schedule view', () => {
     it('switches between the chart and the schedule within 500 ms, never showing both, and announces each view', async () => {
       server = installFakeApi([makeMortgage({ name: 'Home' })])
       const user = setupUser()
@@ -174,7 +174,7 @@ describe('MortgagesPage', () => {
     })
   })
 
-  describe('saved loan payoff timeline view', () => {
+  describe('saved Amortization Schedule view', () => {
     afterEach(() => {
       vi.useRealTimers()
     })
@@ -205,11 +205,11 @@ describe('MortgagesPage', () => {
       expect(server.preferenceRequests).toHaveLength(1)
       await new Promise((resolve) => setTimeout(resolve, 20))
       expect(screen.getByRole('status')).toHaveTextContent('Loading...')
-      expect(screen.queryByRole('region', { name: 'Loan Payoff Timeline' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('region', { name: 'Amortization Schedule' })).not.toBeInTheDocument()
 
       await act(async () => release())
 
-      await screen.findByRole('region', { name: 'Loan Payoff Timeline' })
+      await screen.findByRole('region', { name: 'Amortization Schedule' })
       expectOnlySchedule()
       watcher.stop()
       expect(watcher.seen.chart).toBe(false)
@@ -220,7 +220,7 @@ describe('MortgagesPage', () => {
       server.failPreference('GET', new Error('boom'))
       renderWithProviders(<MortgagesPage userId="user-1" />)
 
-      await screen.findByRole('region', { name: 'Loan Payoff Timeline' })
+      await screen.findByRole('region', { name: 'Amortization Schedule' })
       expectOnlyChart()
     })
 
@@ -232,10 +232,10 @@ describe('MortgagesPage', () => {
 
       await waitFor(() => expect(server.preferenceRequests).toHaveLength(1))
       await act(async () => { await vi.advanceTimersByTimeAsync(1900) })
-      expect(screen.queryByRole('region', { name: 'Loan Payoff Timeline' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('region', { name: 'Amortization Schedule' })).not.toBeInTheDocument()
       await act(async () => { await vi.advanceTimersByTimeAsync(150) })
 
-      expect(await screen.findByRole('region', { name: 'Loan Payoff Timeline' })).toBeInTheDocument()
+      expect(await screen.findByRole('region', { name: 'Amortization Schedule' })).toBeInTheDocument()
       expectOnlyChart()
       expect(server.preferenceRequests[0]?.signal?.aborted).toBe(true)
 
@@ -251,11 +251,11 @@ describe('MortgagesPage', () => {
       await user.click(screen.getByRole('button', { name: 'Show Amortization Schedule' }))
 
       await user.click(screen.getByRole('button', { name: 'Toggle Page' }))
-      expect(screen.queryByRole('region', { name: 'Loan Payoff Timeline' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('region', { name: 'Amortization Schedule' })).not.toBeInTheDocument()
       const watcher = watchForChart()
       await user.click(screen.getByRole('button', { name: 'Toggle Page' }))
 
-      await screen.findByRole('region', { name: 'Loan Payoff Timeline' })
+      await screen.findByRole('region', { name: 'Amortization Schedule' })
       expectOnlySchedule()
       watcher.stop()
       expect(watcher.seen.chart).toBe(false)

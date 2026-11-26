@@ -53,9 +53,9 @@ export type FakeServer = {
   requests: Array<{ method: string; path: string; body?: unknown }>
   /** Hold the next response of a method until released. */
   hold: (method: string) => () => void
-  /** The stored Loan Payoff Timeline view. */
+  /** The stored Amortization Schedule view. */
   view: LoanPayoffTimelineView
-  /** Loan payoff timeline preference requests, kept apart from the mortgage requests. */
+  /** Amortization Schedule preference requests, kept apart from the mortgage requests. */
   preferenceRequests: Array<{ method: string; body?: unknown; signal?: AbortSignal | null }>
   /** Hold the next preference response of a method until released (or aborted). */
   holdPreference: (method: string) => () => void

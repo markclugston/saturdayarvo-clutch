@@ -1,4 +1,4 @@
-# Data Model: Loan Payoff Timeline Group
+# Data Model: Amortization Schedule Group
 
 ## LoanPayoffTimelineView (domain enum, `Domain/Preferences/LoanPayoffTimelineView.cs`)
 

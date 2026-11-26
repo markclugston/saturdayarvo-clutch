@@ -138,7 +138,7 @@ describe('navigation preference API', () => {
   })
 })
 
-describe('loan payoff timeline preference API', () => {
+describe('Amortization Schedule preference API', () => {
   const PATH = '/api/preferences/loan-payoff-timeline'
 
   type SavedBody = { view: string; clientId: string; clientSequence: number }

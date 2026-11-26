@@ -10,12 +10,12 @@ vi.mock('@/lib/api/client', async (importOriginal) => ({
 }))
 
 describe('LoanPayoffTimeline', () => {
-  it('is a section labelled by its Loan Payoff Timeline heading', () => {
+  it('is a section labelled by its Amortization Schedule heading', () => {
     render(<LoanPayoffTimeline duration={12} onSwitch={vi.fn()} saved view="Burndown" />)
 
-    const group = screen.getByRole('region', { name: 'Loan Payoff Timeline' })
+    const group = screen.getByRole('region', { name: 'Amortization Schedule' })
     expect(group.tagName).toBe('SECTION')
-    expect(screen.getByRole('heading', { level: 2, name: 'Loan Payoff Timeline' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'Amortization Schedule' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Mortgage Burndown' })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Amortization Schedule' })).not.toBeInTheDocument()
   })

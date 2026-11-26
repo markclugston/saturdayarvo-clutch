@@ -1,11 +1,11 @@
-# Implementation Plan: Loan Payoff Timeline Group
+# Implementation Plan: Amortization Schedule Group
 
 **Branch**: `019-loan-payoff-timeline` | **Date**: 2026-11-22 | **Spec**: [spec.md](./spec.md)
 
 ## Summary
 
 Replace the side-by-side Mortgage Burndown and Amortization Schedule cards with one full-width
-"Loan Payoff Timeline" card that shows one view at a time, switched by an icon button at its top
+"Amortization Schedule" card that shows one view at a time, switched by an icon button at its top
 right. The chosen view is a per-user preference stored like the 018 navigation preference
 (user-keyed row, authenticated `GET`/`PUT`), loaded in parallel with the mortgages (2 s cap,
 Burndown fallback) so the group never renders the wrong view first. Every switch saves at once;
@@ -20,7 +20,7 @@ Do not restate them.
 
 - Schema: new table `UserLoanPayoffTimelinePreferences` + migration ([data-model.md](./data-model.md)).
 - Endpoints: `GET`/`PUT /api/preferences/loan-payoff-timeline` ([contract](./contracts/loan-payoff-timeline-preferences.md)).
-- Metrics: loan payoff timeline save outcome counter + duration histogram on the existing
+- Metrics: Amortization Schedule save outcome counter + duration histogram on the existing
   `Clutch.API.Preferences` meter.
 - clutch-web: new `LoanPayoffTimeline` group, new `Tooltip` primitive (first tooltip in the app),
   preference query/save hooks, `MortgagesPage` layout and loading. No new packages.
@@ -53,7 +53,7 @@ module-level page-load state; a late preference never applies; no localStorage.
 | SEC-002 | No | No configuration, secrets or integrations touched. | — | N/A |
 | SEC-003 | No | A view choice is not personal, payment or financial data; logs omit bodies; ProblemDetails reveal nothing sensitive. Mortgage data handling is unchanged. | — | N/A |
 | WEB-001 | Yes | TypeScript; React Query + Zod; existing `Button` icon variant; new token-only `Tooltip` primitive (hover + focus, Escape, hoverable: WCAG 2.2 SC 1.4.13); Title Case title and labels; hidden live status; axe in both themes. | Frontend gates (typecheck, lint, test, build, e2e), UI compliance checklist | PASS (lint, typecheck, build, unit, browser; checklist below, T034) |
-| Perf & Observability | Yes | Switch updates the cache before the save; 2 s preference cap; `PreferenceMetrics` loan payoff timeline counter + histogram on the registered meter. | Switch within 500 ms tests; SC-006 browser test (2,000 ms wait, chart within 250 ms after); metrics unit test | PASS |
+| Perf & Observability | Yes | Switch updates the cache before the save; 2 s preference cap; `PreferenceMetrics` Amortization Schedule counter + histogram on the registered meter. | Switch within 500 ms tests; SC-006 browser test (2,000 ms wait, chart within 250 ms after); metrics unit test | PASS |
 
 **Applicable style guide sections**:
 
@@ -110,7 +110,7 @@ specs/019-loan-payoff-timeline/
 src/Clutch.API/
 ├── Domain/Preferences/LoanPayoffTimelineView.cs                        # new (sibling: NavigationState)
 ├── Application/Preferences/LoanPayoffTimelinePreferenceService.cs      # new (sibling: NavigationPreferenceService)
-├── Application/Preferences/PreferenceMetrics.cs                        # add loan payoff timeline instruments
+├── Application/Preferences/PreferenceMetrics.cs                        # add Amortization Schedule instruments
 ├── Api/Endpoints/LoanPayoffTimelinePreferenceEndpoints.cs              # new (sibling: NavigationPreferenceEndpoints)
 ├── Infrastructure/Persistence/Entities/UserLoanPayoffTimelinePreference.cs  # new
 ├── Infrastructure/Persistence/AppDbContext.cs                          # DbSet + mapping

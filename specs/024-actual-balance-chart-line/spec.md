@@ -10,7 +10,7 @@
 
 <!--
   Builds on 016-mortgage-tracking (Mortgage Burndown chart, FR-013, FR-014, FR-018), 019-loan-payoff-timeline
-  (chart inside the Loan Payoff Timeline group), 020-mortgage-account-balance-column (the Actual Balance
+  (chart inside the Amortization Schedule group), 020-mortgage-account-balance-column (the Actual Balance
   column, its per-period values and blank rules) and 023-amortization-schedule-calculation (the Bank Schedule
   line, FR-008, SC-005). This feature lifts 016 FR-018's single-series limit and 023's assumption that the
   Actual Balance is not plotted. The Actual Balance values themselves are unchanged.
@@ -29,7 +29,7 @@
 
 ### User Story 1 - See the actual balance against the bank schedule (Priority: P1)
 
-As a signed-in user with a Mortgage Account linked, when the Loan Payoff Timeline shows the Mortgage Burndown, I see a dashed "Actual Balance" line in a different colour beside the Bank Schedule line, so I can see at a glance whether I am ahead of or behind the bank's schedule.
+As a signed-in user with a Mortgage Account linked, when the Amortization Schedule shows the Mortgage Burndown, I see a dashed "Actual Balance" line in a different colour beside the Bank Schedule line, so I can see at a glance whether I am ahead of or behind the bank's schedule.
 
 **Why this priority**: This is the whole feature: the chart view of the comparison the Actual Balance column already gives.
 

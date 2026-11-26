@@ -50,7 +50,7 @@ public static class LoanPayoffTimelinePreferenceEndpoints
             {
                 PreferenceMetrics.RecordLoanPayoffTimelineSave("invalid", started);
                 return Results.Problem(
-                    title: "The loan payoff timeline view is invalid.",
+                    title: "The Amortization Schedule view is invalid.",
                     detail: "Choose Burndown or Schedule.",
                     statusCode: StatusCodes.Status400BadRequest);
             }

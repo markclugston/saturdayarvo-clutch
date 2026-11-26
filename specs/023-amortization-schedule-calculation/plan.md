@@ -8,7 +8,7 @@ A pure TypeScript function in clutch-web turns the Details form's calculation in
 principal and interest schedule: integer-cent balances, level repayments recalculated whenever a period starts
 wholly at a new rate, interest blended by days within a period that contains a rate change, and the last
 repayment adjusted to close at $0.00 (research R1–R4). The form reports its calculation inputs (or "invalid")
-to the page; the Loan Payoff Timeline memoises the schedule once and feeds both the Bank Schedule column and a
+to the page; the Amortization Schedule memoises the schedule once and feeds both the Bank Schedule column and a
 drawn Burndown "Bank Schedule" line (R5–R7). No server, endpoint, schema or package change.
 
 ## Technical Context

@@ -11,7 +11,7 @@
 <!--
   Builds on 016-mortgage-tracking (schedule group; Bank Schedule cells show "Not yet calculated";
   Burndown chart "not yet calculated"; 016 FR-016 deferred all amortization values to this feature),
-  017/021 (interest rate changes, opening rate on the Disbursal Date), 019 (Loan Payoff Timeline
+  017/021 (interest rate changes, opening rate on the Disbursal Date), 019 (Amortization Schedule
   group), 020 (Actual Balance column) and 022 (Duration rows, period k dated Disbursal Date + k
   intervals). This feature fills the Bank Schedule column and the Burndown chart's Bank Schedule
   series with calculated principal and interest (P&I) balances. Period dates, the Actual Balance
@@ -68,7 +68,7 @@ As a signed-in user with several interest rate changes, I see the schedule switc
 
 ### User Story 3 - Burndown chart plots the bank schedule (Priority: P2)
 
-As a signed-in user, when I switch the Loan Payoff Timeline to the Mortgage Burndown, I see the Bank Schedule line falling from the Opening Balance to $0.00 over the repayment dates.
+As a signed-in user, when I switch the Amortization Schedule to the Mortgage Burndown, I see the Bank Schedule line falling from the Opening Balance to $0.00 over the repayment dates.
 
 **Why this priority**: The chart is the at-a-glance view of the same values; it depends on User Stories 1 and 2.
 
@@ -106,7 +106,7 @@ As a signed-in user, when I switch the Loan Payoff Timeline to the Mortgage Burn
 - **FR-006**: Period 1's repayment MUST be the level repayment over Duration periods from the Opening Balance at the rate in effect on the Disbursal Date, even when a rate change falls inside period 1. The repayment MUST be recalculated over the remaining periods, from the opening balance of the first period that accrues wholly at a new rate, at that rate; a period with a mid-period change keeps the repayment it started with, even if its interest then exceeds that repayment and its balance rises. The final repayment date is unchanged.
 - **FR-007**: Repayment and interest MUST be rounded to the cent (half away from zero); the last period's repayment MUST be adjusted so its closing balance is exactly $0.00. A repayment MUST NOT exceed its period's opening balance + interest, so no balance falls below $0.00; once a balance reaches $0.00 (possible only when a very small level repayment rounds up), later repayments and balances are $0.00.
 - **FR-008**: The Mortgage Burndown chart's single "Bank Schedule" series (016 FR-018) MUST plot the Opening Balance at the Disbursal Date and each period's Bank Schedule balance at its date, using the existing currency balance axis, date axis and legend, replacing its "not yet calculated" message when Details are valid; its text alternative MUST describe the plotted values (016 FR-014).
-- **FR-009**: Period, Date and Actual Balance columns, row count, the monthly fallback view, the Loan Payoff Timeline toggle, scrolling and layout MUST stay as specified in 016, 019, 020 and 022.
+- **FR-009**: Period, Date and Actual Balance columns, row count, the monthly fallback view, the Amortization Schedule toggle, scrolling and layout MUST stay as specified in 016, 019, 020 and 022.
 - **FR-010**: Calculated values MUST be read-only and not stored; they are recalculated whenever an input changes.
 - **FR-011**: The schedule MUST be calculated in the web app (clutch-web) only, from the Details shown on screen; no server calculation or new endpoint is added.
 
