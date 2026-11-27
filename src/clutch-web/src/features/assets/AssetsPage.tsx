@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { LoaderCircle, Plus, Trash2 } from 'lucide-react'
+import { Feather, LoaderCircle, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -111,20 +111,11 @@ function AssetTable({ list, currencies, onOpen }: AssetTableProps) {
           </thead>
           <tbody>
             {list.assets.map((asset) => (
-              // The name button is the keyboard route; its click reaches the row like any other.
-              <tr
-                className="hairline-b cursor-pointer transition-colors hover:bg-hover"
-                key={asset.id}
-                onClick={() => onOpen(asset.id)}
-              >
+              <tr className="hairline-b" key={asset.id}>
                 <td className="px-3 py-2">
-                  <button
-                    className="block min-h-10 max-w-56 cursor-pointer truncate rounded-control text-left font-medium text-primary focus-visible:focus-ring"
-                    title={asset.name}
-                    type="button"
-                  >
+                  <span className="block max-w-56 truncate font-medium" title={asset.name}>
                     {asset.name}
-                  </button>
+                  </span>
                 </td>
                 <td className="px-3 py-2">
                   {asset.description && (
@@ -144,13 +135,19 @@ function AssetTable({ list, currencies, onOpen }: AssetTableProps) {
                     {formatDisplayDate(asset.latestValuation.valuationDate)}
                   </span>
                 </td>
-                <td className="px-3 py-2 text-right">
+                <td className="whitespace-nowrap px-3 py-2 text-right">
+                  <Button
+                    aria-label={`Edit ${asset.name}`}
+                    onClick={() => onOpen(asset.id)}
+                    size="icon"
+                    type="button"
+                    variant="tertiary"
+                  >
+                    <Feather aria-hidden="true" className="size-4" />
+                  </Button>
                   <Button
                     aria-label={`Delete ${asset.name}`}
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      setPendingDelete({ id: asset.id, name: asset.name })
-                    }}
+                    onClick={() => setPendingDelete({ id: asset.id, name: asset.name })}
                     size="icon"
                     type="button"
                     variant="tertiary"

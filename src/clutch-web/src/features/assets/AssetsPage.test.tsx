@@ -26,7 +26,7 @@ describe('AssetsPage', () => {
 
   const render = () => renderAssets(<AssetsPage onAdd={onAdd} onOpen={onOpen} />)
   const table = () => screen.findByRole('table')
-  const rowOf = (name: string) => screen.getByRole('button', { name }).closest('tr')!
+  const rowOf = (name: string) => screen.getByTitle(name).closest('tr')!
 
   it('shows a loading state at once while the list loads', () => {
     vi.mocked(listAssets).mockReturnValue(new Promise(() => {}))
@@ -43,7 +43,7 @@ describe('AssetsPage', () => {
     await table()
 
     const rows = within(screen.getByRole('table')).getAllByRole('row')
-    expect(rows.slice(1, 4).map((row) => within(row).getAllByRole('button')[0]!.textContent))
+    expect(rows.slice(1, 4).map((row) => within(row).getAllByRole('cell')[0]!.textContent))
       .toEqual(['House', 'Bond', 'Shares'])
     expect(rowOf('House')).toHaveTextContent(money(12000, 'AUD'))
     expect(rowOf('House')).toHaveTextContent('1 Jan 2026')
@@ -123,17 +123,38 @@ describe('AssetsPage', () => {
     expect(await table()).toBeInTheDocument()
   })
 
-  it('opens an asset from its row or its name', async () => {
+  it('opens an asset from its quill button, by pointer or keyboard', async () => {
+    const user = userEvent.setup()
+    render()
+    await table()
+    const edit = screen.getByRole('button', { name: 'Edit House' })
+
+    await user.click(edit)
+    expect(onOpen).toHaveBeenLastCalledWith(assetId)
+
+    edit.focus()
+    await user.keyboard('{Enter}')
+    expect(onOpen).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not open an asset from its row or its name', async () => {
     const user = userEvent.setup()
     render()
     await table()
 
     await user.click(screen.getByText('Family home'))
-    expect(onOpen).toHaveBeenLastCalledWith(assetId)
+    await user.click(screen.getByText('House'))
 
-    screen.getByRole('button', { name: 'House' }).focus()
-    await user.keyboard('{Enter}')
-    expect(onOpen).toHaveBeenCalledTimes(2)
+    expect(onOpen).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'House' })).not.toBeInTheDocument()
+  })
+
+  it('puts the quill button before the delete button', async () => {
+    render()
+    await table()
+
+    expect(within(rowOf('House')).getAllByRole('button').map((button) => button.getAttribute('aria-label')))
+      .toEqual(['Edit House', 'Delete House'])
   })
 
   it('starts a new asset', async () => {

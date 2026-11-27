@@ -50,10 +50,12 @@ function expireActiveEdit(assetId: string) {
 }
 
 const nameField = (page: Page) => page.getByLabel('Name', { exact: true })
+const editButton = (page: Page, name: string) =>
+  page.getByRole('button', { name: `Edit ${name}`, exact: true })
 
 async function openAsset(page: Page, name: string) {
   await page.goto('/assets')
-  await page.getByRole('button', { name, exact: true }).click()
+  await editButton(page, name).click()
 }
 
 test('one session edits at a time, and the other can end it', async ({ browser, baseURL }) => {
@@ -88,12 +90,12 @@ test('one session edits at a time, and the other can end it', async ({ browser, 
 
     await expect(nameField(other)).toHaveValue(name, { timeout: 5000 })
     await ended.getByRole('button', { name: 'Return To Assets' }).click()
-    await expect(holder.getByRole('button', { name, exact: true })).toBeVisible()
+    await expect(editButton(holder, name)).toBeVisible()
 
     // The ended edit stored nothing, and the new holder's save is stored.
     await nameField(other).fill(`${name} saved`)
     await other.getByRole('button', { name: 'Save' }).click()
-    await expect(other.getByRole('button', { name: `${name} saved`, exact: true })).toBeVisible()
+    await expect(editButton(other, `${name} saved`)).toBeVisible()
 
     // A reload releases the edit as the page unloads, so the asset opens again.
     await openAsset(other, `${name} saved`)
@@ -135,7 +137,7 @@ test('an expired edit returns to the list with a message that stays', async ({ b
       .toContainText(`Your edit of ${name} expired.`, { timeout: 10_000 })
     await expect(page).toHaveURL(/\/assets$/)
     await expect(page.getByRole('dialog')).toHaveCount(0)
-    await expect(page.getByRole('button', { name, exact: true })).toBeVisible()
+    await expect(editButton(page, name)).toBeVisible()
 
     // Other toasts come and go above it.
     await page.getByRole('button', { name: 'Delete Spare' }).click()
@@ -149,7 +151,7 @@ test('an expired edit returns to the list with a message that stays', async ({ b
     await expect(persistent.getByRole('status')).toHaveCount(0)
 
     // The expired edit no longer blocks.
-    await page.getByRole('button', { name, exact: true }).click()
+    await editButton(page, name).click()
     await expect(nameField(page)).toHaveValue(name)
   } finally {
     await context.close()

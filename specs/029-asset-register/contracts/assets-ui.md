@@ -8,11 +8,11 @@
 ## Assets list (`AssetsPage`)
 
 - Heading "Assets"; "Add Asset" button.
-- Table columns: Name, Description (truncated, full text in `title`), Valuation (right aligned: amount via `formatCurrencyAmount(value.toFixed(minorUnits), currencyCode)`, then the date via `formatDisplayDate`, for example "1 Jan 2026"), and a trash icon button labelled "Delete {name}" that opens the delete dialog without opening the asset. `minorUnits` comes from `getCurrencies`.
+- Table columns: Name, Description (truncated, full text in `title`), Valuation (right aligned: amount via `formatCurrencyAmount(value.toFixed(minorUnits), currencyCode)`, then the date via `formatDisplayDate`, for example "1 Jan 2026"), and an actions column with a quill icon button labelled "Edit {name}" followed by a trash icon button labelled "Delete {name}" that opens the delete dialog without opening the asset. `minorUnits` comes from `getCurrencies`.
 - Rows are in created order. After them comes one total row per entry in `totals`, in the order returned (currency code), labelled "Total {code}" with `formatCurrencyAmount(totalValue, currencyCode)`, right aligned. Empty list: an empty-state message and no total row.
 - **List load failure** (GET `/api/assets` or `getCurrencies` fails with a network error or 5xx): the existing `ErrorMessage` with the error text and a "Retry" button that refetches, as `AccountsPage` does; no rows and no total row are shown. "Add Asset" stays available.
 - `formatDisplayDate` and `localToday` are imported from `features/mortgages/loanDraft.ts`, and `FormattedNumberField` from `features/mortgages/FormattedNumberField.tsx`, where they live today (`docs/code-map.md`); they are not moved.
-- Selecting a row (button or link semantics, keyboard reachable) opens `/assets/{id}`.
+- Only the quill button (keyboard reachable) opens `/assets/{id}`, as the Categories page uses it. Clicking the row or the name does nothing.
 - Delete dialog: "Delete Asset", text naming the asset, buttons "Delete" and "Cancel". On success: list refetch and toast "{name} was deleted.". On 409 `AssetEditActive`: explain that the asset is being edited in another session.
 
 ## Asset page (`AssetPage`)
