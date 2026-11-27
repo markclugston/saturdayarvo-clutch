@@ -227,7 +227,7 @@ function ScheduleTable({
         {balanceColumns?.loading && <p className="sr-only" role="status">Loading account balances</p>}
         <div
           aria-rowindex={1}
-          className={`sticky top-0 z-10 grid ${columns} bg-card font-semibold`}
+          className={`sticky top-0 z-10 grid ${columns} bg-raised font-semibold`}
           role="row"
           style={{ height: ROW_HEIGHT }}
         >
@@ -243,7 +243,7 @@ function ScheduleTable({
           {periods.map((period) => (
             <div
               aria-rowindex={period + 1}
-              className={`grid ${columns} odd:bg-raised`}
+              className={`grid ${columns} hairline-b`}
               key={period}
               role="row"
               style={{ height: ROW_HEIGHT }}

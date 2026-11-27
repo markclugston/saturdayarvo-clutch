@@ -1456,6 +1456,37 @@ for (const theme of ['Light', 'Dark'] as const) {
   })
 }
 
+test('account screens are left aligned: accounts capped, details and import full width', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 900 })
+  await mockApi(page)
+  await page.goto('/')
+
+  const expectLeftAligned = async (name: string, width: 'readable' | 'full') => {
+    const panel = page.getByRole('main')
+    const section = panel.getByRole('region', { name })
+    await expect(section).toBeVisible()
+    await settle(page)
+    const sectionBox = (await section.boundingBox())!
+    // The panel's inner edges: clientWidth leaves out any scrollbar.
+    const inner = await panel.evaluate((element) => {
+      const style = getComputedStyle(element)
+      const left = parseFloat(style.paddingLeft)
+      return {
+        x: element.getBoundingClientRect().x + left,
+        width: element.clientWidth - left - parseFloat(style.paddingRight),
+      }
+    })
+    expect(sectionBox.x).toBeCloseTo(inner.x, 0)
+    expect(sectionBox.width).toBeCloseTo(width === 'full' ? inner.width : 1024, 0)
+  }
+
+  await expectLeftAligned('Your Accounts', 'readable')
+  await openAccountDetails(page)
+  await expectLeftAligned('Account Details', 'full')
+  await page.getByRole('button', { name: 'Import Transactions' }).click()
+  await expectLeftAligned('Import Transactions', 'full')
+})
+
 // WEB-001 reflow (WCAG 2.2 SC 1.4.10): the logo and the header controls never cover each other.
 for (const theme of ['Light', 'Dark'] as const) {
   // The last case makes the header taller and wider with the theme load error.
