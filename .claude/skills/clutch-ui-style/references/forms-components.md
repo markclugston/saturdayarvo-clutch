@@ -19,7 +19,7 @@ existing usage as the pattern.
 - **Selection** (row, column, day, tab) uses the `selected` tint, never an outline or border.
 - Touch targets are at least 40x40px.
 - **Tab strips** (e.g. `MortgageTabs.tsx`) are a `nav` list of buttons with `aria-current`, not ARIA tabs. They scroll within themselves, so the page never scrolls sideways.
-- **Toasts** use `toast.tsx`. **Dialogs** use `dialog.tsx`.
+- **Toasts** use `toast.tsx`. **Dialogs** use `dialog.tsx`. Confirmations use `show`. `showPersistent` is only for a notice the user must not miss (for example, an expired edit): it stays until dismissed, in its own stack below the regular toasts. A notice that names user data is cleared when the sign-in ends (`clearPersistent`).
 
 ## Patterns not yet in code
 

@@ -31,17 +31,21 @@ export function formatPercent(raw: string): string {
 
 /**
  * Restricted entry (WEB-001): drops every character that cannot form a valid value, including pasted
- * symbols ($ , % and spaces), keeps one decimal point and at most two decimal places, so the draft
- * always holds a plain non-negative number and invalid characters never render.
+ * symbols ($ , % and spaces), keeps one decimal point and at most `decimals` decimal places (no point
+ * at all when 0), so the draft always holds a plain non-negative number and invalid characters never
+ * render.
  */
-export function clean(value: string): string {
+export function clean(value: string, decimals = 2): string {
   const stripped = value.replace(/[^\d.]/g, '')
   const dot = stripped.indexOf('.')
   if (dot === -1) {
     return stripped
   }
   const whole = stripped.slice(0, dot)
-  const fraction = stripped.slice(dot + 1).replace(/\./g, '').slice(0, 2)
+  if (decimals === 0) {
+    return whole
+  }
+  const fraction = stripped.slice(dot + 1).replace(/\./g, '').slice(0, decimals)
   return `${whole}.${fraction}`
 }
 
@@ -49,6 +53,8 @@ type FormattedNumberFieldProps = Omit<InputProps, 'value' | 'onChange'> & {
   value: string
   format: (raw: string) => string
   onValueChange: (raw: string) => void
+  /** Most decimal places that can be typed; 0 for currencies such as JPY. */
+  decimals?: number
 }
 
 /** Shows the formatted value while idle and the plain number while editing. */
@@ -58,6 +64,7 @@ export function FormattedNumberField({
   onValueChange,
   onFocus,
   onBlur,
+  decimals = 2,
   ...rest
 }: FormattedNumberFieldProps) {
   const [focused, setFocused] = useState(false)
@@ -68,7 +75,7 @@ export function FormattedNumberField({
         setFocused(false)
         onBlur?.(event)
       }}
-      onChange={(event) => onValueChange(clean(event.currentTarget.value))}
+      onChange={(event) => onValueChange(clean(event.currentTarget.value, decimals))}
       onFocus={(event) => {
         setFocused(true)
         onFocus?.(event)

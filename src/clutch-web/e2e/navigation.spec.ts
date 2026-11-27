@@ -5,6 +5,7 @@ const accountId = '550e8400-e29b-41d4-a716-446655440011'
 const account = { id: accountId, description: 'Browser account', currencyCode: 'AUD' }
 const currency = {
   code: 'AUD',
+  minorUnits: 2,
   name: 'Australian Dollar',
   amountFormats: [{
     id: 'dot-decimal-comma-grouping',
@@ -798,7 +799,7 @@ test('reaches the hamburger and every destination by keyboard in order', async (
   await page.goto('/')
   const nav = page.getByRole('navigation', { name: 'Primary' })
   await page.getByRole('button', { name: 'Sign Out' }).focus()
-  for (const name of ['Toggle navigation', 'Accounts', 'Mortgages', 'Categories']) {
+  for (const name of ['Toggle navigation', 'Accounts', 'Assets', 'Mortgages', 'Categories']) {
     await page.keyboard.press('Tab')
     await expect(nav.getByRole('button', { name })).toBeFocused()
   }

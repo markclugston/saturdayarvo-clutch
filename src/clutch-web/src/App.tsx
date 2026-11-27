@@ -1,10 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { FolderTree, Landmark, Menu, Wallet } from 'lucide-react'
-import { useRef, useState, type PointerEvent, type ReactNode } from 'react'
+import { FolderTree, Gem, Landmark, Menu, Wallet } from 'lucide-react'
+import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react'
 import { useNavigationPreference, useSaveNavigationPreference } from '@/features/preferences/api'
 import { AccountDetails } from '@/features/accounts/AccountDetails'
 import { AccountsPage } from '@/features/accounts/AccountsPage'
 import { ImportLimitsPage } from '@/features/admin/ImportLimitsPage'
+import { AssetPage } from '@/features/assets/AssetPage'
+import { AssetsPage } from '@/features/assets/AssetsPage'
+import { assetPath, parseAssetRoute, pushPath, type AssetRoute } from '@/features/assets/assetRoute'
 import { AuthPage } from '@/features/auth/AuthPage'
 import { StartupLoadingDialog } from '@/features/auth/StartupLoadingDialog'
 import { AddCategoryForm } from '@/features/categories/AddCategoryForm'
@@ -50,6 +53,60 @@ function AppContent() {
   const [showAdminSettings, setShowAdminSettings] = useState(false)
   const [showCategories, setShowCategories] = useState(false)
   const [showMortgages, setShowMortgages] = useState(false)
+  // Null outside Assets. Only the Assets pages have URLs of their own.
+  const [assetRoute, setAssetRoute] = useState<AssetRoute | null>(
+    () => parseAssetRoute(window.location.pathname),
+  )
+  const shownPath = useRef(window.location.pathname)
+  useEffect(() => {
+    shownPath.current = assetRoute ? assetPath(assetRoute) : '/'
+  }, [assetRoute])
+
+  function openAssets(route: AssetRoute) {
+    setShowCategories(false)
+    setShowMortgages(false)
+    setShowAdminSettings(false)
+    setSelectedAccountId(null)
+    setIsImporting(false)
+    pushPath(assetPath(route))
+    setAssetRoute(route)
+  }
+
+  /** Every other destination is plain state at the root URL. */
+  function leaveAssets() {
+    if (assetRoute) {
+      pushPath('/')
+      setAssetRoute(null)
+    }
+  }
+
+  // Back and Forward. While there are unsaved edits the shown URL is restored, and the change is
+  // followed only if the user discards them.
+  useEffect(() => {
+    const follow = () => {
+      const target = window.location.pathname
+      let followed = false
+      run(() => {
+        followed = true
+        pushPath(target)
+        const route = parseAssetRoute(target)
+        if (route) {
+          setShowCategories(false)
+          setShowMortgages(false)
+          setShowAdminSettings(false)
+          setSelectedAccountId(null)
+          setIsImporting(false)
+        }
+        setAssetRoute(route)
+      })
+      if (!followed) {
+        pushPath(shownPath.current)
+      }
+    }
+    window.addEventListener('popstate', follow)
+    return () => window.removeEventListener('popstate', follow)
+  }, [run])
+
   const sessionQuery = useQuery({
     queryKey: ['session'],
     queryFn: async ({ signal }) => {
@@ -94,6 +151,8 @@ function AppContent() {
       setShowAdminSettings(false)
       setShowCategories(false)
       setShowMortgages(false)
+      pushPath('/')
+      setAssetRoute(null)
       setMode('Light')
       queryClient.removeQueries({
         predicate: (query) => query.queryKey[0] !== 'session',
@@ -101,6 +160,16 @@ function AppContent() {
       await queryClient.resetQueries({ queryKey: ['session'], exact: true })
     },
   })
+
+  // A persistent notice can name an asset, so it never outlives the sign-in it belongs to.
+  const { clearPersistent } = useToast()
+  const signedOut = !userId
+    || (sessionQuery.error instanceof ApiError && sessionQuery.error.status === 401)
+  useEffect(() => {
+    if (signedOut) {
+      clearPersistent()
+    }
+  }, [signedOut, clearPersistent])
 
   if (sessionQuery.isPending || (sessionQuery.isFetching && !sessionQuery.data)) {
     return (
@@ -151,32 +220,39 @@ function AppContent() {
 
   // Identifies the page on show, so choosing another destination clears a page's error.
   const pageKey = showAdminSettings ? 'admin'
-    : showMortgages ? 'mortgages'
-      : showCategories ? 'categories'
-        : selectedAccountId ? `${isImporting ? 'import' : 'account'}:${selectedAccountId}`
-          : 'accounts'
+    : assetRoute ? assetPath(assetRoute)
+      : showMortgages ? 'mortgages'
+        : showCategories ? 'categories'
+          : selectedAccountId ? `${isImporting ? 'import' : 'account'}:${selectedAccountId}`
+            : 'accounts'
+  const showAssets = assetRoute !== null && !showAdminSettings
 
   return (
     <SignedInShell
       key={userId ?? 'anonymous'}
       userId={userId}
       initialPinned={navigationPreference.data?.state === 'Pinned'}
-      accountsCurrent={!showCategories && !showMortgages && !showAdminSettings}
+      accountsCurrent={!showAssets && !showCategories && !showMortgages && !showAdminSettings}
+      assetsCurrent={showAssets}
       categoriesCurrent={showCategories && !showMortgages && !showAdminSettings}
       mortgagesCurrent={showMortgages && !showAdminSettings}
       onAccounts={() => run(() => {
+        leaveAssets()
         setShowCategories(false)
         setShowMortgages(false)
         setShowAdminSettings(false)
         setSelectedAccountId(null)
         setIsImporting(false)
       })}
+      onAssets={() => run(() => openAssets({ page: 'list' }))}
       onCategories={() => run(() => {
+        leaveAssets()
         setShowCategories(true)
         setShowMortgages(false)
         setShowAdminSettings(false)
       })}
       onMortgages={() => run(() => {
+        leaveAssets()
         setShowMortgages(true)
         setShowCategories(false)
         setShowAdminSettings(false)
@@ -187,7 +263,10 @@ function AppContent() {
             {sessionQuery.data.id && <ThemeSelector userId={sessionQuery.data.id} />}
             {sessionQuery.data.roles?.includes('Administrator') && (
               <Button
-                onClick={() => run(() => setShowAdminSettings(true))}
+                onClick={() => run(() => {
+                  leaveAssets()
+                  setShowAdminSettings(true)
+                })}
                 type="button"
                 variant="secondary"
               >
@@ -196,7 +275,13 @@ function AppContent() {
             )}
             <Button
               disabled={signOutMutation.isPending}
-              onClick={() => run(() => signOutMutation.mutate())}
+              onClick={() => run(() => {
+                // Leaving an open asset first releases its edit while still signed in.
+                if (assetRoute?.page === 'asset') {
+                  openAssets({ page: 'list' })
+                }
+                signOutMutation.mutate()
+              })}
               type="button"
               variant="secondary"
             >
@@ -208,7 +293,7 @@ function AppContent() {
     >
       {/* Keep keyboard focus visible while the pointer holds the overlay open below md: */}
       {/* the focused control must sit above the navigation (z-40). */}
-      <ContentPanel wide={(showCategories || showMortgages) && !showAdminSettings} className={cn(
+      <ContentPanel wide={(showAssets || showCategories || showMortgages) && !showAdminSettings} className={cn(
         'ml-0 lg:ml-0',
         '[&_:is(button,input,select,textarea):not(.sr-only):focus-visible]:relative [&_:is(button,input,select,textarea):not(.sr-only):focus-visible]:z-50',
         '[&_:focus-visible:not(.sr-only)]:focus-ring',
@@ -231,6 +316,16 @@ function AppContent() {
         <PageErrorBoundary key={pageKey}>
           {showAdminSettings ? (
             <ImportLimitsPage onBack={() => setShowAdminSettings(false)} />
+          ) : assetRoute?.page === 'list' ? (
+            <AssetsPage
+              onAdd={() => openAssets({ page: 'new' })}
+              onOpen={(assetId) => openAssets({ page: 'asset', assetId })}
+            />
+          ) : assetRoute ? (
+            <AssetPage
+              assetId={assetRoute.page === 'asset' ? assetRoute.assetId : undefined}
+              onExit={() => openAssets({ page: 'list' })}
+            />
           ) : showMortgages ? (
             <MortgagesPage userId={sessionQuery.data.id} />
           ) : showCategories ? (
@@ -253,7 +348,7 @@ function AppContent() {
           )}
         </PageErrorBoundary>
       </ContentPanel>
-      {showCategories && !showMortgages && !showAdminSettings && (
+      {showCategories && !showAssets && !showMortgages && !showAdminSettings && (
         <PageErrorBoundary panel>
           <AddCategoryForm />
         </PageErrorBoundary>
@@ -359,9 +454,11 @@ function useNavigationExpansion(initialPinned: boolean) {
 type PrimaryNavigationProps = {
   navigation: NavigationExpansion
   accountsCurrent: boolean
+  assetsCurrent: boolean
   categoriesCurrent: boolean
   mortgagesCurrent: boolean
   onAccounts: () => void
+  onAssets: () => void
   onCategories: () => void
   onMortgages: () => void
 }
@@ -369,9 +466,11 @@ type PrimaryNavigationProps = {
 function PrimaryNavigation({
   navigation: { expanded, toggle, handlers },
   accountsCurrent,
+  assetsCurrent,
   categoriesCurrent,
   mortgagesCurrent,
   onAccounts,
+  onAssets,
   onCategories,
   onMortgages,
 }: PrimaryNavigationProps) {
@@ -394,6 +493,13 @@ function PrimaryNavigation({
         icon={Wallet}
         label="Accounts"
         onClick={onAccounts}
+      />
+      <SideNavItem
+        current={assetsCurrent}
+        expanded={expanded}
+        icon={Gem}
+        label="Assets"
+        onClick={onAssets}
       />
       <SideNavItem
         current={mortgagesCurrent}

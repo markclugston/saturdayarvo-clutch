@@ -20,6 +20,8 @@ export const CurrencyAmountFormatSchema = z.object({
 export const CurrencySchema = z.object({
   code: z.string().regex(/^[A-Z]{3}$/),
   name: z.string().min(1),
+  /** Decimal places an amount in this currency may have. */
+  minorUnits: z.number().int().min(0).max(4),
   amountFormats: z.array(CurrencyAmountFormatSchema).min(1),
 })
 
@@ -209,6 +211,96 @@ export const PeriodBalancesSchema = z.object({
   periodCount: z.number().int().min(0),
   balances: z.array(z.string().regex(/^-?[0-9]+(\.[0-9]+)?$/).nullable()),
 })
+
+/** The established amount cap: it round-trips exactly through a JavaScript number. */
+export const AssetValueSchema = z.number().min(0).max(999999999999.99)
+
+const CurrencyCodeSchema = z.string().regex(/^[A-Z]{3}$/)
+const UtcTimestampSchema = z.iso.datetime({ offset: true })
+
+export const ValuationSchema = z.object({
+  id: z.uuid(),
+  value: AssetValueSchema,
+  valuationDate: z.iso.date(),
+})
+
+export const AssetListItemSchema = z.object({
+  id: z.uuid(),
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).nullable(),
+  currencyCode: CurrencyCodeSchema,
+  latestValuation: z.object({ value: AssetValueSchema, valuationDate: z.iso.date() }),
+})
+
+/** A decimal string, never a number: a sum can exceed what a number holds exactly. */
+export const CurrencyTotalSchema = z.object({
+  currencyCode: CurrencyCodeSchema,
+  totalValue: z.string().regex(/^[0-9]+(\.[0-9]+)?$/),
+})
+
+export const AssetListSchema = z.object({
+  assets: z.array(AssetListItemSchema),
+  totals: z.array(CurrencyTotalSchema),
+})
+
+export const AssetDetailSchema = z.object({
+  id: z.uuid(),
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).nullable(),
+  currencyCode: CurrencyCodeSchema,
+  valuations: z.array(ValuationSchema),
+})
+
+export const AssetInputSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).nullable(),
+  currencyCode: CurrencyCodeSchema,
+  valuations: z.array(z.object({
+    id: z.uuid().optional(),
+    value: AssetValueSchema,
+    valuationDate: z.iso.date(),
+  })).min(1),
+})
+
+export const EditLeaseSchema = z.object({
+  editId: z.uuid(),
+  expiresAtUtc: UtcTimestampSchema,
+  serverTimeUtc: UtcTimestampSchema,
+  asset: AssetDetailSchema,
+})
+
+const WatchedEditSchema = z.discriminatedUnion('state', [
+  z.object({ id: z.uuid(), state: z.literal('Active'), expiresAtUtc: UtcTimestampSchema }),
+  z.object({ id: z.uuid(), state: z.literal('Saved') }),
+  z.object({ id: z.uuid(), state: z.literal('Released') }),
+  z.object({ id: z.uuid(), state: z.literal('Expired') }),
+  z.object({ id: z.uuid(), state: z.literal('Unavailable') }),
+  z.object({
+    id: z.uuid(), state: z.literal('Ended'),
+    endedAtUtc: UtcTimestampSchema,
+    endedBy: z.object({ userId: z.string().trim().min(1), userName: z.string().trim().min(1) }),
+  }),
+])
+
+/** A blocking edit can always be ended, so there is no `canEnd` flag. */
+export const EditStatusSchema = z.discriminatedUnion('availability', [
+  z.object({
+    assetId: z.uuid(), availability: z.literal('Available'),
+    activeEdit: z.null(), watchedEdit: WatchedEditSchema.nullable(),
+  }),
+  z.object({
+    assetId: z.uuid(), availability: z.literal('Blocked'),
+    activeEdit: z.object({ id: z.uuid(), expiresAtUtc: UtcTimestampSchema }),
+    watchedEdit: WatchedEditSchema.nullable(),
+  }),
+])
+
+export type AssetList = z.infer<typeof AssetListSchema>
+export type AssetListItem = z.infer<typeof AssetListItemSchema>
+export type AssetDetail = z.infer<typeof AssetDetailSchema>
+export type AssetInput = z.infer<typeof AssetInputSchema>
+export type EditLease = z.infer<typeof EditLeaseSchema>
+export type EditStatus = z.infer<typeof EditStatusSchema>
 
 export type InterestRateChange = z.infer<typeof InterestRateChangeSchema>
 export type MortgageInput = z.infer<typeof MortgageInputSchema>

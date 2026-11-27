@@ -41,6 +41,7 @@ const account = {
 
 const currency = {
   code: 'AUD',
+  minorUnits: 2,
   name: 'Australian Dollar',
   amountFormats: [
     {

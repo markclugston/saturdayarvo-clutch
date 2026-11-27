@@ -20,6 +20,7 @@ const accounts = [
 ]
 const currency = {
   code: 'AUD',
+  minorUnits: 2,
   name: 'Australian Dollar',
   amountFormats: [{
     id: 'dot-decimal-comma-grouping',
@@ -28,6 +29,39 @@ const currency = {
     reference: 'CLDR',
     version: '44.0',
   }],
+}
+// 029: Assets in two currencies, with long text that must truncate.
+const usd = { ...currency, code: 'USD', name: 'US Dollar' }
+const assetId = '550e8400-e29b-41d4-a716-446655440301'
+const assetEditId = '550e8400-e29b-41d4-a716-446655440302'
+const longAssetName = 'Family home on the corner block with the granny flat and the workshop'
+const assetList = {
+  assets: [
+    {
+      id: assetId, name: longAssetName, currencyCode: 'AUD',
+      description: 'Valued by a local agent after the renovation of the kitchen, bathroom and rear deck',
+      latestValuation: { value: 999999999999.99, valuationDate: '2026-01-01' },
+    },
+    {
+      id: '550e8400-e29b-41d4-a716-446655440303', name: 'Car', description: null, currencyCode: 'AUD',
+      latestValuation: { value: 18500, valuationDate: '2025-06-30' },
+    },
+    {
+      id: '550e8400-e29b-41d4-a716-446655440304', name: 'Shares', description: 'Brokerage account', currencyCode: 'USD',
+      latestValuation: { value: 2000, valuationDate: '2026-03-01' },
+    },
+  ],
+  totals: [
+    { currencyCode: 'AUD', totalValue: '1000000018499.99' },
+    { currencyCode: 'USD', totalValue: '2000.00' },
+  ],
+}
+const assetDetail = {
+  id: assetId, name: longAssetName, description: 'Brick and tile', currencyCode: 'AUD',
+  valuations: [
+    { id: '550e8400-e29b-41d4-a716-446655440311', value: 850000, valuationDate: '2026-01-01' },
+    { id: '550e8400-e29b-41d4-a716-446655440312', value: 790000.5, valuationDate: '2025-01-01' },
+  ],
 }
 const transactions = Array.from({ length: 8 }, (_, index) => ({
   id: `550e8400-e29b-41d4-a716-4466554401${String(index).padStart(2, '0')}`,
@@ -124,6 +158,8 @@ type Mock = {
   actualBalances: boolean
   /** With `actualBalances`, answer with balances that stop early, so a forecast follows them (027). */
   forecast: boolean
+  /** What opening an asset finds (029); 'expiring' gives an edit that lasts 1.5 s. */
+  asset: 'open' | 'blocked' | 'ended' | 'expiring'
   /** When the mocked route received the saved-view request (ms since epoch). */
   loanPayoffTimelineRequestedAt?: number
 }
@@ -139,6 +175,7 @@ async function mockApi(page: Page, options: Partial<Mock> = {}): Promise<Mock> {
     loanPayoffTimeline: 'Burndown',
     actualBalances: false,
     forecast: false,
+    asset: 'open',
     ...options,
   }
   await page.route((url) => url.pathname.startsWith('/api/'), async (route) => {
@@ -154,6 +191,47 @@ async function mockApi(page: Page, options: Partial<Mock> = {}): Promise<Mock> {
       return route.fulfill({ json: { id: 'browser-user', roles: ['Administrator'] } })
     }
     if (path === '/api/security/csrf-token') return route.fulfill({ json: { requestToken: 'test-token' } })
+    if (path === '/api/assets' && method === 'GET') return route.fulfill({ json: assetList })
+    if (path === `/api/assets/${assetId}/edits` && method === 'POST') {
+      const now = Date.now()
+      if (mock.asset === 'blocked') {
+        return route.fulfill({ status: 409, json: {
+          title: 'This asset is being edited in another session.',
+          status: 409,
+          errors: { code: ['AssetEditActive'] },
+          editStatus: {
+            assetId, availability: 'Blocked',
+            activeEdit: { id: assetEditId, expiresAtUtc: '2099-01-01T00:00:00Z' }, watchedEdit: null,
+          },
+        } })
+      }
+      const lifetime = mock.asset === 'expiring' ? 1500 : 300_000
+      return route.fulfill({ status: 201, json: {
+        editId: assetEditId,
+        serverTimeUtc: new Date(now).toISOString(),
+        expiresAtUtc: new Date(now + lifetime).toISOString(),
+        asset: assetDetail,
+      } })
+    }
+    if (path === `/api/assets/${assetId}/edit-status`) {
+      const activeEdit = { id: assetEditId, expiresAtUtc: '2099-01-01T00:00:00Z' }
+      if (!search.get('editId')) {
+        return route.fulfill({ json: { assetId, availability: 'Blocked', activeEdit, watchedEdit: null } })
+      }
+      if (mock.asset === 'ended') {
+        return route.fulfill({ json: {
+          assetId, availability: 'Available', activeEdit: null,
+          watchedEdit: {
+            id: assetEditId, state: 'Ended', endedAtUtc: '2026-01-01T00:00:00Z',
+            endedBy: { userId: 'browser-user', userName: 'owner@example.test' },
+          },
+        } })
+      }
+      return route.fulfill({ json: {
+        assetId, availability: 'Blocked', activeEdit,
+        watchedEdit: { id: assetEditId, state: 'Active', expiresAtUtc: '2099-01-01T00:00:00Z' },
+      } })
+    }
     if (path === '/api/preferences/navigation') return route.fulfill({ json: { state: 'Unpinned' } })
     if (path === '/api/preferences/loan-payoff-timeline') {
       if (method === 'PUT') {
@@ -201,7 +279,7 @@ async function mockApi(page: Page, options: Partial<Mock> = {}): Promise<Mock> {
       return route.fulfill({ json: mock.forecast ? forecastBalancesFixture() : actualBalancesFixture() })
     }
     if (path === '/api/accounts') return route.fulfill({ json: accounts })
-    if (path === '/api/currencies') return route.fulfill({ json: [currency] })
+    if (path === '/api/currencies') return route.fulfill({ json: [currency, usd] })
     if (path === `/api/accounts/${accountId}`) return route.fulfill({ json: accounts[0] })
     if (path === `/api/accounts/${accountId}/transactions`) {
       return route.fulfill({ json: { items: transactions, nextCursor: null } })
@@ -311,6 +389,29 @@ async function openRateDialog(page: Page) {
   await page.getByRole('button', { name: 'Interest Rates' }).click()
   await expect(rateDialog(page)).toBeVisible()
   await page.mouse.move(5, 5)
+}
+
+async function openAssets(page: Page) {
+  await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: 'Assets' }).click()
+  await page.mouse.move(600, 400)
+  await expect(page.getByRole('row', { name: /^Total USD/ })).toBeVisible()
+}
+
+async function openAsset(page: Page) {
+  await openAssets(page)
+  await page.getByRole('button', { name: longAssetName, exact: true }).click()
+}
+
+const regularToasts = (page: Page) => page.getByRole('region', { name: 'Notifications', exact: true })
+const persistentToasts = (page: Page) => page.getByRole('region', { name: 'Persistent notifications' })
+
+/** Lets an edit expire, then deletes an asset so a regular toast joins the persistent one. */
+async function showBothToastStacks(page: Page) {
+  await openAsset(page)
+  await expect(persistentToasts(page).getByRole('status')).toContainText('expired')
+  await page.getByRole('button', { name: 'Delete Car' }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete', exact: true }).click()
+  await expect(regularToasts(page).getByRole('status')).toContainText('Car was deleted.')
 }
 
 type StateDef = {
@@ -632,6 +733,66 @@ const states: StateDef[] = [
       await page.keyboard.press('Tab')
       await expect(button).toBeFocused()
       await expect(timelineTooltip(page)).toBeVisible()
+    },
+  },
+  {
+    name: 'assets', mock: signedIn,
+    reach: async (page) => { await openAssets(page) },
+  },
+  {
+    name: 'assets-delete-dialog', mock: signedIn,
+    reach: async (page) => {
+      await openAssets(page)
+      await page.getByRole('button', { name: 'Delete Car' }).click()
+      await expect(page.getByRole('alertdialog')).toBeVisible()
+    },
+  },
+  {
+    name: 'asset-new-errors', mock: signedIn,
+    reach: async (page) => {
+      await openAssets(page)
+      await page.getByRole('button', { name: 'Add Asset' }).click()
+      await page.getByRole('button', { name: 'Save' }).click()
+      await expect(page.getByText('Add at least one valuation')).toBeVisible()
+    },
+  },
+  {
+    name: 'asset-valuation-dialog-errors', mock: signedIn,
+    reach: async (page) => {
+      await openAsset(page)
+      await page.getByRole('button', { name: 'Add Valuation' }).click()
+      const dialog = page.getByRole('dialog', { name: 'Add Valuation' })
+      await dialog.getByRole('button', { name: 'OK' }).click()
+      await expect(dialog.getByText('Enter a value')).toBeVisible()
+    },
+  },
+  {
+    name: 'asset-edit', mock: signedIn,
+    reach: async (page) => {
+      await openAsset(page)
+      await expect(page.getByLabel('Name', { exact: true })).toHaveValue(longAssetName)
+    },
+  },
+  {
+    name: 'asset-blocked', mock: { ...signedIn, asset: 'blocked' },
+    reach: async (page) => {
+      await openAsset(page)
+      await expect(page.getByRole('button', { name: 'End Other Edit' })).toBeVisible()
+    },
+  },
+  {
+    name: 'asset-edit-ended', mock: { ...signedIn, asset: 'ended' },
+    reach: async (page) => {
+      await openAsset(page)
+      await expect(page.getByRole('alertdialog', { name: 'Edit Ended' })).toBeVisible()
+    },
+  },
+  {
+    name: 'assets-persistent-toast', mock: { ...signedIn, asset: 'expiring' },
+    reach: async (page) => {
+      await showBothToastStacks(page)
+      // Holding the pointer over the regular toast keeps it open while the checks run.
+      await regularToasts(page).getByRole('status').hover()
     },
   },
   {
@@ -1382,6 +1543,34 @@ test('navigation and dialog transitions last 150 to 250ms without reduced motion
     }
   } finally {
     await context.close()
+  }
+})
+
+test.describe('Persistent toasts (029)', () => {
+  for (const width of [320, 1280]) {
+    test(`regular toasts sit above the persistent one at the toast edge at ${width} px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 })
+      await mockApi(page, { theme: 'Light', asset: 'expiring' })
+      await page.goto('/')
+      await showBothToastStacks(page)
+
+      const regular = (await regularToasts(page).getByRole('status').boundingBox())!
+      const persistent = (await persistentToasts(page).getByRole('status').boundingBox())!
+      expect(regular.y + regular.height).toBeLessThanOrEqual(persistent.y)
+      expect(persistent.y + persistent.height).toBeGreaterThan(800 * 0.8)
+      expect(persistent.y + persistent.height).toBeLessThanOrEqual(800)
+      const centre = (persistent.x + persistent.width / 2) / width
+      if (width >= 768) expect(centre).toBeGreaterThan(0.7)
+      else expect(Math.abs(centre - 0.5)).toBeLessThan(0.05)
+      await expectNoHorizontalScroll(page)
+
+      // The regular toast leaves on its own; the persistent one stays until dismissed.
+      await page.mouse.move(5, 5)
+      await expect(regularToasts(page).getByRole('status')).toHaveCount(0, { timeout: 10_000 })
+      await expect(persistentToasts(page).getByRole('status')).toBeVisible()
+      await persistentToasts(page).getByRole('button', { name: 'Dismiss' }).click()
+      await expect(persistentToasts(page).getByRole('status')).toHaveCount(0)
+    })
   }
 })
 

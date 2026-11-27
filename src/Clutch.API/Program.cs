@@ -1,6 +1,7 @@
 using Clutch.API.Api.ProblemDetails;
 using Clutch.API.Api.Endpoints;
 using Clutch.API.Api.Security;
+using Clutch.API.Application.Assets;
 using Clutch.API.Application.Imports;
 using Clutch.API.Application.Mortgages;
 using Clutch.API.Application.Preferences;
@@ -25,6 +26,7 @@ builder.Services.AddOpenTelemetry()
         .AddMeter(TransactionMetrics.MeterName)
         .AddMeter(MortgageMetrics.MeterName)
         .AddMeter(PreferenceMetrics.MeterName)
+        .AddMeter(AssetMetrics.MeterName)
         .AddOtlpExporter());
 builder.Services.AddHealthChecks();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -57,7 +59,8 @@ app.Use(async (context, next) =>
 });
 
 app.UseAuthentication();
-app.UseMortgageRequestLimit();
+app.UseRequestBodyLimit("/api/mortgages", MortgageEndpoints.MaximumRequestBytes);
+app.UseRequestBodyLimit("/api/assets", AssetEndpoints.MaximumRequestBytes);
 app.Use(async (context, next) =>
 {
     var method = context.Request.Method;
@@ -92,6 +95,7 @@ app.MapSecurityEndpoints();
 app.MapAccountEndpoints();
 app.MapCategoryNodeEndpoints();
 app.MapMortgageEndpoints();
+app.MapAssetEndpoints();
 app.MapImportEndpoints();
 app.MapTransactionEndpoints();
 app.MapAdminImportLimitEndpoints();

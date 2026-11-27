@@ -1,4 +1,5 @@
 using Clutch.API.Domain.Accounts;
+using Clutch.API.Domain.Assets;
 using Clutch.API.Domain.Audit;
 using Clutch.API.Domain.Categories;
 using Clutch.API.Domain.Imports;
@@ -43,9 +44,98 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<InterestRateChange> MortgageInterestRateChanges => Set<InterestRateChange>();
 
+    public DbSet<Asset> Assets => Set<Asset>();
+
+    public DbSet<AssetValuation> AssetValuations => Set<AssetValuation>();
+
+    public DbSet<AssetEdit> AssetEdits => Set<AssetEdit>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
+
+        builder.Entity<Asset>(entity =>
+        {
+            entity.ToTable("Assets", table => table.HasCheckConstraint(
+                "CK_Assets_SupportedCurrency",
+                "[CurrencyCode] IN ('AUD', 'CAD', 'EUR', 'GBP', 'HKD', 'INR', 'JPY', 'NZD', 'SGD', 'USD')"));
+            entity.HasKey(asset => asset.Id);
+            entity.Property(asset => asset.Id).ValueGeneratedNever();
+            entity.Property(asset => asset.OwnerUserId)
+                .HasMaxLength(450)
+                .IsRequired();
+            entity.Property(asset => asset.Name)
+                .HasMaxLength(Asset.MaximumNameLength)
+                .IsRequired();
+            entity.Property(asset => asset.Description)
+                .HasMaxLength(Asset.MaximumDescriptionLength);
+            entity.Property(asset => asset.CurrencyCode)
+                .HasMaxLength(3)
+                .IsRequired();
+            entity.Property(asset => asset.CreatedAtUtc)
+                .HasColumnType("datetimeoffset");
+            // Not a foreign key, mirroring Accounts.ActiveImportId.
+            entity.Property(asset => asset.ActiveEditId);
+            entity.HasOne<ApplicationUser>()
+                .WithMany()
+                .HasForeignKey(asset => asset.OwnerUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(asset => new { asset.OwnerUserId, asset.CreatedAtUtc, asset.Id })
+                .HasDatabaseName("IX_Assets_OwnerUserId_CreatedAtUtc");
+            entity.HasMany(asset => asset.Valuations)
+                .WithOne()
+                .HasForeignKey(valuation => valuation.AssetId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.Navigation(asset => asset.Valuations)
+                .UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        builder.Entity<AssetValuation>(entity =>
+        {
+            entity.ToTable("AssetValuations");
+            entity.HasKey(valuation => valuation.Id);
+            entity.Property(valuation => valuation.Id).ValueGeneratedNever();
+            entity.Property(valuation => valuation.Value)
+                .HasColumnType("decimal(18,2)");
+            entity.Property(valuation => valuation.ValuationDate)
+                .HasColumnType("date");
+            // Unique dates, and the latest-valuation lookup the list relies on.
+            entity.HasIndex(valuation => new { valuation.AssetId, valuation.ValuationDate })
+                .IsUnique()
+                .IsDescending(false, true)
+                .IncludeProperties(valuation => valuation.Value)
+                .HasDatabaseName("IX_AssetValuations_AssetId_ValuationDate");
+        });
+
+        builder.Entity<AssetEdit>(entity =>
+        {
+            entity.ToTable("AssetEdits", table => table.HasCheckConstraint(
+                "CK_AssetEdits_ValidState",
+                "[State] IN ('Active', 'Saved', 'Released', 'Ended', 'Expired')"));
+            entity.HasKey(edit => edit.Id);
+            entity.Property(edit => edit.Id).ValueGeneratedNever();
+            entity.Property(edit => edit.OwnerUserId)
+                .HasMaxLength(450)
+                .IsRequired();
+            entity.Property(edit => edit.State)
+                .HasConversion<string>()
+                .HasMaxLength(16)
+                .IsUnicode(false)
+                .IsRequired();
+            entity.Property(edit => edit.OpenedAtUtc)
+                .HasColumnType("datetimeoffset");
+            entity.Property(edit => edit.ExpiresAtUtc)
+                .HasColumnType("datetimeoffset");
+            entity.Property(edit => edit.EndedByUserId)
+                .HasMaxLength(450);
+            entity.Property(edit => edit.EndedAtUtc)
+                .HasColumnType("datetimeoffset");
+            entity.HasIndex(edit => new { edit.AssetId, edit.State });
+            entity.HasOne<Asset>()
+                .WithMany()
+                .HasForeignKey(edit => edit.AssetId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
 
         builder.Entity<Mortgage>(entity =>
         {
@@ -456,7 +546,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .IsUnicode(false)
                 .IsRequired();
             entity.Property(audit => audit.Description)
-                .HasMaxLength(500)
                 .IsRequired();
             entity.Property(audit => audit.OccurredAtUtc)
                 .HasColumnType("datetimeoffset");

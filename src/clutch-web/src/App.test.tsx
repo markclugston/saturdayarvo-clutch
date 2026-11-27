@@ -4,6 +4,7 @@ import { focusManager, useQuery } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getAccount, getCurrencies } from '@/features/accounts/api'
 import { getSession, signIn, signOut } from '@/features/auth/api'
+import { acquireEdit, getEditStatus, listAssets, releaseEdit } from '@/features/assets/api'
 import { confirmImportReview, createImportReview, getAccountImportSettings, getImportStatus } from '@/features/imports/api'
 import { ApiError, apiRequest } from '@/lib/api/client'
 import { useUnsavedChanges } from '@/components/unsaved-changes/UnsavedChangesProvider'
@@ -125,6 +126,15 @@ vi.mock('@/features/imports/api', () => ({
   cancelActiveImportReview: vi.fn(),
 }))
 
+// The Assets pages are real; only their requests are replaced.
+vi.mock('@/features/assets/api', async (importActual) => ({
+  ...await importActual<typeof import('@/features/assets/api')>(),
+  listAssets: vi.fn(),
+  acquireEdit: vi.fn(),
+  getEditStatus: vi.fn(),
+  releaseEdit: vi.fn(),
+}))
+
 vi.mock('@/features/categories/CategoriesPage', () => ({
   CategoriesPage: () => <h1>Categories and Groups</h1>,
 }))
@@ -164,7 +174,10 @@ describe('session loading', () => {
 
   beforeEach(() => {
     vi.resetAllMocks()
+    window.history.replaceState(null, '', '/')
     respondToNavigation()
+    vi.mocked(listAssets).mockResolvedValue({ assets: [], totals: [] })
+    vi.mocked(releaseEdit).mockResolvedValue(undefined)
     vi.mocked(getImportStatus).mockImplementation(async (accountId, reviewId) => reviewId ? ({
       accountId, availability: 'Blocked',
       activeImport: { id: reviewId, stage: 'Preview', canEnd: true, expiresAtUtc: '2027-01-15T14:00:00Z' },
@@ -180,6 +193,7 @@ describe('session loading', () => {
     })
     vi.mocked(getCurrencies).mockResolvedValue([{
       code: 'AUD',
+      minorUnits: 2,
       name: 'Australian Dollar',
       amountFormats: [{
         id: 'dot-decimal-comma-grouping',
@@ -710,6 +724,8 @@ describe('session loading', () => {
     const mortgages = screen.getByRole('button', { name: 'Mortgages' })
     accounts.focus()
     await user.tab()
+    expect(screen.getByRole('button', { name: 'Assets' })).toHaveFocus()
+    await user.tab()
     expect(mortgages).toHaveFocus()
     await user.tab()
     expect(categories).toHaveFocus()
@@ -782,6 +798,175 @@ describe('session loading', () => {
     expect(await screen.findByRole('heading', { name: 'Your Accounts' })).toBeInTheDocument()
     expect(screen.queryByText('Owner private account')).not.toBeInTheDocument()
     expect(screen.queryByText('Owner private import settings')).not.toBeInTheDocument()
+  })
+
+  describe('Assets pages and their URLs', () => {
+    const assetId = '550e8400-e29b-41d4-a716-446655440000'
+    const editId = '550e8400-e29b-41d4-a716-446655440002'
+
+    function holdEdit(secondsLeft = 300) {
+      const now = Date.now()
+      vi.mocked(acquireEdit).mockResolvedValue({
+        editId,
+        serverTimeUtc: new Date(now).toISOString(),
+        expiresAtUtc: new Date(now + secondsLeft * 1000).toISOString(),
+        asset: {
+          id: assetId, name: 'House', description: null, currencyCode: 'AUD',
+          valuations: [{ id: editId, value: 100, valuationDate: '2026-01-01' }],
+        },
+      })
+      vi.mocked(getEditStatus).mockResolvedValue({
+        assetId,
+        availability: 'Blocked',
+        activeEdit: { id: editId, expiresAtUtc: '2027-01-01T00:00:00Z' },
+        watchedEdit: { id: editId, state: 'Active', expiresAtUtc: '2027-01-01T00:00:00Z' },
+      })
+    }
+
+    // The browser changes the URL, then reports it.
+    const traverseTo = (path: string) => act(() => {
+      window.history.replaceState(null, '', path)
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+
+    async function signedIn(path = '/') {
+      window.history.replaceState(null, '', path)
+      vi.mocked(getSession).mockResolvedValue({ id: 'user-1', roles: [] })
+      const user = setupUser()
+      renderWithQueryClient(<App />)
+      await screen.findByRole('navigation', { name: 'Primary' })
+      return user
+    }
+
+    const nav = (name: string) => screen.getByRole('button', { name })
+    const heading = (name: string) => screen.findByRole('heading', { name })
+
+    it('lists Assets directly below Accounts and shows it at its own URL', async () => {
+      const user = await signedIn()
+      expect(nav('Accounts').nextElementSibling).toBe(nav('Assets'))
+
+      await user.click(nav('Assets'))
+
+      expect(await heading('Assets')).toBeInTheDocument()
+      expect(window.location.pathname).toBe('/assets')
+      expect(nav('Assets')).toHaveAttribute('aria-current', 'page')
+      expect(nav('Accounts')).not.toHaveAttribute('aria-current')
+    })
+
+    it('moves between the list and a new asset', async () => {
+      const user = await signedIn('/assets')
+
+      await user.click(await screen.findByRole('button', { name: 'Add Asset' }))
+      expect(await heading('Add Asset')).toBeInTheDocument()
+      expect(window.location.pathname).toBe('/assets/new')
+
+      await user.click(await screen.findByRole('button', { name: 'Cancel' }))
+      expect(await heading('Assets')).toBeInTheDocument()
+      expect(window.location.pathname).toBe('/assets')
+    })
+
+    it.each([
+      ['/assets', 'Assets'],
+      ['/assets/new', 'Add Asset'],
+    ])('opens %s from the URL at startup', async (path, title) => {
+      await signedIn(path)
+
+      expect(await heading(title)).toBeInTheDocument()
+      expect(nav('Assets')).toHaveAttribute('aria-current', 'page')
+      expect(acquireEdit).not.toHaveBeenCalled()
+    })
+
+    it('opens the asset named in the URL at startup', async () => {
+      holdEdit()
+      await signedIn(`/assets/${assetId}`)
+
+      expect(await screen.findByLabelText('Name')).toHaveValue('House')
+      expect(acquireEdit).toHaveBeenCalledWith(assetId)
+    })
+
+    it.each(['Accounts', 'Mortgages', 'Categories'])('returns to the root URL for %s', async (destination) => {
+      const user = await signedIn('/assets')
+
+      await user.click(nav(destination))
+
+      expect(window.location.pathname).toBe('/')
+      expect(nav(destination)).toHaveAttribute('aria-current', 'page')
+      expect(nav('Assets')).not.toHaveAttribute('aria-current')
+    })
+
+    it('follows Back and Forward while there is nothing to lose', async () => {
+      await signedIn('/assets/new')
+
+      await traverseTo('/assets')
+      expect(await heading('Assets')).toBeInTheDocument()
+
+      await traverseTo('/')
+      expect(await heading('Your Accounts')).toBeInTheDocument()
+
+      await traverseTo('/assets/new')
+      expect(await heading('Add Asset')).toBeInTheDocument()
+    })
+
+    it.each([['/assets', 'Assets'], ['/', 'Your Accounts']])(
+      'asks before Back to %s discards an unsaved asset',
+      async (target, title) => {
+        const user = await signedIn('/assets/new')
+        await user.type(await screen.findByLabelText('Name'), 'Car')
+
+        await traverseTo(target)
+        expect(await screen.findByText('Discard Unsaved Changes?')).toBeInTheDocument()
+        expect(window.location.pathname).toBe('/assets/new')
+        await user.click(nav('Stay on This Page'))
+        expect(screen.getByLabelText('Name')).toHaveValue('Car')
+        expect(window.location.pathname).toBe('/assets/new')
+
+        await traverseTo(target)
+        await user.click(await screen.findByRole('button', { name: 'Discard Changes' }))
+        expect(await heading(title)).toBeInTheDocument()
+        expect(window.location.pathname).toBe(target)
+      },
+    )
+
+    it('asks before navigation discards an unsaved asset', async () => {
+      const user = await signedIn('/assets/new')
+      await user.type(await screen.findByLabelText('Name'), 'Car')
+
+      await user.click(nav('Mortgages'))
+      await user.click(await screen.findByRole('button', { name: 'Stay on This Page' }))
+
+      expect(screen.getByLabelText('Name')).toHaveValue('Car')
+      expect(window.location.pathname).toBe('/assets/new')
+    })
+
+    it.each(['Accounts', 'Sign Out'])('releases the held edit on %s', async (destination) => {
+      holdEdit()
+      vi.mocked(signOut).mockReturnValue(new Promise(() => {}))
+      const user = await signedIn(`/assets/${assetId}`)
+      await screen.findByLabelText('Name')
+
+      await user.click(nav(destination))
+
+      await waitFor(() => expect(releaseEdit).toHaveBeenCalledWith(assetId, editId))
+    })
+
+    it('never carries an expiry notice past sign-out', async () => {
+      holdEdit(0.2)
+      vi.mocked(signOut).mockResolvedValue()
+      window.history.replaceState(null, '', `/assets/${assetId}`)
+      vi.mocked(getSession)
+        .mockResolvedValueOnce({ id: 'user-1', roles: [] })
+        .mockRejectedValueOnce(new ApiError(401, { title: 'Authentication required' }))
+      const user = setupUser()
+      renderWithQueryClient(<App />)
+      expect(await screen.findByText('Your edit of House expired.')).toBeInTheDocument()
+
+      await user.click(nav('Sign Out'))
+
+      expect(await heading('Sign In')).toBeInTheDocument()
+      await waitFor(() =>
+        expect(screen.queryByText('Your edit of House expired.')).not.toBeInTheDocument())
+      expect(window.location.pathname).toBe('/')
+    })
   })
 
   describe('saved navigation state', () => {

@@ -21,10 +21,21 @@ public sealed class AuditTests
         Assert.Contains("Savings", audit.Description, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Constructor_accepts_a_description_longer_than_500_characters_in_full()
+    {
+        var description = new string('a', 4000);
+
+        var audit = new Audit("user-1", DateTimeOffset.UtcNow, "AssetUpdate", description);
+
+        Assert.Equal(description, audit.Description);
+    }
+
     [Theory]
     [InlineData("", "ReviewCreated", "Import ReviewCreated for account Savings.")]
     [InlineData("user-1", " ", "Import ReviewCreated for account Savings.")]
     [InlineData("user-1", "ReviewCreated", " ")]
+    [InlineData("user-1", "ReviewCreated", "")]
     public void Constructor_rejects_blank_required_values(
         string actingUserId,
         string eventCode,

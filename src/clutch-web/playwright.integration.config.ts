@@ -13,6 +13,7 @@ export default defineConfig({
     'accounts-transaction-delete.spec.ts',
     'active-import.spec.ts',
     'admin-import-limits.spec.ts',
+    'asset-edit-lease.spec.ts',
     'categories-groups.spec.ts',
     'import-settings.spec.ts',
     'mortgages.spec.ts',

@@ -65,6 +65,115 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Clutch.API.Domain.Assets.Asset", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ActiveEditId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("OwnerUserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerUserId", "CreatedAtUtc", "Id")
+                        .HasDatabaseName("IX_Assets_OwnerUserId_CreatedAtUtc");
+
+                    b.ToTable("Assets", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Assets_SupportedCurrency", "[CurrencyCode] IN ('AUD', 'CAD', 'EUR', 'GBP', 'HKD', 'INR', 'JPY', 'NZD', 'SGD', 'USD')");
+                        });
+                });
+
+            modelBuilder.Entity("Clutch.API.Domain.Assets.AssetEdit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AssetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("EndedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("EndedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("OpenedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("OwnerUserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(16)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssetId", "State");
+
+                    b.ToTable("AssetEdits", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_AssetEdits_ValidState", "[State] IN ('Active', 'Saved', 'Released', 'Ended', 'Expired')");
+                        });
+                });
+
+            modelBuilder.Entity("Clutch.API.Domain.Assets.AssetValuation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AssetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("ValuationDate")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("Value")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssetId", "ValuationDate")
+                        .IsUnique()
+                        .IsDescending(false, true)
+                        .HasDatabaseName("IX_AssetValuations_AssetId_ValuationDate");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("AssetId", "ValuationDate"), new[] { "Value" });
+
+                    b.ToTable("AssetValuations", (string)null);
+                });
+
             modelBuilder.Entity("Clutch.API.Domain.Audit.Audit", b =>
                 {
                     b.Property<Guid>("Id")
@@ -78,8 +187,7 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("EventCode")
                         .IsRequired()
@@ -748,6 +856,33 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("Clutch.API.Domain.Assets.Asset", b =>
+                {
+                    b.HasOne("Clutch.API.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Clutch.API.Domain.Assets.AssetEdit", b =>
+                {
+                    b.HasOne("Clutch.API.Domain.Assets.Asset", null)
+                        .WithMany()
+                        .HasForeignKey("AssetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Clutch.API.Domain.Assets.AssetValuation", b =>
+                {
+                    b.HasOne("Clutch.API.Domain.Assets.Asset", null)
+                        .WithMany("Valuations")
+                        .HasForeignKey("AssetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Clutch.API.Domain.Categories.CategoryNode", b =>
                 {
                     b.HasOne("Clutch.API.Infrastructure.Identity.ApplicationUser", null)
@@ -906,6 +1041,11 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Clutch.API.Domain.Assets.Asset", b =>
+                {
+                    b.Navigation("Valuations");
                 });
 
             modelBuilder.Entity("Clutch.API.Domain.Imports.ImportReview", b =>

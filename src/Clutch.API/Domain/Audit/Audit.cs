@@ -17,8 +17,7 @@ public sealed class Audit
             || eventCode.Length > 50
             || !eventCode.All(character => char.IsAsciiLetterOrDigit(character)
                 || character is '.' or '_' or '-')
-            || string.IsNullOrWhiteSpace(description)
-            || description.Length > 500)
+            || string.IsNullOrWhiteSpace(description))
         {
             throw new ArgumentException("The audit event is invalid.");
         }

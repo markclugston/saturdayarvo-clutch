@@ -29,6 +29,7 @@ describe('AccountDetails', () => {
     vi.mocked(getAccount).mockResolvedValue(existingAccount)
     vi.mocked(getCurrencies).mockResolvedValue([{
       code: 'AUD',
+      minorUnits: 2,
       name: 'Australian dollar',
       amountFormats: [{
         id: 'dot-decimal-comma-grouping',

@@ -118,12 +118,14 @@ public static class AccountEndpoints
     private sealed record CurrencyResponse(
         string Code,
         string Name,
+        int MinorUnits,
         IReadOnlyList<CurrencyAmountFormatResponse> AmountFormats)
     {
         public static CurrencyResponse FromDomain(Currency currency) =>
             new(
                 currency.Code,
                 currency.Name,
+                currency.MinorUnits,
                 CurrencyAmountFormatRegistry.GetFormats(currency.Code)
                     .Select(CurrencyAmountFormatResponse.FromDomain)
                     .ToArray());

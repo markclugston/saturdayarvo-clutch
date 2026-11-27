@@ -1,21 +1,25 @@
 namespace Clutch.API.Api.Endpoints;
 
-public static class MortgageRequestLimit
+public static class RequestBodyLimit
 {
-    // Rejects oversized mortgage bodies (413, never 500) before anything binds them. A declared
-    // length is checked at once; an undeclared one is buffered up to the limit and no further.
-    public static IApplicationBuilder UseMortgageRequestLimit(this IApplicationBuilder app) =>
+    // Rejects oversized POST and PUT bodies under a path (413, never 500) before anything binds
+    // them. A declared length is checked at once; an undeclared one is buffered up to the limit and
+    // no further.
+    public static IApplicationBuilder UseRequestBodyLimit(
+        this IApplicationBuilder app,
+        PathString path,
+        int maximumBytes) =>
         app.Use(async (context, next) =>
         {
             var request = context.Request;
-            if (!request.Path.StartsWithSegments("/api/mortgages")
+            if (!request.Path.StartsWithSegments(path)
                 || !(HttpMethods.IsPost(request.Method) || HttpMethods.IsPut(request.Method)))
             {
                 await next();
                 return;
             }
 
-            if (request.ContentLength > MortgageEndpoints.MaximumRequestBytes)
+            if (request.ContentLength > maximumBytes)
             {
                 await TooLargeAsync(context);
                 return;
@@ -29,7 +33,7 @@ public static class MortgageRequestLimit
                 while ((read = await request.Body.ReadAsync(chunk, context.RequestAborted)) > 0)
                 {
                     await buffer.WriteAsync(chunk.AsMemory(0, read), context.RequestAborted);
-                    if (buffer.Length > MortgageEndpoints.MaximumRequestBytes)
+                    if (buffer.Length > maximumBytes)
                     {
                         await TooLargeAsync(context);
                         return;
