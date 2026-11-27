@@ -101,7 +101,7 @@ Features written before this rule report uncited requirements. That is expected.
 
 ### 3. Keep clarify on material questions
 
-- Put an "Out of scope:" sentence in the `/speckit-specify` description. Specify now asks for it if missing.
+- Put an "Out of scope:" sentence in the `/speckit-specify` description. It is optional; without it the spec records "None".
 - `docs/code-map.md` now holds defaults for concurrency, performance, scale and observability.
 - Clarify now asks only where the answer changes stored data, visible behaviour or security, and marks options that add a mechanism with "Adds:".
 - Run it again while it still asks material questions. Stop when it says none remain.
@@ -147,7 +147,7 @@ Try Sonnet for specify, tasks and analyze, and keep Opus for plan and clarify. T
 
 ## Next Feature Checklist
 
-1. `/speckit-specify` with an "Out of scope:" sentence.
+1. `/speckit-specify`, optionally with an "Out of scope:" sentence.
 2. Read the spec yourself and cut anything you did not ask for.
 3. Clarify until it says no material questions remain.
 4. Plan, then tasks (which runs the script check).

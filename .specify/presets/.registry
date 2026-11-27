@@ -4,7 +4,7 @@
     "clutch": {
       "version": "1.0.0",
       "source": "local",
-      "manifest_hash": "sha256:1069c7cd3bd276473b93cf75fec0966c8edf02487157b07900ca5ac3d6b9dcc1",
+      "manifest_hash": "sha256:f20b3e85b3764fb23e9daed48b1a4bf930d7e05cfaf4911f07b6bcfcdf46fded",
       "enabled": true,
       "priority": 10,
       "registered_commands": {
@@ -25,7 +25,7 @@
           "speckit-analyze"
         ]
       },
-      "installed_at": "2026-11-27T19:39:21.797094+00:00"
+      "installed_at": "2026-11-27T21:26:30.922840+00:00"
     }
   }
 }

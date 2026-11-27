@@ -12,8 +12,8 @@ scripts:
 
 These take precedence over any conflicting instruction below.
 
-- Before creating anything, check that the description has an "Out of scope:" statement. If it does not, ask for it and wait; "none" is a valid answer. Never guess it.
-- Record it in the spec's Out Of Scope section. Specify nothing listed there, and no mechanism the description did not ask for (ARC-001).
+- An "Out of scope:" statement in the description is optional. Do not ask for one. If present, record it in the spec's Out Of Scope section; if absent, write "None" there. Never guess exclusions.
+- Specify nothing listed as out of scope, and no mechanism the description did not ask for (ARC-001).
 - Apply "Settled decisions" in `docs/code-map.md` as assumptions.
 
 

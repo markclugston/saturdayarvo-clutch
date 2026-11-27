@@ -47,7 +47,7 @@ Traceability preserved through relocation of implementation requirements into pa
 - Rationale: in local Claude Code logs (2026-11-20 to 2026-11-27), analyze was 53% of the token cost of specify through tasks plus analyze, at about 5 runs per feature. See `docs/spec-kit-token-review.md`.
 - Analyze reports only CRITICAL and HIGH, applies one approved batch of fixes and re-checks only those, at most twice. An open reporting bar meant each run found something new.
 - Clarify asks only what changes stored data, visible behaviour or security, marks options that add a mechanism, and says when no material questions remain. It may still be repeated, because a missed scenario is cheaper to find there than in implement.
-- Specify requires an "Out of scope:" statement, and the code map gives simple defaults for silent areas, so scope does not grow unasked.
+- Specify records an optional "Out of scope:" statement (not required), and the code map gives simple defaults for silent areas, so scope does not grow unasked.
 - One fact has one owning document, and tasks cite IDs instead of copying constraints. Repeated facts drifted and became findings. Plan researches only real unknowns.
 - Added `scripts/check-spec-artifacts.ps1` for the mechanical checks, run by tasks and analyze.
 - Command rules live in the `presets/clutch/` preset, not in edited `speckit-*` skills, so Spec Kit can be upgraded. Upgrades were tested only on 1.3.2.
