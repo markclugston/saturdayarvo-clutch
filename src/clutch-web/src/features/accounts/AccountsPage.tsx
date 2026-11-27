@@ -67,7 +67,7 @@ export function AccountsPage({ onSelectAccount }: AccountsPageProps) {
   }
 
   return (
-    <section aria-labelledby="accounts-heading" className="space-y-4">
+    <section aria-labelledby="accounts-heading" className="max-w-5xl space-y-4">
       <div>
         <PageHeading id="accounts-heading">
           Your Accounts
