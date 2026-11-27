@@ -41,3 +41,19 @@ Traceability preserved through relocation of implementation requirements into pa
 ## docs/style-guide.md removed (2026-11-20)
 
 - After the split it was only an index that duplicated the section table in `clutch-ui-style/SKILL.md`. The style guide now lives only in `.github/skills/clutch-ui-style/` (SKILL.md and `references/`, with the original § numbers). Delete `docs/style-guide.md` from the repository when these changes are copied back.
+
+## Constitution 1.8.0 (2026-11-28): token cost before implement
+
+- Rationale: in local Claude Code logs (2026-11-20 to 2026-11-27), analyze was 53% of the token cost of specify through tasks plus analyze, at about 5 runs per feature. See `docs/spec-kit-token-review.md`.
+- Analyze reports only CRITICAL and HIGH, applies one approved batch of fixes and re-checks only those, at most twice. An open reporting bar meant each run found something new.
+- Clarify asks only what changes stored data, visible behaviour or security, marks options that add a mechanism, and says when no material questions remain. It may still be repeated, because a missed scenario is cheaper to find there than in implement.
+- Specify requires an "Out of scope:" statement, and the code map gives simple defaults for silent areas, so scope does not grow unasked.
+- One fact has one owning document, and tasks cite IDs instead of copying constraints. Repeated facts drifted and became findings. Plan researches only real unknowns.
+- Added `scripts/check-spec-artifacts.ps1` for the mechanical checks, run by tasks and analyze.
+- Command rules live in the `presets/clutch/` preset, not in edited `speckit-*` skills, so Spec Kit can be upgraded. Upgrades were tested only on 1.3.2.
+- `.gitattributes` keeps Spec Kit files on LF, because line-ending conversion changes their recorded hashes.
+- `scripts/sync-agent-config.ps1` creates the `.github/` `speckit-*` copies from the `.claude/` ones. A second Spec Kit integration for Copilot was refused without `--force`.
+- WEB-001: plans name the UI compliance checklist instead of copying it; the completion review still records every item. MINOR bump.
+- SEC-004 added to the templates, `clutch-constitution-check`, the security and frontend skills and the security rule, where it was missing.
+- Supersedes earlier notes that the project is Copilot-only: Claude Code is also in use, with `CLAUDE.md` mirrored to `copilot-instructions.md`.
+- Not yet proven on a feature.

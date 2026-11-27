@@ -1,9 +1,9 @@
 ---
 name: "clutch-security-review"
-description: "Clutch security rules and independent OWASP review (SEC-001..003). Use for auth, input, secrets or sensitive-data changes, and every completion review."
+description: "Clutch security rules and independent OWASP review (SEC-001..004). Use for auth, input, secrets or sensitive-data changes, and every completion review."
 metadata:
   author: "saturdayarvo-clutch"
-  governs: "SEC-001, SEC-002, SEC-003"
+  governs: "SEC-001, SEC-002, SEC-003, SEC-004"
 ---
 
 # Clutch Security
@@ -30,6 +30,11 @@ Security findings block completion until they are remediated and verified.
 - Avoid exceptions for expected control flow. Use the Result pattern or typed validation failures where applicable.
 - Payment and financial information requires approved handling controls.
 
+**Data validation (SEC-004)**
+- Enforce every field and rule in the UI, with errors shown there, and again on the server at the earliest opportunity.
+- A server validation failure names each failing field and why, through the established ProblemDetails handling.
+- Validation errors disclose no implementation details.
+
 ## Independent review procedure
 
 Run as a separate pass over the full diff after implementation, not while writing the code.
@@ -39,7 +44,7 @@ Record a finding (severity, location, remediation) for each failure.
    insecure design, security misconfiguration, vulnerable components, authentication failures,
    integrity failures, logging and monitoring failures, SSRF.
 2. **Authentication and authorization** on every new or changed endpoint and operation.
-3. **Input validation** on every new trust boundary, server-side.
+3. **Input validation** on every new trust boundary, server-side, and in the UI for data entered there. Both enforce the same complete rules (SEC-004).
 4. **Secrets**: none added to source, configuration or tests.
 5. **Sensitive data**: logs, exceptions and error responses checked for leakage. Payment data handling controls confirmed.
 6. **Dependencies**: vulnerability scan for .NET and npm packages added or updated.

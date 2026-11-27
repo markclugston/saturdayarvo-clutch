@@ -38,6 +38,7 @@ The lint config has no React plugin, so review these:
 - Stable keys are required for lists.
 - `dangerouslySetInnerHTML` with untrusted content is prohibited.
 - Validate data crossing trust boundaries at runtime, as the API client does. Generated types do not replace runtime validation.
+- Data entry enforces every field rule in the UI and shows field errors, including those the server returns. It never replaces server validation (SEC-004).
 - Navigation and file-selection controls are accessible buttons.
 - New primitives come from shadcn/ui on Base UI, remapped to the tokens. Third-party UI registries require an independent security review (`clutch-security-review`).
 - % and $ entry controls reuse `FormattedNumberField` (WEB-001). Their component tests type and paste invalid characters, assert the field excludes them, then blur and assert the formatted text.

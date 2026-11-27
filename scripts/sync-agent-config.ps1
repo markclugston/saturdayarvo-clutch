@@ -8,7 +8,11 @@
       .claude/rules/<name>.md      <->  .github/instructions/<name>.instructions.md
                                         (same body; `paths:` list <-> `applyTo:` string)
 
-    speckit-* skills are not touched: Spec Kit generates them per agent.
+      .claude/skills/speckit-*/SKILL.md -> .github/skills/speckit-*/SKILL.md
+                                        (one way; Claude Code-only front matter removed)
+
+    Spec Kit generates the .claude speckit-* skills, including the rules in presets/clutch.
+    -From copilot never changes them.
     CLAUDE.md and .github/copilot-instructions.md are maintained by hand.
 
     Files that exist only on the target side are reported, never deleted.
@@ -33,11 +37,14 @@ param(
     [ValidateSet('claude', 'copilot')]
     [string]$From,
 
-    [string]$Root = (Split-Path -Parent $PSScriptRoot)
+    [string]$Root
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+# Not a parameter default: under "powershell -File", $PSScriptRoot is empty there.
+if (-not $Root) { $Root = Split-Path -Parent $PSScriptRoot }
 
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
@@ -124,6 +131,28 @@ function Write-TextFile([string]$Path, [string]$Text) {
     [IO.File]::WriteAllText($Path, $Text, $Utf8NoBom)
 }
 
+function Get-SpeckitSkills([string]$SkillsRoot) {
+    $result = @{}
+    if (-not (Test-Path $SkillsRoot)) { return $result }
+    Get-ChildItem -Path $SkillsRoot -Directory -Filter 'speckit-*' | ForEach-Object {
+        $file = Join-Path $_.FullName 'SKILL.md'
+        if (Test-Path $file) { $result[$_.Name] = $file }
+    }
+    $result
+}
+
+function Convert-SpeckitSkill([string]$SourcePath) {
+    $text = [IO.File]::ReadAllText($SourcePath).Replace("`r`n", "`n")
+    $parts = Split-FrontMatter $text $SourcePath
+    $kept = $parts.FrontMatter -split "`n" |
+        Where-Object { $_ -notmatch '^(argument-hint|user-invocable|disable-model-invocation):' }
+    "---`n$($kept -join "`n")`n---`n" + $parts.Body
+}
+
+function Test-SpeckitCopy([string]$Path, [string]$Expected) {
+    (Test-Path $Path) -and ([IO.File]::ReadAllText($Path).Replace("`r`n", "`n") -ceq $Expected)
+}
+
 # ---------------------------------------------------------------- check
 
 if ($PSCmdlet.ParameterSetName -eq 'Check') {
@@ -145,6 +174,16 @@ if ($PSCmdlet.ParameterSetName -eq 'Check') {
         $expected = Convert-Rule $claudeRules[$name] 'claude' 'copilot'
         $actual = [IO.File]::ReadAllText($copilotRules[$name])
         if ($expected -cne $actual) { $problems.Add("rule   differs         : $name") }
+    }
+
+    $claudeSpeckit = Get-SpeckitSkills $Sides.claude.Skills
+    $copilotSpeckit = Get-SpeckitSkills $Sides.copilot.Skills
+    foreach ($name in ($claudeSpeckit.Keys + $copilotSpeckit.Keys | Sort-Object -Unique)) {
+        if (-not $copilotSpeckit.ContainsKey($name)) { $problems.Add("speckit only in .claude : $name"); continue }
+        if (-not $claudeSpeckit.ContainsKey($name)) { $problems.Add("speckit only in .github : $name"); continue }
+        if (-not (Test-SpeckitCopy $copilotSpeckit[$name] (Convert-SpeckitSkill $claudeSpeckit[$name]))) {
+            $problems.Add("speckit differs         : $name")
+        }
     }
 
     if ($problems.Count -eq 0) {
@@ -192,6 +231,22 @@ foreach ($name in ($srcRules.Keys | Sort-Object)) {
 }
 foreach ($name in ($dstRules.Keys | Where-Object { -not $srcRules.ContainsKey($_) } | Sort-Object)) {
     $orphans.Add("rule   $name")
+}
+
+if ($From -eq 'claude') {
+    $srcSpeckit = Get-SpeckitSkills $src.Skills
+    $dstSpeckit = Get-SpeckitSkills $dst.Skills
+    foreach ($name in ($srcSpeckit.Keys | Sort-Object)) {
+        $target = Join-Path $dst.Skills "$name/SKILL.md"
+        $text = Convert-SpeckitSkill $srcSpeckit[$name]
+        if (Test-SpeckitCopy $target $text) { continue }
+        Write-TextFile $target $text
+        Write-Host "  speckit $name"
+        $changed++
+    }
+    foreach ($name in ($dstSpeckit.Keys | Where-Object { -not $srcSpeckit.ContainsKey($_) } | Sort-Object)) {
+        $orphans.Add("speckit $name")
+    }
 }
 
 Write-Host "Synced $From -> $To : $changed file(s) updated."

@@ -8,6 +8,8 @@ Path-scoped rules live in `.claude/rules/`.
 
 The GitHub Copilot copies in `.github/` are kept in sync. After editing a `clutch-*` skill or a rule, run `.\scripts\sync-agent-config.ps1 -From claude`. Mirror any change to this file in `.github/copilot-instructions.md`.
 
+Never edit `speckit-*` skills: they are generated. Change their Clutch rules in `presets/clutch/` and follow its README.
+
 ## Workspace operations
 
 - Create, read, update and delete files inside this workspace without asking. Ask before touching anything outside it.

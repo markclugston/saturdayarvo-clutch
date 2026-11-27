@@ -6,6 +6,8 @@ The code is the source of truth. Use `docs/code-map.md` to find the file that an
 
 The Claude Code copies in `.claude/` are kept in sync. After editing a `clutch-*` skill or an instructions file, run `.\scripts\sync-agent-config.ps1 -From copilot`. Mirror any change to this file in `CLAUDE.md`.
 
+Never edit `speckit-*` skills: they are generated. Change their Clutch rules in `presets/clutch/` and follow its README.
+
 ## Workspace operations
 
 - Create, read, update and delete files inside this workspace without asking. Ask before touching anything outside it.

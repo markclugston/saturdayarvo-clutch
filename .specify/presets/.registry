@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0",
+  "presets": {
+    "clutch": {
+      "version": "1.0.0",
+      "source": "local",
+      "manifest_hash": "sha256:1069c7cd3bd276473b93cf75fec0966c8edf02487157b07900ca5ac3d6b9dcc1",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "claude": [
+          "speckit.specify",
+          "speckit.clarify",
+          "speckit.plan",
+          "speckit.tasks",
+          "speckit.analyze"
+        ]
+      },
+      "registered_skills": {
+        "claude": [
+          "speckit-specify",
+          "speckit-clarify",
+          "speckit-plan",
+          "speckit-tasks",
+          "speckit-analyze"
+        ]
+      },
+      "installed_at": "2026-11-27T19:39:21.797094+00:00"
+    }
+  }
+}

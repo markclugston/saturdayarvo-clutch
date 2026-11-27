@@ -44,11 +44,11 @@ pick a side.
 | 6 | `index.css` (tokens) and the token-use rules in `forms-components.md` | Choosing colours or status styles |
 | 7, 8, 9 | [references/typography-motion-a11y.md](references/typography-motion-a11y.md) | Text, casing, motion, contrast, focus |
 | 10 | The Source of truth table above | Editing tokens, primitives, theme runtime or the lint rule |
-| 11 | [references/compliance-checklist.md](references/compliance-checklist.md) | Every plan and completion review for UI work |
+| 11 | [references/compliance-checklist.md](references/compliance-checklist.md) | Every completion review for UI work |
 
 ## Use by phase
 
-- **Plan:** list the applicable sections (by §) and copy the compliance checklist into the Constitution Check.
+- **Plan:** list the applicable sections (by §) and name the compliance checklist as a Constitution Check gate; do not copy it.
 - **Implement:** build from the primitives (`docs/code-map.md`); open the nearest sibling and follow its pattern. Do not restyle primitives with ad-hoc classes.
 - **Review / completion:** run lint and the style-guide browser tests, then review the checklist items marked *Review*. A deviation without explicit justification in the plan is rejected.
 

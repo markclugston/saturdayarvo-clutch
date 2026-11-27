@@ -16,6 +16,8 @@ tests first and confirm they fail before implementing.
 - One line per task, at most about 200 characters. State the file and the outcome. Do not
   restate spec or plan text; reference it (e.g. `per data-model.md ImportReview`, `FR-004`).
 - Paths and patterns follow the nearest existing sibling file (`docs/code-map.md`).
+- Cite every FR, and every success criterion needing buildable work, by ID in at least one task.
+- Each gate task cites every PENDING Constitution Check ID it closes.
 
 <!--
   Replace every sample below with real tasks. Omit Setup or Foundational phases when the
@@ -60,9 +62,9 @@ Include each applicable row from the plan's Constitution Check. Delete rows that
 - [ ] TXXX Browser test for critical journey in `<e2e spec path>` (WEB-001)
 - [ ] TXXX Independent query review of changed queries (DOT-002, `clutch-data-access`)
 - [ ] TXXX Migration review with rollback/backfill plan (OPS-001, `clutch-data-access`)
-- [ ] TXXX Independent security review of the full diff (SEC-001..003, `clutch-security-review`)
-- [ ] TXXX Validate UI compliance checklist in both themes (WEB-001, `clutch-ui-style`)
-- [ ] TXXX Run completion quality gates and record results (ENG-001, test cadence in `clutch-dotnet-service` / `clutch-frontend`)
+- [ ] TXXX Independent security review of the full diff (SEC-001..004, `clutch-security-review`)
+- [ ] TXXX Validate every UI compliance checklist item in both themes; record each result in `validation.md` (WEB-001, `clutch-ui-style`)
+- [ ] TXXX Run completion quality gates and record results (ENG-001, DOT-001, test cadence in `clutch-dotnet-service` / `clutch-frontend`)
 
 ---
 

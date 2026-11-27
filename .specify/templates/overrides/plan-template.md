@@ -6,6 +6,7 @@
   Clutch override. Be concise: bullets over prose, no restating the spec.
   The code is the source of truth. Use docs/code-map.md to find the files that answer a
   question, and record only what this feature changes or adds.
+  State each fact in one file; elsewhere cite the ID or file.
   research.md: only when NEEDS CLARIFICATION items exist; one short entry per decision.
   contracts/: schema only. quickstart.md: runnable validation commands only.
 -->
@@ -30,7 +31,7 @@ Do not restate them.
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
-*Procedure: `clutch-constitution-check` skill. One row per ID; use N/A with a reason when an ID does not apply.*
+*Procedure: `clutch-constitution-check` skill. Keep rows only for IDs that apply, one sentence per cell. List every other ID on the N/A line with a short reason.*
 
 | ID | Applies | How the plan complies | Gate / evidence | Status |
 |----|---------|-----------------------|-----------------|--------|
@@ -43,10 +44,13 @@ Do not restate them.
 | SEC-001 | | | Independent security review | |
 | SEC-002 | | | Security review | |
 | SEC-003 | | | Security review | |
+| SEC-004 | | | Validation tests in UI and server, security review | |
 | WEB-001 | | | Frontend gates, UI compliance checklist | |
 | Perf & Observability | | | 500 ms feedback, OpenTelemetry metrics | |
 
-[If WEB-001 applies: list the applicable style guide sections (§) and paste the UI compliance checklist from `clutch-ui-style/references/compliance-checklist.md`.]
+N/A: [ID (reason), ...]
+
+[If WEB-001 applies: list the applicable style guide sections (§). Gate: every item in `clutch-ui-style/references/compliance-checklist.md`. Do not copy the checklist here.]
 
 ## Project Structure
 

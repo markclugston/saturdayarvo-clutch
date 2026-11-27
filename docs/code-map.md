@@ -43,3 +43,8 @@ contains what's described, search for the concern and update the pointer.
 format, audit storage, telemetry, data fetching and validation) is settled. Specify, clarify and
 plan record it as an assumption, citing the file above, and never raise it as NEEDS
 CLARIFICATION. Only a feature that changes it should discuss it.
+
+**Defaults when the feature description is silent** (also settled):
+
+- Concurrent edits: the version check in `src/Clutch.API/Application/Mortgages/MortgageService.cs`. Add edit leases only when the description asks for them.
+- Performance, scale and observability: the constitution's requirements, with no added targets or mechanisms.

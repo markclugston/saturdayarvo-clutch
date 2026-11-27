@@ -1,14 +1,15 @@
 <!--
 Sync Impact Report
-- Version: 1.6.0 → 1.7.0 (MINOR: new requirement SEC-004)
-- Added: SEC-004 Data Validation — dual validation (UI for UX, server at earliest opportunity for
-  correctness and security), complete and correct, field-level errors, no information disclosure
-- Follow-up: clutch-security-review and clutch-frontend skills should reference SEC-004; run
-  .\scripts\sync-agent-config.ps1 -From claude
+- Version: 1.7.0 → 1.8.0 (MINOR: WEB-001 compliance checklist is referenced by plans, not copied)
+- Changed: WEB-001. Rationale: the copied checklist added to every plan and analysis; the
+  completion review still records every item
+- Updated: plan and tasks templates, clutch-constitution-check, clutch-ui-style,
+  clutch-security-review and clutch-frontend (the last two close the 1.7.0 SEC-004 follow-up)
+- Follow-up: none
 -->
 # SaturdayArvo Clutch Constitution
 
-**Version**: 1.7.0 | **Last Amended**: 2026-11-22
+**Version**: 1.8.0 | **Last Amended**: 2026-11-28
 
 ## Governance
 Source of truth: the running code, its lint rules and its automated tests define implementation (design tokens, components, patterns, conventions). This constitution defines obligations, governance and process. Specifications define intent.
@@ -77,7 +78,7 @@ Each heading names the skill holding the process for that requirement. The proce
 - Visible labels, headings and button text must use Title Case.
 - Percentage (%) and currency ($) entry controls must never display characters that cannot form a valid value, and must show the formatted value when focus leaves the field. They reuse the established implementation (`docs/code-map.md`).
 - All numbers and currency amounts must be right aligned: numeric and currency table cells and their column headers, numeric entry controls, and displayed amounts and rates. Enforced by the `clutch/numeric-align` lint rule and the `FloatingField` primitive (`docs/code-map.md`).
-- UI work must apply the style guide: the design system implemented in code and its enforcing lint rule and browser tests. Plans must identify the applicable style guide sections, and its compliance checklist must appear in the Constitution Check and completion review.
+- UI work must apply the style guide: the design system implemented in code and its enforcing lint rule and browser tests. Plans must identify the applicable style guide sections and name its compliance checklist as a Constitution Check gate. The completion review must record a result for every checklist item.
 - Style-guide rule changes are made in code first (tokens, primitives, lint rule, browser tests); guidance that references them is updated in the same change.
 
 ## Performance & Observability

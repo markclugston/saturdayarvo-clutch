@@ -24,6 +24,7 @@ procedure for applying them. Constitutional violations are CRITICAL findings.
 | SEC-001 | adds or changes endpoints, auth, input handling or dependencies | `clutch-security-review` |
 | SEC-002 | touches configuration, credentials or integrations | `clutch-security-review` |
 | SEC-003 | handles personal, payment or financial data, logging or error responses | `clutch-security-review` |
+| SEC-004 | accepts or changes data entry or input validation | `clutch-security-review`, `clutch-frontend` |
 | WEB-001 | touches `src/clutch-web` | `clutch-frontend`, `clutch-ui-style` |
 | Perf & Observability | adds user-initiated actions or service behaviour | `clutch-dotnet-service` / `clutch-frontend` |
 
@@ -32,18 +33,20 @@ say why it is marginal.
 
 ## 2. Write the Constitution Check (plan)
 
-Fill the plan's Constitution Check section with one row per ID, applicable or not:
+Fill the plan's Constitution Check section with one row per applicable ID, then name every other
+ID on one N/A line with a short reason:
 
 ```markdown
 | ID | Applies | How the plan complies | Gate / evidence | Status |
 |----|---------|-----------------------|-----------------|--------|
 | ARC-001 | Yes | Domain logic in X, no HTTP types in domain | Review | PASS |
 | DOT-002 | Yes | New query in Y; independent query review planned | Query review checklist | PENDING |
-| WEB-001 | No | No clutch-web changes | — | N/A |
+
+N/A: WEB-001 (no clutch-web changes)
 ```
 
-- When WEB-001 applies: list the applicable style guide sections (by §) and paste the UI
-  compliance checklist from `clutch-ui-style/references/compliance-checklist.md`.
+- When WEB-001 applies: list the applicable style guide sections (by §) and name
+  `clutch-ui-style/references/compliance-checklist.md` as a gate. Do not copy it into the plan.
 - Any deviation goes in the plan's Complexity Tracking table with a justification. An unjustified
   deviation is a CRITICAL finding.
 - Re-evaluate the Constitution Check after design (Phase 1).
@@ -68,7 +71,7 @@ Work is complete only when all of these hold. Record each with evidence:
 - [ ] All applicable automated tests and quality gates pass (see the domain skills for the commands)
 - [ ] Required database reviews completed (`clutch-data-access`)
 - [ ] Independent security review completed and all findings remediated and verified (`clutch-security-review`)
-- [ ] UI compliance checklist validated, if WEB-001 applies
+- [ ] Every UI compliance checklist item validated and its result recorded, if WEB-001 applies
 - [ ] No blocking findings remain
 
 Reporting rules:

@@ -64,6 +64,10 @@ Tick each that applies, so plan can pick requirement IDs without rereading the s
 
 - **SC-001**: [Measurable outcome]
 
+## Out Of Scope
+
+- [From the "Out of scope:" statement and clarify answers, or "None"]
+
 ## Assumptions
 
 - [Reasonable defaults chosen where the description was silent]

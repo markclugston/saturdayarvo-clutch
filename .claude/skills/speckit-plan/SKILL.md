@@ -1,14 +1,25 @@
 ---
-name: "speckit-plan"
-description: "Execute the implementation planning workflow using the plan template to generate design artifacts."
+name: speckit-plan
+description: Execute the implementation planning workflow using the plan template
+  to generate design artifacts.
 argument-hint: "Optional guidance for the planning phase"
-compatibility: "Requires spec-kit project structure with .specify/ directory"
+compatibility: Requires spec-kit project structure with .specify/ directory
 metadata:
-  author: "github-spec-kit"
-  source: "templates/commands/plan.md"
+  author: github-spec-kit
+  source: preset:clutch
 user-invocable: true
 disable-model-invocation: false
 ---
+
+# Speckit Plan Skill
+
+## Clutch Rules
+
+These take precedence over any conflicting instruction below.
+
+- Phase 0 replaces the version below: take only the NEEDS CLARIFICATION items in Technical Context. If there are none, skip the phase and write no `research.md`. Otherwise resolve each from the code (`docs/code-map.md`) and record it in a few lines. Do not research dependencies or technology choices, and do not dispatch research agents.
+- Phase 1 needs no `research.md`, only that no NEEDS CLARIFICATION remains.
+- State each fact in one file only: behaviour and rules stay in `spec.md`, fields and constraints go in `data-model.md`, API and UI shapes in `contracts/`, decisions in `research.md`. Elsewhere cite the ID or file.
 
 
 ## User Input

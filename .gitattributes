@@ -1,0 +1,5 @@
+# Spec Kit compares file hashes, so its files keep LF line endings on every checkout.
+.specify/** text eol=lf
+.claude/skills/speckit-*/** text eol=lf
+.github/skills/speckit-*/** text eol=lf
+presets/** text eol=lf

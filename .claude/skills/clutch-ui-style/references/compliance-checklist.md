@@ -1,6 +1,7 @@
 # UI compliance checklist (style guide §11)
 
-Copy into the plan's Constitution Check and the task-completion gate for any UI work. The
+The gate for any UI work: plans reference this file, and the completion review records a result
+for every item in the feature's `validation.md`. The
 *Check* column says what validates each item: **Lint** (`npm run lint`), **Browser**
 (`e2e/style-guide.spec.ts` and affected journey specs), **Component** (component tests) or
 **Review** (no tool enforces it; record the evidence).
