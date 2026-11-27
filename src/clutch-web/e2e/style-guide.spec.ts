@@ -399,7 +399,7 @@ async function openAssets(page: Page) {
 
 async function openAsset(page: Page) {
   await openAssets(page)
-  await page.getByRole('button', { name: longAssetName, exact: true }).click()
+  await page.getByRole('button', { name: `Edit ${longAssetName}`, exact: true }).click()
 }
 
 const regularToasts = (page: Page) => page.getByRole('region', { name: 'Notifications', exact: true })

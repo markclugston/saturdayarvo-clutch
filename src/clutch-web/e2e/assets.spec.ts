@@ -133,7 +133,7 @@ async function mockApi(page: Page, assets: Asset[] = []) {
 const navigation = (page: Page) => page.getByRole('navigation', { name: 'Primary' })
 const dataRows = (page: Page) => page.locator('tbody tr')
 const row = (page: Page, name: string) =>
-  dataRows(page).filter({ has: page.getByRole('button', { name, exact: true }) })
+  dataRows(page).filter({ has: page.getByRole('button', { name: `Edit ${name}`, exact: true }) })
 const total = (page: Page, code: string) => page.getByRole('row', { name: new RegExp(`^Total ${code} `) })
 const heading = (page: Page, name: string) => page.getByRole('heading', { name, exact: true })
 const field = (page: Page, name: string) => page.getByLabel(name, { exact: true })
@@ -277,7 +277,7 @@ test('editing adds and deletes valuations, and each currency keeps its own total
   await expect(total(page, 'AUD')).toContainText('$15,500.00')
   await expect(total(page, 'USD')).toContainText('$2,000.00')
 
-  await page.getByRole('button', { name: 'House', exact: true }).click()
+  await page.getByRole('button', { name: 'Edit House', exact: true }).click()
   await expect(page).toHaveURL(new RegExp(`/assets/${register.assets[0]!.id}$`))
   await expect(field(page, 'Name')).toHaveValue('House')
   await expect(page.getByText('Currency: Australian Dollar (AUD)')).toBeVisible()
@@ -299,7 +299,7 @@ test('editing adds and deletes valuations, and each currency keeps its own total
 test('asks before browser Back discards unsaved edits', async ({ page }) => {
   const register = await mockApi(page, [asset('House', 'AUD', [1, '2026-01-01'])])
   await openAssets(page)
-  await page.getByRole('button', { name: 'House', exact: true }).click()
+  await page.getByRole('button', { name: 'Edit House', exact: true }).click()
   await field(page, 'Name').fill('Home')
   const editUrl = page.url()
 
