@@ -293,7 +293,7 @@ function AppContent() {
     >
       {/* Keep keyboard focus visible while the pointer holds the overlay open below md: */}
       {/* the focused control must sit above the navigation (z-40). */}
-      <ContentPanel wide={(showAssets || showCategories || showMortgages) && !showAdminSettings} className={cn(
+      <ContentPanel wide={!showAdminSettings} className={cn(
         'ml-0 lg:ml-0',
         '[&_:is(button,input,select,textarea):not(.sr-only):focus-visible]:relative [&_:is(button,input,select,textarea):not(.sr-only):focus-visible]:z-50',
         '[&_:focus-visible:not(.sr-only)]:focus-ring',
