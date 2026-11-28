@@ -5,6 +5,8 @@ import { Card, CardTitle } from '@/components/ui/card'
 import { ErrorMessage } from '@/components/ui/error-message'
 import { ApiError } from '@/lib/api/client'
 import { formatCurrencyAmount } from '@/lib/formatCurrencyAmount'
+import { usePinnedList } from '@/lib/usePinnedList'
+import { cn } from '@/lib/utils'
 import { DeleteTransactionDialog } from './DeleteTransactionDialog'
 import { useTransactions } from './useTransactions'
 
@@ -19,6 +21,7 @@ export function TransactionsTable({
 }: TransactionsTableProps) {
   const transactionsQuery = useTransactions(accountId)
   const [pendingDelete, setPendingDelete] = useState<{ id: string; description: string } | null>(null)
+  const { trackRef, listRef, spacerRef } = usePinnedList()
 
   if (transactionsQuery.isPending) {
     return <p className="text-fg-secondary" role="status">Loading transactions…</p>
@@ -39,86 +42,104 @@ export function TransactionsTable({
     )
   }
 
+  // Anything after the rows is reached at the end of the list, so it scrolls inside the region.
+  const hasListEnd = transactionsQuery.hasNextPage || transactionsQuery.isFetchNextPageError
+
   return (
-    <Card aria-labelledby="transactions-heading" as="section" className="min-w-0 space-y-3">
-      <CardTitle as="h2" id="transactions-heading">Transactions</CardTitle>
-      {pendingDelete && (
-        <DeleteTransactionDialog
-          accountId={accountId}
-          onClose={() => setPendingDelete(null)}
-          transaction={pendingDelete}
-        />
-      )}
-      <div
-        aria-label="Transactions"
-        className="overflow-x-auto rounded-control focus-visible:focus-ring"
-        role="region"
-        tabIndex={0}
-      >
-        <table className="w-full text-left text-sm">
-          <caption className="sr-only">Transactions for this account</caption>
-          <thead className="bg-raised">
-            <tr>
-              <th className="px-3 py-2" scope="col">Date</th>
-              <th className="px-3 py-2" scope="col">Description</th>
-              <th className="px-3 py-2" scope="col">Direction</th>
-              <th className="px-3 py-2 text-right" scope="col">Amount</th>
-              {showBalance && <th className="px-3 py-2 text-right" scope="col">Balance</th>}
-              <th className="px-3 py-2 text-right" scope="col"><span className="sr-only">Actions</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            {transactions.map((transaction) => (
-              <tr className="hairline-b" key={transaction.id}>
-                <td className="px-3 py-2">
-                  {new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' })
-                    .format(new Date(`${transaction.transactionDate}T00:00:00`))}
-                </td>
-                <td className="px-3 py-2">{transaction.description}</td>
-                <td className="px-3 py-2">{transaction.direction}</td>
-                <td className="px-3 py-2 text-right tabular-nums">
-                  {formatCurrencyAmount(transaction.amount, currencyCode)}
-                </td>
-                {showBalance && (
-                  <td className="px-3 py-2 text-right tabular-nums">
-                    {transaction.balance == null
-                      ? ''
-                      : formatCurrencyAmount(transaction.balance, currencyCode)}
-                  </td>
-                )}
-                <td className="px-3 py-2 text-right">
-                  <Button
-                    aria-label="Delete transaction"
-                    onClick={() => setPendingDelete({
-                      id: transaction.id,
-                      description: transaction.description,
-                    })}
-                    size="icon"
-                    type="button"
-                    variant="tertiary"
-                  >
-                    <Trash2 aria-hidden="true" className="size-4 text-danger" />
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {transactionsQuery.hasNextPage && (
-        <Button
-          disabled={transactionsQuery.isFetchingNextPage}
-          onClick={() => void transactionsQuery.fetchNextPage()}
-          type="button"
-          variant="secondary"
+    <div className="min-w-0 [overflow-anchor:none]" ref={trackRef}>
+      <Card aria-labelledby="transactions-heading" as="section" className="sticky top-0 min-w-0 space-y-3">
+        <CardTitle as="h2" id="transactions-heading">Transactions</CardTitle>
+        {pendingDelete && (
+          <DeleteTransactionDialog
+            accountId={accountId}
+            onClose={() => setPendingDelete(null)}
+            transaction={pendingDelete}
+          />
+        )}
+        <div
+          aria-label="Transactions"
+          // The extra room keeps the focus ring of what follows the rows from being clipped.
+          className={cn(
+            'overflow-x-auto overflow-y-hidden rounded-control [overflow-anchor:none] focus-visible:focus-ring',
+            hasListEnd && '-mx-1 -mb-1 px-1',
+          )}
+          ref={listRef}
+          role="region"
+          tabIndex={0}
         >
-          {transactionsQuery.isFetchingNextPage ? 'Loading…' : 'Load More'}
-        </Button>
-      )}
-      {transactionsQuery.isFetchNextPageError && (
-        <ErrorMessage>Unable to load more transactions. Please try again.</ErrorMessage>
-      )}
-    </Card>
+          <div className={cn('w-fit min-w-full', hasListEnd && 'pb-1')}>
+            <table className="w-full text-left text-sm">
+              <caption className="sr-only">Transactions for this account</caption>
+              <thead className="sticky top-0 z-10 bg-raised">
+                <tr>
+                  <th className="px-3 py-2" scope="col">Date</th>
+                  <th className="px-3 py-2" scope="col">Description</th>
+                  <th className="px-3 py-2" scope="col">Direction</th>
+                  <th className="px-3 py-2 text-right" scope="col">Amount</th>
+                  {showBalance && <th className="px-3 py-2 text-right" scope="col">Balance</th>}
+                  <th className="px-3 py-2 text-right" scope="col"><span className="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              {/* Isolated, so a focused button's stacking order cannot lift it above the header. */}
+              <tbody className="isolate">
+                {transactions.map((transaction) => (
+                  <tr className="hairline-b" key={transaction.id}>
+                    <td className="px-3 py-2">
+                      {new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' })
+                        .format(new Date(`${transaction.transactionDate}T00:00:00`))}
+                    </td>
+                    <td className="px-3 py-2">{transaction.description}</td>
+                    <td className="px-3 py-2">{transaction.direction}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">
+                      {formatCurrencyAmount(transaction.amount, currencyCode)}
+                    </td>
+                    {showBalance && (
+                      <td className="px-3 py-2 text-right tabular-nums">
+                        {transaction.balance == null
+                          ? ''
+                          : formatCurrencyAmount(transaction.balance, currencyCode)}
+                      </td>
+                    )}
+                    <td className="px-3 py-2 text-right">
+                      <Button
+                        aria-label="Delete transaction"
+                        onClick={() => setPendingDelete({
+                          id: transaction.id,
+                          description: transaction.description,
+                        })}
+                        size="icon"
+                        type="button"
+                        variant="tertiary"
+                      >
+                        <Trash2 aria-hidden="true" className="size-4 text-danger" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {hasListEnd && (
+              <div className="sticky left-0 w-fit space-y-3 pt-3">
+                {transactionsQuery.hasNextPage && (
+                  <Button
+                    disabled={transactionsQuery.isFetchingNextPage}
+                    onClick={() => void transactionsQuery.fetchNextPage()}
+                    type="button"
+                    variant="secondary"
+                  >
+                    {transactionsQuery.isFetchingNextPage ? 'Loading…' : 'Load More'}
+                  </Button>
+                )}
+                {transactionsQuery.isFetchNextPageError && (
+                  <ErrorMessage>Unable to load more transactions. Please try again.</ErrorMessage>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </Card>
+      <div aria-hidden="true" ref={spacerRef} />
+    </div>
   )
 }
 

@@ -21,6 +21,19 @@ function scrollToRow(row: number) {
   vi.restoreAllMocks()
 }
 
+/** The list sits `listTop` px down the panel and has itself scrolled `row` rows. */
+function scrollListToRow(row: number, listTop: number) {
+  const list = screen.getByRole('group', { name: 'Schedule Rows' })
+  const scroller = screen.getByTestId('scroller')
+  const rect = (top: number) => ({ top }) as DOMRect
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function mock(this: HTMLElement) {
+    if (this === scroller) return rect(0)
+    return this === list ? rect(listTop) : rect(listTop - 40 * row)
+  })
+  fireEvent.scroll(list)
+  vi.restoreAllMocks()
+}
+
 describe('AmortizationSchedule', () => {
   it('is a read-only table with Period, Date and Bank Schedule headers and Duration rows', () => {
     render(<AmortizationSchedule duration={360} {...monthly} />)
@@ -112,6 +125,43 @@ describe('AmortizationSchedule', () => {
     expect(rows[0]).toHaveAttribute('aria-rowindex', '1')
     expect(rows[0]?.className).toContain('sticky')
     expect(screen.getByText('501')).toBeInTheDocument()
+    expect(cells(501)[1]).toBe('29 Aug 2065')
+    expect(screen.queryByText('2', { selector: '[role="cell"]' })).not.toBeInTheDocument()
+  })
+
+  it('puts its rows in a named, keyboard-focusable list that scrolls sideways', () => {
+    const listRef = vi.fn()
+    render(<AmortizationSchedule duration={12} listRef={listRef} {...monthly} />)
+
+    const list = screen.getByRole('group', { name: 'Schedule Rows' })
+    expect(listRef).toHaveBeenCalledWith(list)
+    expect(list.firstElementChild).toBe(screen.getByRole('table'))
+    expect(list).toHaveAttribute('tabindex', '0')
+    expect(list).toHaveClass('overflow-x-auto', 'overflow-y-hidden', '[overflow-anchor:none]')
+    expect(list).not.toHaveClass('flex-1')
+  })
+
+  it('gives the space standing in for unrendered rows no transition, so the list keeps its height', () => {
+    render(<AmortizationSchedule duration={360} {...monthly} />)
+
+    const spacers = within(screen.getByRole('rowgroup')).getAllByRole('presentation', { hidden: true })
+
+    // The reduced-motion rule would otherwise change their height a frame after the rows.
+    expect(spacers).toHaveLength(2)
+    for (const spacer of spacers) {
+      expect(spacer).toHaveClass('transition-none')
+    }
+  })
+
+  it.each([0, 1000])('renders the rows its own list has scrolled to, %d px down the panel', (listTop) => {
+    render(
+      <div data-testid="scroller" style={{ overflowY: 'auto' }}>
+        <AmortizationSchedule duration={1000} {...monthly} />
+      </div>,
+    )
+
+    scrollListToRow(500, listTop)
+
     expect(cells(501)[1]).toBe('29 Aug 2065')
     expect(screen.queryByText('2', { selector: '[role="cell"]' })).not.toBeInTheDocument()
   })

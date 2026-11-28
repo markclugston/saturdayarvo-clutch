@@ -32,6 +32,7 @@ contains what's described, search for the concern and update the pointer.
 | Numeric right-alignment lint rule (`clutch/numeric-align`) and its tests | `src/clutch-web/eslint-rules/clutch-numeric-align.js`, `clutch-numeric-align.test.js` |
 | Render error boundaries (whole app and page content); console handling of render errors | `src/clutch-web/src/components/error-boundary/` |
 | Percentage and currency entry fields; display formatting of amounts | `src/clutch-web/src/features/mortgages/FormattedNumberField.tsx`; `src/clutch-web/src/lib/formatCurrencyAmount.ts` |
+| List card stopped at the top of the content panel while the page scroll moves its rows, with the column header held | `src/clutch-web/src/lib/usePinnedList.ts` |
 | Mortgage Actual Balance values shared by the schedule column and the Burndown chart | `src/clutch-web/src/features/mortgages/actualBalances.ts` |
 | Mortgage Forecast Balance calculation (median recent reduction) | `src/clutch-web/src/features/mortgages/forecastBalances.ts` |
 | Style-guide browser states (axe, focus, surfaces, screenshots) | `src/clutch-web/e2e/style-guide.spec.ts`, `playwright.style-guide.config.ts` |

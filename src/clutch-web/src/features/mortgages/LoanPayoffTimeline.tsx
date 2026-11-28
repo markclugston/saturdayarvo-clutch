@@ -3,6 +3,8 @@ import { RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip } from '@/components/ui/tooltip'
 import type { LoanPayoffTimelineView } from '@/lib/api/schemas'
+import { usePinnedList } from '@/lib/usePinnedList'
+import { cn } from '@/lib/utils'
 import { AmortizationSchedule } from './AmortizationSchedule'
 import { BurnDownChart } from './BurnDownChart'
 import type { PaymentFrequency } from './repaymentDates'
@@ -35,7 +37,10 @@ type LoanPayoffTimelineProps = {
   calculation?: ScheduleInputs
 }
 
-/** One card showing the burndown chart or the amortization schedule, with a switch at its top right. */
+/**
+ * One card showing the burndown chart or the amortization schedule, with a switch at its top right.
+ * With the schedule, the card stops at the top of the page while its rows scroll.
+ */
 export function LoanPayoffTimeline({
   view,
   onSwitch,
@@ -51,39 +56,50 @@ export function LoanPayoffTimeline({
     [calculation],
   )
   const label = SWITCH_LABEL[view]
+  const { trackRef, listRef, spacerRef } = usePinnedList()
 
   return (
-    <section aria-labelledby="loan-payoff-timeline-heading" className="flex min-w-0 flex-1 flex-col rounded-card bg-card p-4 xl:p-5">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold" id="loan-payoff-timeline-heading">Amortization Schedule</h2>
-        <Tooltip content={label}>
-          <Button aria-label={label} onClick={onSwitch} size="icon" type="button" variant="icon">
-            <RefreshCw aria-hidden="true" className="size-4" />
-          </Button>
-        </Tooltip>
-      </div>
-      <p className="sr-only" role="status">{SHOWING[view]}</p>
-      {view === 'Burndown'
-        ? (
-          <BurnDownChart
-            accountId={accountId}
-            disbursalDate={calculation?.disbursalDate}
-            duration={calculation?.duration}
-            openingBalanceCents={calculation?.openingBalanceCents}
-            paymentFrequency={calculation?.paymentFrequency}
-            saved={saved}
-            schedule={schedule}
-          />
-        )
-        : (
-          <AmortizationSchedule
-            accountId={accountId}
-            disbursalDate={disbursalDate}
-            duration={duration}
-            paymentFrequency={paymentFrequency}
-            schedule={schedule}
-          />
+    <div className="flex min-w-0 flex-1 flex-col [overflow-anchor:none]" ref={trackRef}>
+      <section
+        aria-labelledby="loan-payoff-timeline-heading"
+        className={cn(
+          'flex min-w-0 flex-1 flex-col rounded-card bg-card p-4 xl:p-5',
+          view === 'Schedule' && 'sticky top-0',
         )}
-    </section>
+      >
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="text-base font-semibold" id="loan-payoff-timeline-heading">Amortization Schedule</h2>
+          <Tooltip content={label}>
+            <Button aria-label={label} onClick={onSwitch} size="icon" type="button" variant="icon">
+              <RefreshCw aria-hidden="true" className="size-4" />
+            </Button>
+          </Tooltip>
+        </div>
+        <p className="sr-only" role="status">{SHOWING[view]}</p>
+        {view === 'Burndown'
+          ? (
+            <BurnDownChart
+              accountId={accountId}
+              disbursalDate={calculation?.disbursalDate}
+              duration={calculation?.duration}
+              openingBalanceCents={calculation?.openingBalanceCents}
+              paymentFrequency={calculation?.paymentFrequency}
+              saved={saved}
+              schedule={schedule}
+            />
+          )
+          : (
+            <AmortizationSchedule
+              accountId={accountId}
+              disbursalDate={disbursalDate}
+              duration={duration}
+              listRef={listRef}
+              paymentFrequency={paymentFrequency}
+              schedule={schedule}
+            />
+          )}
+      </section>
+      <div aria-hidden="true" className="shrink-0" ref={spacerRef} />
+    </div>
   )
 }

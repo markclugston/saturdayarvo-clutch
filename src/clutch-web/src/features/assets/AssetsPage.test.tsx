@@ -13,6 +13,9 @@ vi.mock('./api', async (importActual) => ({
   listAssets: vi.fn(),
   deleteAsset: vi.fn(),
 }))
+// What the hook does with the elements is covered by its own tests.
+const pinned = vi.hoisted(() => ({ trackRef: vi.fn(), listRef: vi.fn(), spacerRef: vi.fn() }))
+vi.mock('@/lib/usePinnedList', () => ({ usePinnedList: () => pinned }))
 
 describe('AssetsPage', () => {
   const onAdd = vi.fn()
@@ -60,6 +63,55 @@ describe('AssetsPage', () => {
     for (const row of [rowOf('House'), screen.getByRole('row', { name: /Total AUD/ })]) {
       expect(row.querySelector('td.tabular-nums')).toHaveClass('text-right', 'tabular-nums')
     }
+  })
+
+  it('stops its card while the list scrolls, with the column header held in the list', async () => {
+    render()
+    await table()
+
+    const assetTable = screen.getByRole('table', {
+      name: 'Your assets with their latest valuations and totals by currency',
+    })
+    const header = assetTable.querySelector('thead')!
+    const region = assetTable.parentElement!
+    const card = region.closest('[data-slot="card"]')!
+    const track = card.parentElement!
+    const spacer = card.nextElementSibling!
+    expect(pinned.trackRef).toHaveBeenCalledWith(track)
+    expect(pinned.listRef).toHaveBeenCalledWith(region)
+    expect(pinned.spacerRef).toHaveBeenCalledWith(spacer)
+    expect(track).toHaveClass('min-w-0', '[overflow-anchor:none]')
+    expect(track.firstElementChild).toBe(card)
+    expect(card).toHaveClass('sticky', 'top-0')
+    expect(spacer).toHaveAttribute('aria-hidden', 'true')
+    expect(header).toHaveClass('sticky', 'top-0', 'z-10', 'bg-raised')
+    expect(assetTable.querySelector('tbody')).toHaveClass('isolate')
+
+    expect(region).toHaveAttribute('role', 'region')
+    expect(region).toHaveAccessibleName('Assets')
+    expect(region).toHaveClass('relative', 'overflow-x-auto', 'overflow-y-hidden', '[overflow-anchor:none]')
+    expect(region).toHaveAttribute('tabindex', '0')
+
+    const headers = within(header).getAllByRole('columnheader')
+    expect(headers.map((cell) => cell.textContent)).toEqual(['Name', 'Description', 'Valuation', 'Actions'])
+    for (const cell of headers) {
+      expect(cell).toHaveAttribute('scope', 'col')
+    }
+    for (const cell of headers.slice(2)) {
+      expect(cell).toHaveClass('text-right')
+    }
+  })
+
+  it('never holds the totals footer: it scrolls at the end of the list', async () => {
+    render()
+    await table()
+
+    const assetTable = screen.getByRole('table')
+    const footer = assetTable.querySelector('tfoot')!
+    expect(assetTable.closest('[role="region"]')).toContainElement(footer)
+    expect(footer).toContainElement(screen.getByRole('row', { name: /Total AUD/ }))
+    expect(footer).not.toHaveAttribute('class')
+    expect(footer).not.toHaveAttribute('style')
   })
 
   it('truncates long text and keeps it in the title', async () => {

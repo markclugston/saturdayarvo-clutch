@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type Ref } from 'react'
 import { ErrorMessage } from '@/components/ui/error-message'
 import { formatCurrencyAmount } from '@/lib/formatCurrencyAmount'
 import { useActualBalances } from './actualBalances'
@@ -36,6 +36,8 @@ type AmortizationScheduleProps = {
   accountId?: string
   /** The calculated Bank Schedule; absent shows "Not yet calculated". */
   schedule?: ScheduledPeriod[]
+  /** Receives the element that scrolls the rows, so the card around it can be stopped (`usePinnedList`). */
+  listRef?: Ref<HTMLDivElement>
 }
 
 /** What the schedule table needs to add the account balance columns. */
@@ -70,12 +72,14 @@ function PlainSchedule({
   disbursalDate,
   paymentFrequency,
   schedule,
-}: PeriodDates & { duration?: number, schedule?: ScheduledPeriod[] }) {
+  listRef,
+}: Pick<AmortizationScheduleProps, 'duration' | 'disbursalDate' | 'paymentFrequency' | 'schedule' | 'listRef'>) {
   return duration === undefined
     ? <p className="text-sm text-fg-secondary">{ENTER_DETAILS_MESSAGE}</p>
     : (
         <ScheduleTable
           disbursalDate={disbursalDate}
+          listRef={listRef}
           paymentFrequency={paymentFrequency}
           rowCount={duration}
           schedule={schedule}
@@ -89,6 +93,7 @@ function AccountSchedule({
   disbursalDate,
   paymentFrequency,
   schedule,
+  listRef,
 }: AmortizationScheduleProps & { accountId: string }) {
   const actual = useActualBalances(accountId, { duration, disbursalDate, paymentFrequency })
   const complete = duration !== undefined && disbursalDate !== undefined && paymentFrequency !== undefined
@@ -98,6 +103,7 @@ function AccountSchedule({
       <PlainSchedule
         disbursalDate={disbursalDate}
         duration={duration}
+        listRef={listRef}
         paymentFrequency={paymentFrequency}
         schedule={schedule}
       />
@@ -132,6 +138,7 @@ function AccountSchedule({
               balanceColumns={balanceColumns}
               calculated={complete}
               disbursalDate={disbursalDate}
+              listRef={listRef}
               paymentFrequency={paymentFrequency}
               rowCount={rowCount}
               schedule={schedule}
@@ -147,6 +154,7 @@ type ScheduleTableProps = PeriodDates & {
   /** False for the fallback view: only Period and the balances are filled. */
   calculated?: boolean
   schedule?: ScheduledPeriod[]
+  listRef?: Ref<HTMLDivElement>
 }
 
 /** "29 Dec 2023" for period k, or '' without a disbursal date and frequency or past 31 Dec 9999. */
@@ -165,34 +173,38 @@ function ScheduleTable({
   schedule,
   disbursalDate,
   paymentFrequency,
+  listRef,
 }: ScheduleTableProps) {
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportHeight, setViewportHeight] = useState(FALLBACK_VIEWPORT_HEIGHT)
-  const wrapperRef = useRef<HTMLDivElement>(null)
+  const tableRef = useRef<HTMLDivElement>(null)
 
-  // The page's content area scrolls, not this group: window the rows against that scroller.
+  // Rows pass out of sight above the page's content area, or above their own list once the card is
+  // stopped and the list scrolls: window them against whichever edge is lower.
   useEffect(() => {
-    const wrapper = wrapperRef.current
-    const scroller = wrapper ? findScrollParent(wrapper) : null
-    if (!wrapper || !scroller) {
+    const table = tableRef.current
+    const list = table?.parentElement
+    const scroller = list ? findScrollParent(list) : null
+    if (!table || !list || !scroller) {
       return undefined
     }
     function measure() {
-      if (!wrapper || !scroller) {
+      if (!table || !list || !scroller) {
         return
       }
-      const wrapperTop = wrapper.getBoundingClientRect().top
-      const scrollerTop = scroller.getBoundingClientRect().top
-      setScrollTop(Math.max(0, scrollerTop - wrapperTop))
+      const visibleTop = Math.max(scroller.getBoundingClientRect().top, list.getBoundingClientRect().top)
+      setScrollTop(Math.max(0, visibleTop - table.getBoundingClientRect().top))
       if (scroller.clientHeight > 0) {
         setViewportHeight(scroller.clientHeight)
       }
     }
     measure()
     scroller.addEventListener('scroll', measure, { passive: true })
+    list.addEventListener('scroll', measure, { passive: true })
     window.addEventListener('resize', measure)
     return () => {
       scroller.removeEventListener('scroll', measure)
+      list.removeEventListener('scroll', measure)
       window.removeEventListener('resize', measure)
     }
   }, [])
@@ -217,11 +229,19 @@ function ScheduleTable({
   return (
     // No scroll anchoring: swapping rows for spacer height keeps the total height, and the browser's
     // anchor adjustment would move the scroller itself, which renders new rows and moves it again.
-    <div className="min-w-0 flex-1 [overflow-anchor:none]" ref={wrapperRef}>
+    <div
+      aria-label="Schedule Rows"
+      // Rounded for the focus ring only: at rest the header keeps its square corners.
+      className="min-w-0 overflow-x-auto overflow-y-hidden [overflow-anchor:none] focus-visible:rounded-control focus-visible:focus-ring"
+      ref={listRef}
+      role="group"
+      tabIndex={0}
+    >
       <div
         aria-busy={balanceColumns?.loading ? true : undefined}
         aria-rowcount={rowCount + 1}
         className={`${balanceColumns ? 'min-w-140' : 'min-w-80'} text-sm`}
+        ref={tableRef}
         role="table"
       >
         {balanceColumns?.loading && <p className="sr-only" role="status">Loading account balances</p>}
@@ -239,7 +259,9 @@ function ScheduleTable({
           ))}
         </div>
         <div role="rowgroup">
-          <div aria-hidden="true" role="presentation" style={{ height: first * ROW_HEIGHT }} />
+          {/* No transition on the spacers: under reduced motion index.css would otherwise resize them a
+              frame after the rows, and the list's height would jump, moving its scroll position. */}
+          <div aria-hidden="true" className="transition-none" role="presentation" style={{ height: first * ROW_HEIGHT }} />
           {periods.map((period) => (
             <div
               aria-rowindex={period + 1}
@@ -263,7 +285,7 @@ function ScheduleTable({
               ))}
             </div>
           ))}
-          <div aria-hidden="true" role="presentation" style={{ height: (rowCount - last) * ROW_HEIGHT }} />
+          <div aria-hidden="true" className="transition-none" role="presentation" style={{ height: (rowCount - last) * ROW_HEIGHT }} />
         </div>
       </div>
     </div>

@@ -8,6 +8,9 @@ vi.mock('@/lib/api/client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/api/client')>()),
   apiRequest: vi.fn(),
 }))
+// What the hook does with the elements is covered by its own tests.
+const pinned = vi.hoisted(() => ({ trackRef: vi.fn(), listRef: vi.fn(), spacerRef: vi.fn() }))
+vi.mock('@/lib/usePinnedList', () => ({ usePinnedList: () => pinned }))
 
 describe('LoanPayoffTimeline', () => {
   it('is a section labelled by its Amortization Schedule heading', () => {
@@ -38,6 +41,31 @@ describe('LoanPayoffTimeline', () => {
     const button = screen.getByRole('button', { name: 'Show Burndown Chart' })
     expect(button).not.toHaveAttribute('aria-pressed')
     expect(screen.getByRole('status')).toHaveTextContent('Showing Amortization Schedule')
+  })
+
+  it('stops its card while the schedule list scrolls', () => {
+    pinned.listRef.mockClear()
+    render(<LoanPayoffTimeline duration={12} onSwitch={vi.fn()} saved view="Schedule" />)
+
+    const card = screen.getByRole('region', { name: 'Amortization Schedule' })
+    const track = card.parentElement!
+    const spacer = card.nextElementSibling!
+    expect(card).toHaveClass('sticky', 'top-0')
+    expect(track.firstElementChild).toBe(card)
+    expect(track).toHaveClass('flex', 'flex-1', 'flex-col', '[overflow-anchor:none]')
+    expect(spacer).toHaveAttribute('aria-hidden', 'true')
+    expect(spacer).toHaveClass('shrink-0')
+    expect(pinned.trackRef).toHaveBeenCalledWith(track)
+    expect(pinned.spacerRef).toHaveBeenCalledWith(spacer)
+    expect(pinned.listRef).toHaveBeenCalledWith(screen.getByRole('group', { name: 'Schedule Rows' }))
+  })
+
+  it('leaves the burndown chart card scrolling with the page', () => {
+    pinned.listRef.mockClear()
+    render(<LoanPayoffTimeline duration={12} onSwitch={vi.fn()} saved view="Burndown" />)
+
+    expect(screen.getByRole('region', { name: 'Amortization Schedule' })).not.toHaveClass('sticky')
+    expect(pinned.listRef).not.toHaveBeenCalled()
   })
 
   it('keeps the status line visually hidden', () => {

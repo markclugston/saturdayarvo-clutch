@@ -71,6 +71,27 @@ const transactions = Array.from({ length: 8 }, (_, index) => ({
   direction: index % 2 === 0 ? 'Outgoing' : 'Incoming',
   balance: `${1000 - index * 12}.00`,
 }))
+// 030: Lists long enough to scroll well past their column headers.
+const longTransactions = Array.from({ length: 60 }, (_, index) => ({
+  ...transactions[index % transactions.length]!,
+  id: `550e8400-e29b-41d4-a716-4466554406${String(index).padStart(2, '0')}`,
+}))
+const laterTransactions = transactions.map((transaction, index) => ({
+  ...transaction,
+  id: `550e8400-e29b-41d4-a716-4466554407${String(index).padStart(2, '0')}`,
+  description: `Earlier purchase ${index + 1}`,
+}))
+const longAssetList = {
+  ...assetList,
+  assets: [
+    ...assetList.assets,
+    ...Array.from({ length: 40 }, (_, index) => ({
+      id: `550e8400-e29b-41d4-a716-4466554405${String(index).padStart(2, '0')}`,
+      name: `Holding ${index + 1}`, description: 'Brokerage account', currencyCode: 'AUD',
+      latestValuation: { value: 1000 + index, valuationDate: '2026-02-01' },
+    })),
+  ],
+}
 const categoryNodes = [
   { id: 'group-1', parentId: null, name: 'Food and household running costs for the entire year', depth: 0 },
   { id: 'category-1', parentId: 'group-1', name: 'Groceries', depth: 1 },
@@ -101,7 +122,7 @@ const csv = {
 }
 
 type Session = 'ok' | 'unauthorized' | 'error' | 'hang'
-type MortgagesMode = 'ok' | 'empty' | 'many' | 'rates' | 'error' | 'hang'
+type MortgagesMode = 'ok' | 'empty' | 'many' | 'rates' | 'short' | 'longest' | 'error' | 'hang'
 
 const longMortgageName = 'Family home loan with the offset account and the fixed rate period'
 const mortgageFixture = (index: number) => ({
@@ -160,6 +181,10 @@ type Mock = {
   forecast: boolean
   /** What opening an asset finds (029); 'expiring' gives an edit that lasts 1.5 s. */
   asset: 'open' | 'blocked' | 'ended' | 'expiring'
+  /** Answer with transactions and assets lists that scroll (030). */
+  longLists: boolean
+  /** With `longLists`, offer a second page of transactions behind Load More (030). */
+  morePages: boolean
   /** When the mocked route received the saved-view request (ms since epoch). */
   loanPayoffTimelineRequestedAt?: number
 }
@@ -176,6 +201,8 @@ async function mockApi(page: Page, options: Partial<Mock> = {}): Promise<Mock> {
     actualBalances: false,
     forecast: false,
     asset: 'open',
+    longLists: false,
+    morePages: false,
     ...options,
   }
   await page.route((url) => url.pathname.startsWith('/api/'), async (route) => {
@@ -191,7 +218,9 @@ async function mockApi(page: Page, options: Partial<Mock> = {}): Promise<Mock> {
       return route.fulfill({ json: { id: 'browser-user', roles: ['Administrator'] } })
     }
     if (path === '/api/security/csrf-token') return route.fulfill({ json: { requestToken: 'test-token' } })
-    if (path === '/api/assets' && method === 'GET') return route.fulfill({ json: assetList })
+    if (path === '/api/assets' && method === 'GET') {
+      return route.fulfill({ json: mock.longLists ? longAssetList : assetList })
+    }
     if (path === `/api/assets/${assetId}/edits` && method === 'POST') {
       const now = Date.now()
       if (mock.asset === 'blocked') {
@@ -253,6 +282,11 @@ async function mockApi(page: Page, options: Partial<Mock> = {}): Promise<Mock> {
       if (mock.mortgages === 'hang') return new Promise<void>(() => {})
       if (mock.mortgages === 'error') return route.fulfill({ status: 500, json: { title: 'Server error' } })
       if (mock.mortgages === 'rates') return route.fulfill({ json: rateFixtures() })
+      if (mock.mortgages === 'short') return route.fulfill({ json: [{ ...mortgageFixture(1), duration: 6 }] })
+      // Weekly from 2000 to close to the last date there is, 31 Dec 9999.
+      if (mock.mortgages === 'longest') {
+        return route.fulfill({ json: [{ ...mortgageFixture(1), duration: 417000, paymentFrequency: 'Weekly' }] })
+      }
       const count = mock.mortgages === 'empty' ? 0 : mock.mortgages === 'many' ? 10 : 3
       return route.fulfill({
         json: Array.from({ length: count }, (_, index) => (
@@ -282,7 +316,11 @@ async function mockApi(page: Page, options: Partial<Mock> = {}): Promise<Mock> {
     if (path === '/api/currencies') return route.fulfill({ json: [currency, usd] })
     if (path === `/api/accounts/${accountId}`) return route.fulfill({ json: accounts[0] })
     if (path === `/api/accounts/${accountId}/transactions`) {
-      return route.fulfill({ json: { items: transactions, nextCursor: null } })
+      if (search.has('cursor')) return route.fulfill({ json: { items: laterTransactions, nextCursor: null } })
+      return route.fulfill({ json: {
+        items: mock.longLists ? longTransactions : transactions,
+        nextCursor: mock.morePages ? 'next-page' : null,
+      } })
     }
     if (path === `/api/accounts/${accountId}/import-settings`) return route.fulfill({ json: { mapping: null } })
     if (path === `/api/accounts/${accountId}/import-status`) {
@@ -414,6 +452,114 @@ async function showBothToastStacks(page: Page) {
   await expect(regularToasts(page).getByRole('status')).toContainText('Car was deleted.')
 }
 
+// 030: The two lists whose card stops at the top of the content panel while the panel moves their rows.
+const pinnedLists = [
+  {
+    name: 'transactions',
+    open: openAccountDetails,
+    table: (page: Page) => page.getByRole('table', { name: 'Transactions for this account' }),
+    buttonsPerRow: 1,
+  },
+  {
+    name: 'assets',
+    open: openAssets,
+    table: (page: Page) => page.getByRole('table', { name: 'Your assets with their latest valuations and totals by currency' }),
+    buttonsPerRow: 2,
+  },
+]
+type PinnedList = Pick<(typeof pinnedLists)[number], 'table'>
+
+/** The mortgages schedule: a grid of divs in a section, rendering only the rows in view. */
+const scheduleList: PinnedList = { table: (page) => timelineGroup(page).getByRole('table') }
+
+// A table's card, the element scrolling its rows, and its header row, in either kind of markup.
+const listSelectors = {
+  card: '[data-slot="card"], section[aria-labelledby="loan-payoff-timeline-heading"]',
+  list: '[role="region"], [role="group"]',
+  header: 'thead, [role="row"][aria-rowindex="1"]',
+}
+
+const listTable = (page: Page, list: PinnedList) => list.table(page)
+const listRow = (page: Page, list: PinnedList, index: number) => listTable(page, list).locator('tbody tr').nth(index)
+
+/** Where a list's card, header and rows are. Card edges are measured from where a stopped card's belong. */
+async function pinGeometry(table: Locator) {
+  return table.evaluate((element, selectors) => {
+    const main = element.closest('main')!
+    const card = element.closest(selectors.card)!.getBoundingClientRect()
+    const region = element.closest(selectors.list)!
+    const style = getComputedStyle(main)
+    const panelTop = main.getBoundingClientRect().top
+    return {
+      scrollTop: main.scrollTop,
+      maxScrollTop: main.scrollHeight - main.clientHeight,
+      listScrollTop: region.scrollTop,
+      hidden: region.scrollHeight - region.clientHeight,
+      listOverflowY: getComputedStyle(region).overflowY,
+      cardTop: card.top - (panelTop + parseFloat(style.paddingTop)),
+      cardBottom: card.bottom - (panelTop + main.clientHeight - parseFloat(style.paddingBottom)),
+      headerInCard: element.querySelector(selectors.header)!.getBoundingClientRect().top - card.top,
+    }
+  }, listSelectors)
+}
+
+/** True when the element is wholly between the list's header and the bottom of what the list shows. */
+async function isShowingInList(target: Locator) {
+  return target.evaluate((element) => {
+    const region = element.closest('[role="region"]')!
+    const view = region.getBoundingClientRect()
+    const box = element.getBoundingClientRect()
+    const headerBottom = region.querySelector('thead')!.getBoundingClientRect().bottom
+    const panel = element.closest('main')!.getBoundingClientRect()
+    return box.top >= headerBottom - 0.5 && box.bottom <= view.top + region.clientHeight + 0.5
+      && box.top >= panel.top && box.bottom <= panel.bottom
+  })
+}
+
+async function nextFrames(page: Page) {
+  await page.evaluate(() => new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+  }))
+}
+
+/** Scrolls the content panel and waits for the list to follow. */
+async function scrollPanelTo(page: Page, scrollTop: number) {
+  await page.locator('main').evaluate((element, value) => { element.scrollTop = value }, scrollTop)
+  await nextFrames(page)
+}
+
+/** The panel positions at which the card stops and at which its list ends. */
+async function pinnedRange(page: Page, list: PinnedList) {
+  await scrollPanelTo(page, 0)
+  await expect.poll(async () => (await pinGeometry(listTable(page, list))).hidden).toBeGreaterThan(500)
+  const rest = await pinGeometry(listTable(page, list))
+  const start = Math.ceil(rest.cardTop)
+  return { start, end: start + rest.hidden, rest }
+}
+
+/** On an open list, scrolls to the middle of the range where its card is stopped. */
+async function scrollListToMiddle(page: Page, list: PinnedList) {
+  const { start, end } = await pinnedRange(page, list)
+  await scrollPanelTo(page, Math.round((start + end) / 2))
+  await expect.poll(async () => Math.abs((await pinGeometry(listTable(page, list))).cardTop)).toBeLessThan(1)
+}
+
+/** True when the header is what is seen across the visible width of each of its cells. */
+async function headerIsOnTop(table: Locator) {
+  return table.evaluate((element, selectors) => {
+    const region = element.closest(selectors.list)!.getBoundingClientRect()
+    const header = element.querySelector(selectors.header)
+    return Array.from(element.querySelectorAll('thead th, [role="columnheader"]')).every((cell) => {
+      const box = cell.getBoundingClientRect()
+      const left = Math.max(box.left, region.left)
+      const right = Math.min(box.right, region.right)
+      if (right - left < 2) return true
+      return [box.top + 2, box.bottom - 2].every((y) =>
+        document.elementFromPoint((left + right) / 2, y)?.closest(selectors.header) === header)
+    })
+  }, listSelectors)
+}
+
 type StateDef = {
   name: string
   /** Pre-auth states and the theme-load failure never receive the theme from the API. */
@@ -430,11 +576,14 @@ async function scrollScheduleTo(page: Page, period: number) {
   await expect(table).toBeVisible()
   const row = table.locator(`[role="row"][aria-rowindex="${period + 1}"]`)
   await table.evaluate((element, rowsAbove) => {
-    let scroller = element.parentElement
-    while (scroller && !/auto|scroll/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement
-    if (!scroller) return
+    const main = element.closest('main')!
+    const list = element.parentElement!.getBoundingClientRect()
+    const card = element.closest('section')!.getBoundingClientRect()
+    // Where the list's top is once the card has stopped below the panel's padding (030).
+    const stoppedListTop = main.getBoundingClientRect().top + parseFloat(getComputedStyle(main).paddingTop)
+      + list.top - card.top
     // The header and every body row are 40 px tall.
-    scroller.scrollTop += element.getBoundingClientRect().top - scroller.getBoundingClientRect().top + rowsAbove * 40
+    main.scrollTop += element.getBoundingClientRect().top - stoppedListTop + rowsAbove * 40
   }, period - 2)
   // Any part: at 320 px most of the row's width is off screen.
   await expect(row).toBeInViewport()
@@ -739,6 +888,13 @@ const states: StateDef[] = [
     name: 'assets', mock: signedIn,
     reach: async (page) => { await openAssets(page) },
   },
+  ...pinnedLists.map((list): StateDef => ({
+    name: `${list.name}-list-pinned`, mock: { ...signedIn, longLists: true },
+    reach: async (page) => {
+      await list.open(page)
+      await scrollListToMiddle(page, list)
+    },
+  })),
   {
     name: 'assets-delete-dialog', mock: signedIn,
     reach: async (page) => {
@@ -1380,6 +1536,493 @@ for (const [theme, expected] of [['Light', { opacity: 0.6, width: 1.2 }], ['Dark
       width: parseFloat(getComputedStyle(svg.querySelector('pattern line')!).strokeWidth),
     }))
     expect(stripes).toEqual(expected)
+  })
+}
+
+// 030: the transactions and assets cards stop at the top of the panel while their rows scroll within them.
+for (const theme of ['Light', 'Dark'] as const) {
+  for (const list of pinnedLists) {
+    const open = async (page: Page, options: Partial<Mock> = {}) => {
+      await mockApi(page, { theme, longLists: true, ...options })
+      await page.goto('/')
+      await list.open(page)
+      await expectTheme(page, theme)
+    }
+
+    test(`${list.name} card stops with a margin while the panel scrolls through its rows [${theme}]`, async ({ page }) => {
+      await open(page)
+      const table = listTable(page, list)
+      const { start, end, rest } = await pinnedRange(page, list)
+      expect(rest.listScrollTop).toBe(0)
+      expect(rest.listOverflowY, 'the panel is the only vertical scroller').toBe('hidden')
+
+      // Before it stops, the card travels with the page.
+      await scrollPanelTo(page, start - 40)
+      const approaching = await pinGeometry(table)
+      expect(Math.abs(approaching.cardTop - (rest.cardTop - start + 40))).toBeLessThan(1)
+      expect(approaching.listScrollTop).toBe(0)
+
+      const positions = [start]
+      for (let position = start + 90; position < end; position += 90) positions.push(position)
+      positions.push(end)
+      for (const position of positions) {
+        await scrollPanelTo(page, position)
+        const at = await pinGeometry(table)
+        expect(Math.abs(at.cardTop), `card top at ${position}`).toBeLessThan(1)
+        expect(Math.abs(at.cardBottom), `card bottom at ${position}`).toBeLessThan(1)
+        expect(Math.abs(at.headerInCard - rest.headerInCard), `header at ${position}`).toBeLessThan(1)
+        expect(Math.abs(at.listScrollTop - (position - rest.cardTop)), `rows at ${position}`).toBeLessThan(1.5)
+        expect(await headerIsOnTop(table), `header on top at ${position}`).toBe(true)
+      }
+      expect((await pinGeometry(table)).maxScrollTop).toBeGreaterThanOrEqual(end - 1)
+      expect(await isShowingInList(table.locator('tbody tr').last())).toBe(true)
+
+      await scrollPanelTo(page, 0)
+      const back = await pinGeometry(table)
+      expect(back.listScrollTop).toBe(0)
+      expect(back.cardTop).toBeCloseTo(rest.cardTop, 0)
+    })
+
+    test(`${list.name} wheel over the list scrolls the page from top to the last row [${theme}]`, async ({ page }) => {
+      await open(page)
+      const table = listTable(page, list)
+      const { end, rest } = await pinnedRange(page, list)
+      const main = page.locator('main')
+      await main.evaluate((element) => {
+        const positions: number[] = []
+        Object.assign(window, { positions })
+        element.addEventListener('scroll', () => positions.push(Math.round(element.scrollTop)))
+      })
+      const box = (await main.boundingBox())!
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height - 60)
+
+      for (let wanted = 200; wanted < end + 200; wanted += 200) {
+        await page.mouse.wheel(0, 200)
+        await expect.poll(async () => (await pinGeometry(table)).scrollTop).toBeGreaterThanOrEqual(Math.min(wanted, end) - 1)
+        await nextFrames(page)
+        const at = await pinGeometry(table)
+        const past = at.scrollTop - rest.cardTop
+        expect(Math.abs(at.listScrollTop - Math.min(Math.max(past, 0), at.hidden)), `rows at ${wanted}`).toBeLessThan(1.5)
+      }
+      await page.waitForTimeout(300)
+
+      const wheeled = await page.evaluate(() => (window as unknown as { positions: number[] }).positions)
+      expect(wheeled, 'the panel only ever moves down').toEqual([...wheeled].sort((a, b) => a - b))
+      expect(await isShowingInList(table.locator('tbody tr').last())).toBe(true)
+    })
+
+    test(`${list.name} content after the card scrolls into view once the list ends [${theme}]`, async ({ page }) => {
+      await open(page)
+      const table = listTable(page, list)
+      await pinnedRange(page, list)
+      await table.evaluate((element) => {
+        const extra = document.createElement('p')
+        extra.textContent = 'Content after the list'
+        extra.style.height = '600px'
+        element.closest('[data-slot="card"]')!.parentElement!.after(extra)
+      })
+      const { end } = await pinnedRange(page, list)
+
+      await scrollPanelTo(page, end + 300)
+
+      const at = await pinGeometry(table)
+      expect(Math.abs(at.cardTop + 300)).toBeLessThan(1.5)
+      expect(Math.abs(at.listScrollTop - at.hidden)).toBeLessThan(1.5)
+      await expect(page.getByText('Content after the list')).toBeInViewport()
+    })
+
+    test(`${list.name} keyboard focus is always fully showing [${theme}]`, async ({ page }) => {
+      await open(page)
+      await pinnedRange(page, list)
+      const table = listTable(page, list)
+      const focused = page.locator(':focus')
+      await table.evaluate((element) => (element.closest('[role="region"]') as HTMLElement).focus())
+
+      // 24 rows, more than the list shows at once.
+      for (let step = 0; step < 24 * list.buttonsPerRow; step += 1) {
+        await page.keyboard.press('Tab')
+        await expect.poll(() => isShowingInList(focused), { message: `Tab ${step + 1}` }).toBe(true)
+      }
+      expect((await pinGeometry(table)).listScrollTop).toBeGreaterThan(0)
+      expect(Math.abs((await pinGeometry(table)).cardTop)).toBeLessThan(1)
+      for (let step = 0; step < 20; step += 1) {
+        await page.keyboard.press('Shift+Tab')
+        await expect.poll(() => isShowingInList(focused), { message: `Shift+Tab ${step + 1}` }).toBe(true)
+      }
+    })
+
+    test(`${list.name} keys pressed on the list scroll the page and its rows [${theme}]`, async ({ page }) => {
+      await open(page)
+      const table = listTable(page, list)
+      await scrollListToMiddle(page, list)
+      const before = await pinGeometry(table)
+      await table.evaluate((element) => (element.closest('[role="region"]') as HTMLElement).focus({ preventScroll: true }))
+
+      await page.keyboard.press('PageDown')
+
+      await expect.poll(async () => (await pinGeometry(table)).listScrollTop).toBeGreaterThan(before.listScrollTop + 100)
+      expect(Math.abs((await pinGeometry(table)).cardTop)).toBeLessThan(1)
+    })
+
+    test(`${list.name} scrolling to a row, as find in page does, moves the page with it [${theme}]`, async ({ page }) => {
+      await open(page)
+      const table = listTable(page, list)
+      await pinnedRange(page, list)
+      const row = listRow(page, list, 35)
+
+      await row.evaluate((element) => element.scrollIntoView({ block: 'center' }))
+      await nextFrames(page)
+      await nextFrames(page)
+
+      await expect.poll(() => isShowingInList(row)).toBe(true)
+      const found = await pinGeometry(table)
+      expect(Math.abs(found.cardTop)).toBeLessThan(1)
+      // The next scroll carries on from there rather than jumping back.
+      await scrollPanelTo(page, found.scrollTop + 40)
+      expect(Math.abs((await pinGeometry(table)).listScrollTop - found.listScrollTop - 40)).toBeLessThan(1.5)
+    })
+
+    test(`${list.name} keyboard focus left behind does not paint over the header [${theme}]`, async ({ page }) => {
+      await open(page)
+      await scrollListToMiddle(page, list)
+      const table = listTable(page, list)
+      await table.evaluate((element) => (element.closest('[role="region"]') as HTMLElement).focus({ preventScroll: true }))
+      await page.keyboard.press('Tab')
+      const focused = page.locator(':focus')
+      await expect.poll(() => isShowingInList(focused)).toBe(true)
+      const { scrollTop } = await pinGeometry(table)
+      const button = (await focused.boundingBox())!
+      const header = (await table.locator('thead').boundingBox())!
+
+      // Scroll on until the focused button's middle is at the header's middle.
+      await scrollPanelTo(page, scrollTop + (button.y + button.height / 2) - (header.y + header.height / 2))
+
+      const seen = await page.evaluate(() => {
+        const box = document.activeElement!.getBoundingClientRect()
+        return document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)?.closest('thead') !== null
+      })
+      expect(seen).toBe(true)
+    })
+
+    for (const edge of ['top', 'bottom'] as const) {
+      test(`${list.name} row control cut off at the ${edge} of the list takes a click without moving [${theme}]`, async ({ page }) => {
+        await open(page)
+        await scrollListToMiddle(page, list)
+        const table = listTable(page, list)
+        // Each row's last button deletes, which opens a dialog.
+        const target = listRow(page, list, 25).locator('button').last()
+        const edges = () => table.evaluate((element) => {
+          const region = element.closest('[role="region"]')!
+          return {
+            top: element.querySelector('thead')!.getBoundingClientRect().bottom,
+            bottom: region.getBoundingClientRect().top + region.clientHeight,
+          }
+        })
+        const box = (await target.boundingBox())!
+        const middle = box.y + box.height / 2
+        const { scrollTop } = await pinGeometry(table)
+        await scrollPanelTo(page, scrollTop + middle - (await edges())[edge])
+        const cut = (await target.boundingBox())!
+        const before = (await pinGeometry(table)).scrollTop
+
+        await page.mouse.click(cut.x + cut.width / 2, edge === 'top' ? cut.y + cut.height - 6 : cut.y + 6)
+
+        await expect(page.getByRole('alertdialog')).toBeVisible()
+        // The page behind a dialog is hidden from role queries.
+        expect(await page.locator('main').evaluate((element) => element.scrollTop)).toBe(before)
+      })
+    }
+
+    test(`${list.name} header stays over its columns while scrolled sideways at 320 px [${theme}]`, async ({ page }) => {
+      await page.setViewportSize({ width: 320, height: 800 })
+      await open(page)
+      await scrollListToMiddle(page, list)
+      const table = listTable(page, list)
+      const before = await pinGeometry(table)
+      const scrolled = await table.evaluate((element) => {
+        const region = element.closest('[role="region"]')!
+        region.scrollLeft = region.scrollWidth
+        return region.scrollLeft
+      })
+      expect(scrolled, 'the table is wider than its region').toBeGreaterThan(0)
+      await settle(page)
+
+      const columns = await table.evaluate((element) => {
+        const edges = (selector: string) => Array.from(element.querySelectorAll(selector)).map((cell) => {
+          const box = cell.getBoundingClientRect()
+          return [Math.round(box.left), Math.round(box.right)]
+        })
+        return { header: edges('thead th'), body: edges('tbody tr:first-child td') }
+      })
+      expect(columns.header).toEqual(columns.body)
+      const after = await pinGeometry(table)
+      expect(after.scrollTop).toBe(before.scrollTop)
+      expect(Math.abs(after.cardTop)).toBeLessThan(1)
+      expect(await headerIsOnTop(table)).toBe(true)
+      await expectNoHorizontalScroll(page)
+      await expectNoViolations(page)
+    })
+
+    test(`${list.name} card refits when the window is resized while stopped [${theme}]`, async ({ page }) => {
+      await open(page)
+      await scrollListToMiddle(page, list)
+      const table = listTable(page, list)
+
+      await page.setViewportSize({ width: 1280, height: 640 })
+
+      await expect.poll(async () => {
+        const at = await pinGeometry(table)
+        return Math.max(Math.abs(at.cardTop), Math.abs(at.cardBottom))
+      }).toBeLessThan(1)
+      expect(await headerIsOnTop(table)).toBe(true)
+    })
+
+    test(`${list.name} on a short screen scrolls as an ordinary page [${theme}]`, async ({ page }) => {
+      await page.setViewportSize({ width: 1024, height: 330 })
+      await open(page)
+      const table = listTable(page, list)
+      await nextFrames(page)
+      const rest = await pinGeometry(table)
+      expect(rest.hidden).toBe(0)
+
+      await scrollPanelTo(page, rest.cardTop + 400)
+
+      expect(Math.abs((await pinGeometry(table)).cardTop + 400)).toBeLessThan(1.5)
+    })
+
+    test(`${list.name} card that fits scrolls as an ordinary card [${theme}]`, async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 1200 })
+      await open(page, { longLists: false })
+      const table = listTable(page, list)
+      await nextFrames(page)
+
+      const rest = await pinGeometry(table)
+      expect(rest.hidden).toBe(0)
+      expect(rest.cardBottom).toBeLessThanOrEqual(0.5)
+    })
+  }
+
+  test(`assets totals are seen only at the end of the list [${theme}]`, async ({ page }) => {
+    const list = pinnedLists.find((item) => item.name === 'assets')!
+    await mockApi(page, { theme, longLists: true })
+    await page.goto('/')
+    await list.open(page)
+    const total = page.getByRole('row', { name: /^Total AUD/ })
+    const { start, end } = await pinnedRange(page, list)
+
+    for (const position of [0, start, Math.round((start + end) / 2), end - 200]) {
+      await scrollPanelTo(page, position)
+      await expect(total, `totals at scroll ${position}`).not.toBeInViewport()
+    }
+
+    await scrollPanelTo(page, end)
+    await expect(total).toBeInViewport({ ratio: 1 })
+  })
+
+  test(`transactions Load More is reached at the end and adds rows without moving [${theme}]`, async ({ page }) => {
+    const list = pinnedLists.find((item) => item.name === 'transactions')!
+    await mockApi(page, { theme, longLists: true, morePages: true })
+    await page.goto('/')
+    await list.open(page)
+    const table = listTable(page, list)
+    const loadMore = page.getByRole('button', { name: 'Load More' })
+    const { start, end } = await pinnedRange(page, list)
+    await scrollPanelTo(page, Math.round((start + end) / 2))
+    await expect(loadMore).not.toBeInViewport()
+
+    await scrollPanelTo(page, end)
+    await expect(loadMore).toBeInViewport({ ratio: 1 })
+    // Room for the focus ring, 2 px wide and 2 px out, inside the list that clips it.
+    const room = await loadMore.evaluate((element) => {
+      const region = element.closest('[role="region"]')!.getBoundingClientRect()
+      const box = element.getBoundingClientRect()
+      return Math.min(box.left - region.left, region.bottom - box.bottom)
+    })
+    expect(room).toBeGreaterThanOrEqual(4)
+    const lastRow = listRow(page, list, 59)
+    const before = (await lastRow.boundingBox())!
+
+    await loadMore.click()
+
+    await expect(table.locator('tbody tr')).toHaveCount(68)
+    await nextFrames(page)
+    expect(Math.abs((await lastRow.boundingBox())!.y - before.y)).toBeLessThan(1.5)
+    expect(Math.abs((await pinGeometry(table)).cardTop)).toBeLessThan(1)
+    const grown = await pinnedRange(page, list)
+    await scrollPanelTo(page, grown.end)
+    expect(await isShowingInList(table.locator('tbody tr').last())).toBe(true)
+  })
+}
+
+// 030: the mortgages schedule card stops like the other lists.
+for (const theme of ['Light', 'Dark'] as const) {
+  const open = async (page: Page, options: Partial<Mock> = {}) => {
+    await reachState(page, { ...stateNamed('mortgages-timeline-schedule'), mock: {
+      ...signedIn, loanPayoffTimeline: 'Schedule', ...options,
+    } }, theme)
+  }
+  /** The periods rendered across what the list shows, top to bottom; null where a row is missing. */
+  const periodsShowing = (table: Locator) => table.evaluate((element) => {
+    const list = element.parentElement!
+    const view = list.getBoundingClientRect()
+    const header = element.querySelector('[role="row"][aria-rowindex="1"]')!.getBoundingClientRect()
+    const found: (number | null)[] = []
+    for (let y = header.bottom + 20; y < view.top + list.clientHeight - 20; y += 40) {
+      const row = document.elementFromPoint(view.left + 20, y)?.closest('[role="row"]')
+      found.push(row ? Number(row.getAttribute('aria-rowindex')) - 1 : null)
+    }
+    return found
+  })
+
+  for (const [columns, options] of [['plain', {}], ['balance', { actualBalances: true }]] as const) {
+    test(`mortgages schedule card stops while its ${columns} rows scroll [${theme}]`, async ({ page }) => {
+      await open(page, options)
+      const table = scheduleList.table(page)
+      const switchButton = timelineGroup(page).getByRole('button', { name: 'Show Burndown Chart' })
+      const { start, end, rest } = await pinnedRange(page, scheduleList)
+      expect(rest.listScrollTop).toBe(0)
+      expect(rest.listOverflowY).toBe('hidden')
+      await scrollPanelTo(page, start)
+      const switchAt = (await switchButton.boundingBox())!.y
+
+      for (const position of [start, start + 90, start + 1010, Math.round((start + end) / 2), end - 70, end]) {
+        await scrollPanelTo(page, position)
+        const at = await pinGeometry(table)
+        expect(Math.abs(at.cardTop), `card top at ${position}`).toBeLessThan(1)
+        expect(Math.abs(at.cardBottom), `card bottom at ${position}`).toBeLessThan(1)
+        expect(Math.abs(at.headerInCard - rest.headerInCard), `header at ${position}`).toBeLessThan(1)
+        expect(Math.abs(at.listScrollTop - (position - rest.cardTop)), `rows at ${position}`).toBeLessThan(1.5)
+        expect(Math.abs((await switchButton.boundingBox())!.y - switchAt)).toBeLessThan(1)
+        expect(await headerIsOnTop(table), `header on top at ${position}`).toBe(true)
+        // Every row in view is rendered, in order.
+        await expect.poll(async () => {
+          const periods = await periodsShowing(table)
+          return periods.length > 5 && periods.every((period, index) => period === periods[0]! + index)
+        }, { message: `rows rendered at ${position}` }).toBe(true)
+      }
+      await expect.poll(async () => (await periodsShowing(table)).at(-1)).toBeGreaterThanOrEqual(359)
+      await expect(table.locator('[role="row"][aria-rowindex="361"]')).toBeInViewport({ ratio: 1 })
+    })
+  }
+
+  test(`mortgages schedule wheel and keys scroll the page and its rows [${theme}]`, async ({ page }) => {
+    await open(page)
+    const table = scheduleList.table(page)
+    const { rest } = await pinnedRange(page, scheduleList)
+    const main = page.locator('main')
+    const box = (await main.boundingBox())!
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height - 60)
+
+    for (let step = 1; step <= 10; step += 1) {
+      await page.mouse.wheel(0, 300)
+      await expect.poll(async () => (await pinGeometry(table)).scrollTop).toBeGreaterThanOrEqual(step * 300 - 1)
+      await nextFrames(page)
+      const at = await pinGeometry(table)
+      expect(Math.abs(at.listScrollTop - Math.max(at.scrollTop - rest.cardTop, 0))).toBeLessThan(1.5)
+    }
+
+    const before = await pinGeometry(table)
+    await table.evaluate((element) => (element.parentElement as HTMLElement).focus({ preventScroll: true }))
+    await page.keyboard.press('PageDown')
+    await expect.poll(async () => (await pinGeometry(table)).listScrollTop).toBeGreaterThan(before.listScrollTop + 100)
+    expect(Math.abs((await pinGeometry(table)).cardTop)).toBeLessThan(1)
+  })
+
+  test(`mortgages schedule scrolls sideways within its stopped card at 320 px [${theme}]`, async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 800 })
+    await open(page, { actualBalances: true })
+    const table = scheduleList.table(page)
+    await scrollListToMiddle(page, scheduleList)
+    const before = await pinGeometry(table)
+
+    await table.evaluate((element) => (element.parentElement as HTMLElement).focus({ preventScroll: true }))
+    await page.keyboard.press('ArrowRight')
+    await expect.poll(() => table.evaluate((element) => element.parentElement!.scrollLeft)).toBeGreaterThan(0)
+    const sideways = await table.evaluate((element) => {
+      element.parentElement!.scrollLeft = element.parentElement!.scrollWidth
+      const main = element.closest('main')!
+      return { list: element.parentElement!.scrollLeft, panel: main.scrollWidth - main.clientWidth }
+    })
+    expect(sideways.list).toBeGreaterThan(0)
+    expect(sideways.panel, 'only the list scrolls sideways').toBeLessThanOrEqual(0)
+    await settle(page)
+
+    await expect.poll(() => table.evaluate((element) => {
+      const edges = (cells: NodeListOf<Element>) => JSON.stringify(Array.from(cells).map((cell) => {
+        const box = cell.getBoundingClientRect()
+        return [Math.round(box.left), Math.round(box.right)]
+      }))
+      const row = element.querySelector('[role="rowgroup"] [role="row"]')!
+      return edges(element.querySelectorAll('[role="columnheader"]')) === edges(row.querySelectorAll('[role="cell"]'))
+    })).toBe(true)
+    const after = await pinGeometry(table)
+    expect(after.scrollTop).toBe(before.scrollTop)
+    expect(Math.abs(after.cardTop)).toBeLessThan(1)
+    expect(await headerIsOnTop(table)).toBe(true)
+    await expectNoHorizontalScroll(page)
+    await expectNoViolations(page)
+  })
+
+  test(`mortgages chart card scrolls with the page, and the schedule stops again [${theme}]`, async ({ page }) => {
+    await open(page)
+    await scrollListToMiddle(page, scheduleList)
+
+    await timelineGroup(page).getByRole('button', { name: 'Show Burndown Chart' }).click()
+    await expect(timelineGroup(page).getByRole('img', { name: /balance over time/i })).toBeVisible()
+    const chartCard = () => timelineGroup(page).evaluate((card) => ({
+      position: getComputedStyle(card).position,
+      spacer: card.nextElementSibling!.getBoundingClientRect().height,
+    }))
+    await expect.poll(chartCard).toEqual({ position: 'static', spacer: 0 })
+
+    await timelineGroup(page).getByRole('button', { name: 'Show Amortization Schedule' }).click()
+    await scrollListToMiddle(page, scheduleList)
+  })
+
+  test(`mortgages schedule that fits scrolls as an ordinary card [${theme}]`, async ({ page }) => {
+    await open(page, { mortgages: 'short' })
+    const table = scheduleList.table(page)
+    await expect(table.getByRole('row')).toHaveCount(7)
+    await nextFrames(page)
+    const rest = await pinGeometry(table)
+    expect(rest.hidden).toBe(0)
+
+    await scrollPanelTo(page, rest.maxScrollTop)
+
+    const end = await pinGeometry(table)
+    expect(Math.abs(end.cardTop - (rest.cardTop - rest.maxScrollTop))).toBeLessThan(1.5)
+  })
+
+  test(`mortgages longest schedule reaches its middle and last rows [${theme}]`, async ({ page }) => {
+    await open(page, { mortgages: 'longest' })
+    const table = scheduleList.table(page)
+    const { start, end } = await pinnedRange(page, scheduleList)
+
+    for (const position of [Math.round((start + end) / 2), end]) {
+      await scrollPanelTo(page, position)
+      await expect.poll(async () => {
+        const periods = await periodsShowing(table)
+        return periods.length > 5 && periods.every((period, index) => period === periods[0]! + index)
+      }, { message: `rows rendered at ${position}` }).toBe(true)
+      expect(Math.abs((await pinGeometry(table)).cardTop)).toBeLessThan(1)
+    }
+
+    await expect(table.locator('[role="row"][aria-rowindex="417001"]')).toBeInViewport({ ratio: 1 })
+  })
+
+  test(`mortgages schedule on a short screen scrolls as an ordinary page [${theme}]`, async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 330 })
+    await open(page)
+    const table = scheduleList.table(page)
+    await nextFrames(page)
+    const rest = await pinGeometry(table)
+    expect(rest.hidden).toBe(0)
+
+    await scrollPanelTo(page, rest.cardTop + 2000)
+
+    expect(Math.abs((await pinGeometry(table)).cardTop + 2000)).toBeLessThan(1.5)
+    await expect.poll(async () => (await table.getByRole('row').count()) > 5).toBe(true)
+    await expect(table.locator('[role="row"][aria-rowindex="52"]')).toBeAttached()
   })
 }
 
