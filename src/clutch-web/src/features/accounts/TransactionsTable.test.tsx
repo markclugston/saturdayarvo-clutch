@@ -97,7 +97,58 @@ describe('TransactionsTable', () => {
     expect(salaryCells.at(-1)).toHaveTextContent('')
   })
 
-  it('gives each row an icon-only button named Delete transaction', async () => {
+  it('shows a loading state at once while the list loads', () => {
+    vi.mocked(getTransactions).mockReturnValue(new Promise(() => {}))
+
+    renderWithQueryClient(<TransactionsTable accountId="account-id" currencyCode="AUD" />)
+
+    const status = screen.getByRole('status')
+    expect(status).toHaveTextContent('Loading transactions…')
+    expect(status).toHaveAttribute('aria-busy', 'true')
+    expect(status.querySelector('svg')).toHaveClass('animate-spin')
+  })
+
+  it('offers a retry when the list fails to load', async () => {
+    const user = userEvent.setup()
+    vi.mocked(getTransactions)
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValue({ items: [], nextCursor: null })
+
+    renderWithQueryClient(<TransactionsTable accountId="account-id" currencyCode="AUD" />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The request could not be completed.')
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+
+    expect(await screen.findByText('No transactions yet. Import transactions to see them here.'))
+      .toHaveClass('text-fg-secondary')
+    expect(screen.getByRole('heading', { name: 'Transactions' })).toBeInTheDocument()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+  })
+
+  it('truncates a long description, keeps it in the title and never wraps dates or amounts', async () => {
+    const description = 'x'.repeat(300)
+    vi.mocked(getTransactions).mockResolvedValueOnce({
+      items: [{
+        id: '550e8400-e29b-41d4-a716-446655440022',
+        transactionDate: '2025-01-15',
+        description,
+        amount: '5.00',
+        direction: 'Outgoing',
+        balance: '10.00',
+      }],
+      nextCursor: null,
+    })
+
+    renderWithQueryClient(<TransactionsTable accountId="account-id" currencyCode="AUD" />)
+
+    expect(await screen.findByTitle(description)).toHaveClass('block', 'max-w-72', 'truncate', 'text-fg-secondary')
+    const cells = within(screen.getByRole('row', { name: /Outgoing/ })).getAllByRole('cell')
+    expect(cells[0]).toHaveClass('whitespace-nowrap')
+    expect(cells[3]).toHaveClass('whitespace-nowrap', 'text-right', 'tabular-nums')
+    expect(cells[4]).toHaveClass('whitespace-nowrap', 'text-right', 'tabular-nums')
+  })
+
+  it('gives each row an icon-only delete button named for its description and date', async () => {
     vi.mocked(getTransactions).mockResolvedValueOnce({
       items: [
         {
@@ -125,8 +176,11 @@ describe('TransactionsTable', () => {
     )
 
     expect(await screen.findByText('First row')).toBeInTheDocument()
-    const deleteButtons = screen.getAllByRole('button', { name: 'Delete transaction' })
-    expect(deleteButtons).toHaveLength(2)
+    const deleteButtons = screen.getAllByRole('button', { name: /^Delete / })
+    expect(deleteButtons.map((button) => button.getAttribute('aria-label'))).toEqual([
+      `Delete First row, ${formatLocalDate('2025-01-15')}`,
+      `Delete Second row, ${formatLocalDate('2025-01-14')}`,
+    ])
     for (const button of deleteButtons) {
       expect(button.textContent).toBe('')
     }

@@ -22,6 +22,9 @@ tester.run('clutch/numeric-align', rule, {
     'const a = <input className="text-right" inputMode="decimal" />',
     'const a = <input type="text" />',
     'const a = <FloatingField inputMode="numeric" />',
+    'const a = <ListCell numeric>{formatCurrencyAmount(x, c)}</ListCell>',
+    'const a = <ListHeaderCell className="text-right">{formatPercent(x)}</ListHeaderCell>',
+    'const a = <ListCell>{row.description}</ListCell>',
   ],
   invalid: [
     { code: 'const a = <td className="px-3">{formatCurrencyAmount(x, c)}</td>', errors: [{ messageId: 'cell' }] },
@@ -29,5 +32,8 @@ tester.run('clutch/numeric-align', rule, {
     { code: 'const a = <th className="text-left">{formatPercent(x)}</th>', errors: [{ messageId: 'cell' }] },
     { code: 'const a = <input type="number" />', errors: [{ messageId: 'input' }] },
     { code: 'const a = <input inputMode="numeric" className="w-full" />', errors: [{ messageId: 'input' }] },
+    { code: 'const a = <ListCell>{formatCurrencyAmount(x, c)}</ListCell>', errors: [{ messageId: 'cell' }] },
+    { code: 'const a = <ListCell numeric={false}>{formatCurrency(x)}</ListCell>', errors: [{ messageId: 'cell' }] },
+    { code: 'const a = <ListHeaderCell>{formatPercent(x)}</ListHeaderCell>', errors: [{ messageId: 'cell' }] },
   ],
 })

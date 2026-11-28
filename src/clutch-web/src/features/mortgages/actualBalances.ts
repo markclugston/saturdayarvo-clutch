@@ -42,6 +42,8 @@ export type ActualBalances = {
   currencyCode?: string
   /** Monthly fallback row count (the table only). */
   periodCount?: number
+  /** Loads the balances again after a failure. */
+  retry: () => void
 }
 
 type ScheduleParams = {
@@ -73,16 +75,19 @@ export function useActualBalances(accountId: string | undefined, params: Schedul
     [values, duration, disbursalDate, paymentFrequency],
   )
 
+  const retry = () => void balances.refetch()
+
   if (!account) {
-    return { status: 'none', balances: [], forecast: [] }
+    return { status: 'none', balances: [], forecast: [], retry }
   }
   if (balances.isPending) {
-    return { status: 'loading', balances: [], forecast: [], currencyCode: account.currencyCode }
+    return { status: 'loading', balances: [], forecast: [], currencyCode: account.currencyCode, retry }
   }
   if (balances.isError) {
-    return { status: 'failed', balances: [], forecast: [], currencyCode: account.currencyCode }
+    return { status: 'failed', balances: [], forecast: [], currencyCode: account.currencyCode, retry }
   }
   return {
+    retry,
     status: 'ready',
     balances: balances.data.balances,
     forecast,

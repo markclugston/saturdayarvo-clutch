@@ -115,6 +115,23 @@ const importReview = {
     },
   ],
 }
+// 031: a long valuations list and a long import review.
+const longAssetDetail = {
+  ...assetDetail,
+  valuations: Array.from({ length: 60 }, (_, index) => ({
+    id: `550e8400-e29b-41d4-a716-4466554408${String(index).padStart(2, '0')}`,
+    value: 850000 - index * 1000, valuationDate: `${2026 - index}-01-01`,
+  })),
+}
+const longImportReview = {
+  ...importReview,
+  rowCount: 60,
+  rows: Array.from({ length: 60 }, (_, index) => ({
+    ...importReview.rows[index % 2]!,
+    sourceRowNumber: index + 2,
+    description: `Card purchase ${index + 1} at a merchant with an exceptionally long trading name and location reference`,
+  })),
+}
 const csv = {
   name: 'bank.csv',
   mimeType: 'text/csv',
@@ -239,7 +256,7 @@ async function mockApi(page: Page, options: Partial<Mock> = {}): Promise<Mock> {
         editId: assetEditId,
         serverTimeUtc: new Date(now).toISOString(),
         expiresAtUtc: new Date(now + lifetime).toISOString(),
-        asset: assetDetail,
+        asset: mock.longLists ? longAssetDetail : assetDetail,
       } })
     }
     if (path === `/api/assets/${assetId}/edit-status`) {
@@ -305,7 +322,9 @@ async function mockApi(page: Page, options: Partial<Mock> = {}): Promise<Mock> {
           json: { title: 'Validation failed', detail: 'The request could not be saved. Check the values and try again.' },
         })
       }
-      if (path === `/api/accounts/${accountId}/import-reviews`) return route.fulfill({ status: 201, json: importReview })
+      if (path === `/api/accounts/${accountId}/import-reviews`) {
+        return route.fulfill({ status: 201, json: mock.longLists ? longImportReview : importReview })
+      }
       if (method === 'PUT' && path === '/api/admin/import-limits') return route.fulfill({ json: limits })
       return route.fulfill({ status: 204 })
     }
@@ -452,31 +471,52 @@ async function showBothToastStacks(page: Page) {
   await expect(regularToasts(page).getByRole('status')).toContainText('Car was deleted.')
 }
 
-// 030: The two lists whose card stops at the top of the content panel while the panel moves their rows.
+// 030, 031: The lists whose card stops at the top of the content panel while the panel moves their rows.
+// `deletes`: a row's last button opens a confirmation. `wide`: the table scrolls sideways at 320 px.
 const pinnedLists = [
   {
     name: 'transactions',
     open: openAccountDetails,
     table: (page: Page) => page.getByRole('table', { name: 'Transactions for this account' }),
     buttonsPerRow: 1,
+    deletes: true,
+    wide: true,
   },
   {
     name: 'assets',
     open: openAssets,
     table: (page: Page) => page.getByRole('table', { name: 'Your assets with their latest valuations and totals by currency' }),
     buttonsPerRow: 2,
+    deletes: true,
+    wide: true,
+  },
+  {
+    name: 'valuations',
+    open: openAsset,
+    table: (page: Page) => page.getByRole('table', { name: 'Valuations of this asset, newest first' }),
+    buttonsPerRow: 1,
+    deletes: false,
+    wide: false,
+  },
+  {
+    name: 'import-review',
+    open: openImportReview,
+    table: (page: Page) => page.getByRole('table', { name: 'Validated transactions for review' }),
+    buttonsPerRow: 0,
+    deletes: false,
+    wide: true,
   },
 ]
 type PinnedList = Pick<(typeof pinnedLists)[number], 'table'>
 
-/** The mortgages schedule: a grid of divs in a section, rendering only the rows in view. */
+/** The mortgages schedule: a table in a section, rendering only the rows in view. */
 const scheduleList: PinnedList = { table: (page) => timelineGroup(page).getByRole('table') }
 
-// A table's card, the element scrolling its rows, and its header row, in either kind of markup.
+// A table's card, the region holding its rows, and its header.
 const listSelectors = {
   card: '[data-slot="card"], section[aria-labelledby="loan-payoff-timeline-heading"]',
-  list: '[role="region"], [role="group"]',
-  header: 'thead, [role="row"][aria-rowindex="1"]',
+  list: '[role="region"]',
+  header: 'thead',
 }
 
 const listTable = (page: Page, list: PinnedList) => list.table(page)
@@ -549,7 +589,7 @@ async function headerIsOnTop(table: Locator) {
   return table.evaluate((element, selectors) => {
     const region = element.closest(selectors.list)!.getBoundingClientRect()
     const header = element.querySelector(selectors.header)
-    return Array.from(element.querySelectorAll('thead th, [role="columnheader"]')).every((cell) => {
+    return Array.from(element.querySelectorAll('thead th')).every((cell) => {
       const box = cell.getBoundingClientRect()
       const left = Math.max(box.left, region.left)
       const right = Math.min(box.right, region.right)
@@ -574,7 +614,7 @@ const signedIn = { session: 'ok' } as const
 async function scrollScheduleTo(page: Page, period: number) {
   const table = timelineGroup(page).getByRole('table')
   await expect(table).toBeVisible()
-  const row = table.locator(`[role="row"][aria-rowindex="${period + 1}"]`)
+  const row = table.locator(`tr[aria-rowindex="${period + 1}"]`)
   await table.evaluate((element, rowsAbove) => {
     const main = element.closest('main')!
     const list = element.parentElement!.getBoundingClientRect()
@@ -663,7 +703,7 @@ const states: StateDef[] = [
     name: 'delete-transaction-dialog', mock: signedIn,
     reach: async (page) => {
       await openAccountDetails(page)
-      await page.getByRole('button', { name: 'Delete transaction' }).first().click()
+      await page.getByRole('button', { name: /^Delete Card purchase 1 / }).click()
       await expect(page.getByRole('alertdialog')).toBeVisible()
     },
   },
@@ -1118,11 +1158,39 @@ async function expectNoPureBlackOrWhite(page: Page) {
   expect(offenders).toEqual([])
 }
 
+type Violations = Awaited<ReturnType<AxeBuilder['analyze']>>['violations']
+
+/**
+ * Axe judges a row scrolled out of its list against whatever is drawn at that place, such as the notice
+ * above the import review (031). That row is clipped and cannot be seen, so its contrast is not judged.
+ */
+async function withoutClippedRows(page: Page, violations: Violations): Promise<Violations> {
+  const kept: Violations = []
+  for (const violation of violations) {
+    if (violation.id !== 'color-contrast') {
+      kept.push(violation)
+      continue
+    }
+    const nodes: typeof violation.nodes = []
+    for (const node of violation.nodes) {
+      const clipped = await page.locator(String(node.target[0])).evaluate((element) => {
+        const list = element.closest('tbody')?.closest('[role="region"]')?.getBoundingClientRect()
+        const box = element.getBoundingClientRect()
+        return list !== undefined && (box.bottom <= list.top || box.top >= list.bottom)
+      })
+      if (!clipped) nodes.push(node)
+    }
+    if (nodes.length > 0) kept.push({ ...violation, nodes })
+  }
+  return kept
+}
+
 async function runChecks(page: Page, name: string, theme: Theme) {
   await settle(page)
   await expectSurfaces(page)
   const results = await new AxeBuilder({ page }).withTags(axeTags).analyze()
-  expect(results.violations, JSON.stringify(results.violations.map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target) })))).toEqual([])
+  const violations = await withoutClippedRows(page, results.violations)
+  expect(violations, JSON.stringify(violations.map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target) })))).toEqual([])
   await expectNoHorizontalScroll(page)
   if (theme === 'Dark') await expectNoPureBlackOrWhite(page)
   if (process.env.STYLE_SCREENSHOTS === '1') {
@@ -1322,7 +1390,7 @@ async function expectNoViolations(page: Page) {
 /** Header and cell of the Forecast Balance column are on screen, unclipped and clear of Actual Balance. */
 async function expectForecastColumnReadable(page: Page, period: number) {
   const table = timelineGroup(page).getByRole('table')
-  const row = table.locator(`[role="row"][aria-rowindex="${period + 1}"]`)
+  const row = table.locator(`tr[aria-rowindex="${period + 1}"]`)
   const header = table.getByRole('columnheader', { name: 'Forecast Balance' })
   const cell = row.getByRole('cell').nth(4)
   await cell.evaluate((element) => element.scrollIntoView({ block: 'nearest', inline: 'end' }))
@@ -1471,7 +1539,7 @@ for (const theme of ['Light', 'Dark'] as const) {
       if (narrow) await page.setViewportSize({ width: 320, height: 800 })
       await reachState(page, stateNamed('mortgages-schedule-forecast'), theme)
       const table = timelineGroup(page).getByRole('table')
-      const cell = (period: number) => table.locator(`[role="row"][aria-rowindex="${period + 1}"]`).getByRole('cell').nth(4)
+      const cell = (period: number) => table.locator(`tr[aria-rowindex="${period + 1}"]`).getByRole('cell').nth(4)
 
       // The first forecast row, then the last positive value, $0.00 and a blank cell.
       for (const [name, period] of [['start', 121], ['end', 249]] as const) {
@@ -1631,7 +1699,7 @@ for (const theme of ['Light', 'Dark'] as const) {
       await expect(page.getByText('Content after the list')).toBeInViewport()
     })
 
-    test(`${list.name} keyboard focus is always fully showing [${theme}]`, async ({ page }) => {
+    if (list.buttonsPerRow > 0) test(`${list.name} keyboard focus is always fully showing [${theme}]`, async ({ page }) => {
       await open(page)
       await pinnedRange(page, list)
       const table = listTable(page, list)
@@ -1682,7 +1750,7 @@ for (const theme of ['Light', 'Dark'] as const) {
       expect(Math.abs((await pinGeometry(table)).listScrollTop - found.listScrollTop - 40)).toBeLessThan(1.5)
     })
 
-    test(`${list.name} keyboard focus left behind does not paint over the header [${theme}]`, async ({ page }) => {
+    if (list.buttonsPerRow > 0) test(`${list.name} keyboard focus left behind does not paint over the header [${theme}]`, async ({ page }) => {
       await open(page)
       await scrollListToMiddle(page, list)
       const table = listTable(page, list)
@@ -1704,7 +1772,7 @@ for (const theme of ['Light', 'Dark'] as const) {
       expect(seen).toBe(true)
     })
 
-    for (const edge of ['top', 'bottom'] as const) {
+    for (const edge of list.deletes ? ['top', 'bottom'] as const : []) {
       test(`${list.name} row control cut off at the ${edge} of the list takes a click without moving [${theme}]`, async ({ page }) => {
         await open(page)
         await scrollListToMiddle(page, list)
@@ -1733,7 +1801,7 @@ for (const theme of ['Light', 'Dark'] as const) {
       })
     }
 
-    test(`${list.name} header stays over its columns while scrolled sideways at 320 px [${theme}]`, async ({ page }) => {
+    if (list.wide) test(`${list.name} header stays over its columns while scrolled sideways at 320 px [${theme}]`, async ({ page }) => {
       await page.setViewportSize({ width: 320, height: 800 })
       await open(page)
       await scrollListToMiddle(page, list)
@@ -1781,7 +1849,8 @@ for (const theme of ['Light', 'Dark'] as const) {
       await page.setViewportSize({ width: 1024, height: 330 })
       await open(page)
       const table = listTable(page, list)
-      await nextFrames(page)
+      // Some lists are reached with the panel already scrolled.
+      await scrollPanelTo(page, 0)
       const rest = await pinGeometry(table)
       expect(rest.hidden).toBe(0)
 
@@ -1865,10 +1934,10 @@ for (const theme of ['Light', 'Dark'] as const) {
   const periodsShowing = (table: Locator) => table.evaluate((element) => {
     const list = element.parentElement!
     const view = list.getBoundingClientRect()
-    const header = element.querySelector('[role="row"][aria-rowindex="1"]')!.getBoundingClientRect()
+    const header = element.querySelector('tr[aria-rowindex="1"]')!.getBoundingClientRect()
     const found: (number | null)[] = []
     for (let y = header.bottom + 20; y < view.top + list.clientHeight - 20; y += 40) {
-      const row = document.elementFromPoint(view.left + 20, y)?.closest('[role="row"]')
+      const row = document.elementFromPoint(view.left + 20, y)?.closest('tr[aria-rowindex]')
       found.push(row ? Number(row.getAttribute('aria-rowindex')) - 1 : null)
     }
     return found
@@ -1901,7 +1970,26 @@ for (const theme of ['Light', 'Dark'] as const) {
         }, { message: `rows rendered at ${position}` }).toBe(true)
       }
       await expect.poll(async () => (await periodsShowing(table)).at(-1)).toBeGreaterThanOrEqual(359)
-      await expect(table.locator('[role="row"][aria-rowindex="361"]')).toBeInViewport({ ratio: 1 })
+      await expect(table.locator('tr[aria-rowindex="361"]')).toBeInViewport({ ratio: 1 })
+    })
+  }
+
+  // 031: the rows drawn are placed by arithmetic, so each must be exactly 40 px from the next.
+  for (const width of [320, 1440]) {
+    test(`mortgages schedule rows are exactly 40 px apart at ${width} px [${theme}]`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 })
+      await open(page, { actualBalances: true })
+      const table = scheduleList.table(page)
+      await scrollListToMiddle(page, scheduleList)
+
+      const pitches = await table.evaluate((element) => {
+        const tops = Array.from(element.querySelectorAll('tbody tr[aria-rowindex]'))
+          .map((row) => row.getBoundingClientRect().top)
+        return tops.slice(1).map((top, index) => top - tops[index]!)
+      })
+
+      expect(pitches.length).toBeGreaterThan(10)
+      for (const pitch of pitches) expect(pitch).toBeCloseTo(40, 1)
     })
   }
 
@@ -1952,8 +2040,8 @@ for (const theme of ['Light', 'Dark'] as const) {
         const box = cell.getBoundingClientRect()
         return [Math.round(box.left), Math.round(box.right)]
       }))
-      const row = element.querySelector('[role="rowgroup"] [role="row"]')!
-      return edges(element.querySelectorAll('[role="columnheader"]')) === edges(row.querySelectorAll('[role="cell"]'))
+      const row = element.querySelector('tbody tr[aria-rowindex]')!
+      return edges(element.querySelectorAll('thead th')) === edges(row.querySelectorAll('td'))
     })).toBe(true)
     const after = await pinGeometry(table)
     expect(after.scrollTop).toBe(before.scrollTop)
@@ -2007,7 +2095,7 @@ for (const theme of ['Light', 'Dark'] as const) {
       expect(Math.abs((await pinGeometry(table)).cardTop)).toBeLessThan(1)
     }
 
-    await expect(table.locator('[role="row"][aria-rowindex="417001"]')).toBeInViewport({ ratio: 1 })
+    await expect(table.locator('tr[aria-rowindex="417001"]')).toBeInViewport({ ratio: 1 })
   })
 
   test(`mortgages schedule on a short screen scrolls as an ordinary page [${theme}]`, async ({ page }) => {
@@ -2022,7 +2110,7 @@ for (const theme of ['Light', 'Dark'] as const) {
 
     expect(Math.abs((await pinGeometry(table)).cardTop + 2000)).toBeLessThan(1.5)
     await expect.poll(async () => (await table.getByRole('row').count()) > 5).toBe(true)
-    await expect(table.locator('[role="row"][aria-rowindex="52"]')).toBeAttached()
+    await expect(table.locator('tr[aria-rowindex="52"]')).toBeAttached()
   })
 }
 
@@ -2056,7 +2144,7 @@ test('mortgages schedule stays where it is scrolled to', async ({ page }) => {
   await main.evaluate((element) => { element.scrollTop = 8000 })
   await page.waitForTimeout(500)
   expect(await positions()).toEqual([8000])
-  await expect(timelineGroup(page).locator('[role="row"][aria-rowindex="200"]')).toBeInViewport()
+  await expect(timelineGroup(page).locator('tr[aria-rowindex="200"]')).toBeInViewport()
 })
 
 for (const theme of ['Light', 'Dark'] as const) {
@@ -2427,9 +2515,13 @@ test.describe('Mortgages layout and motion', () => {
       await button.click()
       const dialog = rateDialog(page)
       await expect(dialog).toBeVisible()
-      const list = dialog.getByRole('list', { name: 'Interest Rate Changes' })
+      const list = dialog.getByRole('region', { name: 'Interest Rate Changes' })
       expect(await list.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true)
+      const header = list.locator('thead')
+      const headerTop = (await header.boundingBox())!.y
       await list.evaluate((element) => { element.scrollTop = element.scrollHeight })
+      // 031: the column header is held while the rows move.
+      expect((await header.boundingBox())!.y).toBeCloseTo(headerTop, 0)
       await expect(dialog.getByLabel('New Interest Rate')).toBeInViewport()
       await expect(dialog.getByRole('button', { name: 'Add', exact: true })).toBeInViewport()
       await expect(dialog.getByRole('button', { name: 'Close' })).toBeInViewport()

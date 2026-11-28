@@ -62,6 +62,11 @@ function addTo(dialog: HTMLElement, rate: string, date: string, user: ReturnType
 
 const opening = () => newRow('5.25', '2000-01-01')
 
+/** The table's rows, without its header row. */
+function bodyRows(dialog: HTMLElement): HTMLElement[] {
+  return within(within(dialog).getByRole('table')).getAllByRole('row').slice(1)
+}
+
 describe('InterestRateChangesDialog', () => {
   it('opens titled "Interest Rates" with focus on New Interest Rate and no Save or Cancel', async () => {
     const user = setupUser()
@@ -80,41 +85,55 @@ describe('InterestRateChangesDialog', () => {
     const dialog = await openDialog(user)
 
     expect(listedRates()).toEqual(['5.25% 1 Jan 2000', '6.00% 1 Jun 2001', '7.00% 1 Jan 2003'])
-    const items = within(within(dialog).getByRole('list', { name: 'Interest Rate Changes' })).getAllByRole('listitem')
-    expect(items[0]).toHaveTextContent('Opening Interest Rate')
-    expect(items[1]).not.toHaveTextContent('Opening Interest Rate')
+    const rows = bodyRows(dialog)
+    expect(rows[0]).toHaveTextContent('Opening Interest Rate')
+    expect(rows[1]).not.toHaveTextContent('Opening Interest Rate')
   })
 
-  it('titles the opening row "Opening Interest Rate" and every other row "Interest Rate Change", with no extra Opening Rate text', async () => {
+  it('labels only the opening row\'s field, with no extra Opening Rate text on the others', async () => {
     const user = setupUser()
     render(<Harness initial={makeDraft([opening(), newRow('6', '2001-06-01'), newRow('7', '2003-01-01')])} />)
     const dialog = await openDialog(user)
 
-    const items = within(within(dialog).getByRole('list', { name: 'Interest Rate Changes' })).getAllByRole('listitem')
-    expect(within(items[0] as HTMLElement).getByLabelText('Opening Interest Rate')).toBeInTheDocument()
-    expect(items[0]).not.toHaveTextContent(/Opening Rate/)
-    for (const item of items.slice(1)) {
-      expect(item).toHaveTextContent('Interest Rate Change')
-      expect(item).not.toHaveTextContent('Opening')
+    const rows = bodyRows(dialog)
+    expect(within(rows[0]!).getByLabelText('Opening Interest Rate')).toBeInTheDocument()
+    expect(rows[0]).not.toHaveTextContent(/Opening Rate/)
+    for (const row of rows.slice(1)) {
+      expect(row).not.toHaveTextContent('Opening')
     }
   })
 
-  it('left aligns the opening rate value', async () => {
+  it('is a table with a held header that scrolls within the dialog, rates right aligned', async () => {
     const user = setupUser()
-    render(<Harness initial={makeDraft([opening()])} />)
+    render(<Harness initial={makeDraft([opening(), newRow('6', '2001-06-01')])} />)
     const dialog = await openDialog(user)
 
-    expect(within(dialog).getByLabelText('Opening Interest Rate').parentElement?.parentElement?.className)
-      .toContain('[&_input]:text-left')
+    const region = within(dialog).getByRole('region', { name: 'Interest Rate Changes' })
+    expect(region).toHaveClass('overflow-auto', 'min-h-0')
+    expect(region).toHaveAttribute('tabindex', '0')
+    const table = within(region).getByRole('table', { name: 'Interest rate changes, oldest first' })
+    expect(table.querySelector('thead')).toHaveClass('sticky', 'top-0', 'bg-raised')
+    expect(within(table).getAllByRole('columnheader').map((header) => header.textContent))
+      .toEqual(['Interest Rate', 'Effective Date', 'Actions'])
+    expect(within(table).getByRole('columnheader', { name: 'Interest Rate' })).toHaveClass('text-right')
+    const rows = bodyRows(dialog)
+    for (const row of rows) {
+      expect(row).toHaveClass('hairline-b')
+      expect(within(row).getAllByRole('cell')[0]).toHaveClass('text-right', 'tabular-nums')
+    }
+    expect(within(rows[0]!).getByLabelText('Opening Interest Rate')).toHaveClass('text-right')
+    const remove = within(rows[1]!).getByRole('button', { name: 'Remove 6.00% from 1 Jun 2001' })
+    expect(remove).toHaveClass('size-10', 'text-primary')
+    expect(remove.querySelector('svg')).toHaveClass('lucide-trash-2', 'text-danger')
   })
 
-  it('shows "No interest rate changes yet" when empty', async () => {
+  it('says what to do when there are no changes, with no table', async () => {
     const user = setupUser()
     render(<Harness initial={makeDraft([])} />)
     const dialog = await openDialog(user)
 
-    expect(within(dialog).getByText('No interest rate changes yet')).toBeInTheDocument()
-    expect(within(dialog).queryByRole('list')).not.toBeInTheDocument()
+    expect(within(dialog).getByText('No interest rate changes yet. Add a rate above.')).toHaveClass('text-fg-secondary')
+    expect(within(dialog).queryByRole('table')).not.toBeInTheDocument()
   })
 
   it('adds a valid change in date order, clears the inputs and refocuses New Interest Rate', async () => {
@@ -363,7 +382,7 @@ describe('InterestRateChangesDialog', () => {
       const dialog = await openDialog(user)
 
       expect(within(dialog).getByRole('alert')).toHaveTextContent('Add the opening interest rate, effective on the disbursal date')
-      const [first, second] = within(within(dialog).getByRole('list')).getAllByRole('listitem')
+      const [first, second] = bodyRows(dialog)
       expect(first).toHaveTextContent('This effective date is already used')
       expect(first).toHaveTextContent('Enter an interest rate from 0 to 100')
       expect(second).not.toHaveTextContent('already used')

@@ -48,6 +48,46 @@ describe('ImportReviewTable', () => {
     expect(screen.getByText('$1,000.00')).toBeInTheDocument()
   })
 
+  it('lists rows in a card that stops while they scroll under a held header', () => {
+    render(<ImportReviewTable review={review} currencyCode="AUD" />)
+
+    const table = screen.getByRole('table', { name: 'Validated transactions for review' })
+    const region = screen.getByRole('region', { name: 'Validated transactions' })
+    const card = region.closest('[data-slot="card"]')!
+    expect(region).toContainElement(table)
+    expect(region).toHaveClass('overflow-x-auto', 'overflow-y-hidden')
+    expect(region).toHaveAttribute('tabindex', '0')
+    expect(card).toHaveClass('sticky', 'top-0')
+    expect(card).toContainElement(screen.getByRole('heading', { name: 'Review Transactions' }))
+    expect(card).toContainElement(screen.getByRole('status'))
+    expect(region).not.toContainElement(screen.getByRole('status'))
+    expect(table.querySelector('thead')).toHaveClass('sticky', 'top-0', 'z-10', 'bg-raised')
+    expect(table.querySelector('tbody')).toHaveClass('isolate')
+  })
+
+  it('truncates a long description, keeping it in the title', () => {
+    const description = 'x'.repeat(300)
+    render(
+      <ImportReviewTable currencyCode="AUD" review={{ ...review, rows: [{ ...review.rows[0]!, description }] }} />,
+    )
+
+    expect(screen.getByTitle(description)).toHaveClass('block', 'max-w-72', 'truncate', 'text-fg-secondary')
+    const cells = within(screen.getAllByRole('row')[1]!).getAllByRole('cell')
+    expect(cells[0]).toHaveClass('whitespace-nowrap')
+    expect(cells[3]).toHaveClass('whitespace-nowrap', 'text-right', 'tabular-nums')
+  })
+
+  it('leaves the Warning cell empty when there is no warning', () => {
+    render(
+      <ImportReviewTable
+        currencyCode="AUD"
+        review={{ ...review, rows: [{ ...review.rows[0]!, isPossibleDuplicate: false }] }}
+      />,
+    )
+
+    expect(within(screen.getAllByRole('row')[1]!).getAllByRole('cell').at(-1)).toBeEmptyDOMElement()
+  })
+
   it('omits the Balance column when no row has a balance', () => {
     render(<ImportReviewTable review={review} currencyCode="AUD" />)
 

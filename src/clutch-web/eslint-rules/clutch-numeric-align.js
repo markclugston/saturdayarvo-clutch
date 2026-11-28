@@ -3,7 +3,9 @@
 // FloatingField right aligns numeric inputs itself, so it needs no check.
 
 const FORMATTERS = new Set(['formatCurrencyAmount', 'formatCurrency', 'formatPercent'])
-const CELLS = new Set(['td', 'th'])
+// The list primitives (components/ui/list.tsx) are cells too; their `numeric` prop right aligns them.
+const LIST_CELLS = new Set(['ListCell', 'ListHeaderCell'])
+const CELLS = new Set(['td', 'th', ...LIST_CELLS])
 const NUMERIC_INPUT_MODES = new Set(['numeric', 'decimal'])
 const RIGHT = /(^|[\s"'`])(text-right|text-end|justify-end)(?=[\s"'`]|$)/
 
@@ -45,6 +47,8 @@ export const rule = {
   create(context) {
     const source = context.sourceCode
     const rightAligned = (opening) => {
+      const numeric = LIST_CELLS.has(opening.name.name) ? attribute(opening, 'numeric') : undefined
+      if (numeric && literalValue(numeric) !== false) return true
       const attr = attribute(opening, 'className')
       return Boolean(attr) && RIGHT.test(source.getText(attr))
     }

@@ -160,6 +160,42 @@ describe('adding an asset', () => {
     expect(createAsset).not.toHaveBeenCalled()
   })
 
+  it('says what to do while there are no valuations, with no table', async () => {
+    await render()
+
+    expect(screen.getByText('No valuations yet. Add a valuation to record what this asset is worth.'))
+      .toHaveClass('text-fg-secondary')
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Valuations' })?.tagName).toBe('SECTION')
+  })
+
+  it('lists valuations in a card that stops while its rows scroll under a held header', async () => {
+    const user = setup()
+    await render()
+    const add = button('Add Valuation')
+    await complete(user)
+
+    const table = screen.getByRole('table', { name: 'Valuations of this asset, newest first' })
+    const region = table.closest('[role="region"][aria-label="Valuations"]')!
+    const card = region.closest('[data-slot="card"]')!
+    expect(region).toHaveAttribute('tabindex', '0')
+    expect(region).toHaveClass('overflow-x-auto', 'overflow-y-hidden')
+    expect(card).toHaveClass('sticky', 'top-0')
+    expect(card).toContainElement(screen.getByRole('heading', { name: 'Valuations' }))
+    expect(region).not.toContainElement(button('Add Valuation'))
+    expect(table.querySelector('thead')).toHaveClass('sticky', 'top-0', 'z-10', 'bg-raised')
+    expect(table.querySelector('tbody')).toHaveClass('isolate')
+    expect(within(table).getAllByRole('columnheader').map((header) => header.textContent))
+      .toEqual(['Value', 'Valuation Date', 'Actions'])
+    // The same button throughout, so focus can return to it.
+    expect(button('Add Valuation')).toBe(add)
+
+    await user.click(button('Delete valuation dated 1 Jan 2026'))
+
+    expect(button('Add Valuation')).toBe(add)
+    await waitFor(() => expect(add).toHaveFocus())
+  })
+
   it('saves the asset, returns to the list and confirms', async () => {
     vi.mocked(createAsset).mockResolvedValue({ ...detail, name: 'Car' })
     const user = setup()

@@ -23,7 +23,7 @@ function scrollToRow(row: number) {
 
 /** The list sits `listTop` px down the panel and has itself scrolled `row` rows. */
 function scrollListToRow(row: number, listTop: number) {
-  const list = screen.getByRole('group', { name: 'Schedule Rows' })
+  const list = screen.getByRole('region', { name: 'Schedule Rows' })
   const scroller = screen.getByTestId('scroller')
   const rect = (top: number) => ({ top }) as DOMRect
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function mock(this: HTMLElement) {
@@ -59,7 +59,7 @@ describe('AmortizationSchedule', () => {
     scrollToRow(350)
 
     expect(cells(360)).toEqual(['360', '29 Nov 2053', 'Not yet calculated'])
-    expect(screen.queryByText('361', { selector: '[role="cell"]' })).not.toBeInTheDocument()
+    expect(screen.queryByText('361', { selector: 'td' })).not.toBeInTheDocument()
   })
 
   it('keeps the disbursal day and clamps to the month end', () => {
@@ -123,17 +123,17 @@ describe('AmortizationSchedule', () => {
 
     const rows = within(screen.getByRole('table')).getAllByRole('row')
     expect(rows[0]).toHaveAttribute('aria-rowindex', '1')
-    expect(rows[0]?.className).toContain('sticky')
+    expect(rows[0]?.closest('thead')).toHaveClass('sticky')
     expect(screen.getByText('501')).toBeInTheDocument()
     expect(cells(501)[1]).toBe('29 Aug 2065')
-    expect(screen.queryByText('2', { selector: '[role="cell"]' })).not.toBeInTheDocument()
+    expect(screen.queryByText('2', { selector: 'td' })).not.toBeInTheDocument()
   })
 
   it('puts its rows in a named, keyboard-focusable list that scrolls sideways', () => {
     const listRef = vi.fn()
     render(<AmortizationSchedule duration={12} listRef={listRef} {...monthly} />)
 
-    const list = screen.getByRole('group', { name: 'Schedule Rows' })
+    const list = screen.getByRole('region', { name: 'Schedule Rows' })
     expect(listRef).toHaveBeenCalledWith(list)
     expect(list.firstElementChild).toBe(screen.getByRole('table'))
     expect(list).toHaveAttribute('tabindex', '0')
@@ -144,13 +144,30 @@ describe('AmortizationSchedule', () => {
   it('gives the space standing in for unrendered rows no transition, so the list keeps its height', () => {
     render(<AmortizationSchedule duration={360} {...monthly} />)
 
-    const spacers = within(screen.getByRole('rowgroup')).getAllByRole('presentation', { hidden: true })
+    const spacers = screen.getByRole('table').querySelectorAll('tbody tr[aria-hidden="true"]')
 
     // The reduced-motion rule would otherwise change their height a frame after the rows.
     expect(spacers).toHaveLength(2)
-    for (const spacer of spacers) {
+    for (const spacer of Array.from(spacers)) {
       expect(spacer).toHaveClass('transition-none')
+      expect(spacer.firstElementChild).toHaveClass('transition-none', 'p-0')
     }
+  })
+
+  it('is a captioned table with a held header and hairline rows of a fixed height', () => {
+    render(<AmortizationSchedule duration={12} {...monthly} />)
+
+    const table = screen.getByRole('table', { name: 'Repayment schedule by period' })
+    expect(table.tagName).toBe('TABLE')
+    expect(table).toHaveClass('table-fixed')
+    expect(table.querySelector('thead')).toHaveClass('sticky', 'top-0', 'z-10', 'bg-raised')
+    expect(table.querySelector('tbody')).toHaveClass('isolate')
+    for (const header of within(table).getAllByRole('columnheader')) {
+      expect(header).toHaveAttribute('scope', 'col')
+    }
+    const row = within(table).getAllByRole('row')[1]!
+    expect(row).toHaveClass('hairline-b')
+    expect(row).toHaveStyle({ height: '40px' })
   })
 
   it.each([0, 1000])('renders the rows its own list has scrolled to, %d px down the panel', (listTop) => {
@@ -163,7 +180,7 @@ describe('AmortizationSchedule', () => {
     scrollListToRow(500, listTop)
 
     expect(cells(501)[1]).toBe('29 Aug 2065')
-    expect(screen.queryByText('2', { selector: '[role="cell"]' })).not.toBeInTheDocument()
+    expect(screen.queryByText('2', { selector: 'td' })).not.toBeInTheDocument()
   })
 
   it('redraws with the new row count when the saved duration changes', () => {
@@ -174,7 +191,7 @@ describe('AmortizationSchedule', () => {
 
     expect(screen.getByRole('table')).toHaveAttribute('aria-rowcount', '13')
     expect(screen.getByText('12')).toBeInTheDocument()
-    expect(screen.queryByText('13', { selector: '[role="cell"]' })).not.toBeInTheDocument()
+    expect(screen.queryByText('13', { selector: 'td' })).not.toBeInTheDocument()
   })
 
   it('shows the prompt instead of a table for a new mortgage', () => {
@@ -210,6 +227,6 @@ describe('AmortizationSchedule Bank Schedule values', () => {
     render(<AmortizationSchedule duration={3} {...monthly} />)
 
     expect(cells(1)[2]).toBe('Not yet calculated')
-    expect(screen.getAllByText('Not yet calculated', { selector: '[role="cell"]' })[0]).toHaveClass('text-fg-secondary')
+    expect(screen.getAllByText('Not yet calculated', { selector: 'td' })[0]).toHaveClass('text-fg-secondary')
   })
 })

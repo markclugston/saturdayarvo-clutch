@@ -4,6 +4,10 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogBackdrop, DialogPopup, DialogPortal, DialogTitle } from '@/components/ui/dialog'
 import { ErrorMessage } from '@/components/ui/error-message'
 import { FloatingField } from '@/components/ui/floating-field'
+import {
+  DeleteButton, ListActionsCell, ListActionsHeader, ListBody, ListCell, ListEmpty, ListHead, ListHeaderCell,
+  ListRegion, ListRow, ListTable,
+} from '@/components/ui/list'
 import { FormattedNumberField, formatPercent } from './FormattedNumberField'
 import {
   MAX_RATE_CHANGES,
@@ -19,6 +23,7 @@ import {
   type RateRowDraft,
 } from './loanDraft'
 
+export const EMPTY_MESSAGE = 'No interest rate changes yet. Add a rate above.'
 export const ADD_ROW_HINT = 'Enter the disbursal date, duration and payment frequency first'
 export const DISBURSAL_FIRST_HINT = 'Enter the disbursal date first'
 export const OPENING_DELETE_HINT = 'Delete the other interest rate changes first'
@@ -218,63 +223,70 @@ function RateList({ draft, today, errors, saving, onRemove, onRateChange }: Rate
     <div className="flex min-h-0 flex-col gap-3">
       {setError && <ErrorMessage className="text-sm">{setError}</ErrorMessage>}
       {sorted.length === 0 ? (
-        <p className="text-sm text-fg-secondary">No interest rate changes yet</p>
+        <ListEmpty>{EMPTY_MESSAGE}</ListEmpty>
       ) : (
-        <ul aria-label="Interest Rate Changes" className="min-h-0 space-y-2 overflow-y-auto">
-          {sorted.map((row) => {
-            const rate = formatPercent(row.rate)
-            const date = formatDisplayDate(row.date)
-            const isOpeningRow = row.key === openingKey
-            const lockedDelete = isOpeningRow && rows.length > 1
-            const deleteHintId = `${id}-${row.key}-delete-hint`
-            const rowEditing = editing?.key === row.key ? editing : null
-            const rowErrors = [rowEditing?.error, errors[`${row.key}.newInterestRate`], errors[`${row.key}.effectiveDate`]]
-              .filter((message): message is string => Boolean(message))
-            return (
-              <li className="rounded-control bg-raised px-3 py-2" key={row.key}>
-                <div className="flex items-center gap-3">
-                  <div className="flex min-w-0 flex-1 flex-wrap items-end gap-x-3 gap-y-1 text-sm">
-                    {isOpeningRow ? (
-                      <FormattedNumberField
-                        autoComplete="off"
-                        className="w-40 [&_input]:h-12 [&_input]:pt-6 [&_input]:text-left"
-                        disabled={saving}
-                        format={formatPercent}
-                        id={`${id}-${row.key}-rate`}
-                        inputMode="decimal"
-                        label="Opening Interest Rate"
-                        onBlur={() => commit(row)}
-                        onValueChange={(next) => setEditing({ key: row.key, rate: next })}
-                        value={rowEditing ? rowEditing.rate : row.rate}
+        <ListRegion className="min-h-0" label="Interest Rate Changes" scroll="self">
+          <ListTable caption="Interest rate changes, oldest first">
+            <ListHead>
+              <tr>
+                <ListHeaderCell numeric>Interest Rate</ListHeaderCell>
+                <ListHeaderCell>Effective Date</ListHeaderCell>
+                <ListActionsHeader />
+              </tr>
+            </ListHead>
+            <ListBody>
+              {sorted.map((row) => {
+                const rate = formatPercent(row.rate)
+                const date = formatDisplayDate(row.date)
+                const isOpeningRow = row.key === openingKey
+                const lockedDelete = isOpeningRow && rows.length > 1
+                const deleteHintId = `${id}-${row.key}-delete-hint`
+                const rowEditing = editing?.key === row.key ? editing : null
+                const rowErrors = [rowEditing?.error, errors[`${row.key}.newInterestRate`], errors[`${row.key}.effectiveDate`]]
+                  .filter((message): message is string => Boolean(message))
+                return (
+                  <ListRow key={row.key}>
+                    <ListCell numeric>
+                      {isOpeningRow ? (
+                        <FormattedNumberField
+                          autoComplete="off"
+                          className="ml-auto w-40 [&_input]:h-12 [&_input]:pt-6"
+                          disabled={saving}
+                          format={formatPercent}
+                          id={`${id}-${row.key}-rate`}
+                          inputMode="decimal"
+                          label="Opening Interest Rate"
+                          onBlur={() => commit(row)}
+                          onValueChange={(next) => setEditing({ key: row.key, rate: next })}
+                          value={rowEditing ? rowEditing.rate : row.rate}
+                        />
+                      ) : rate}
+                      {lockedDelete && (
+                        <p className="mt-1 whitespace-normal text-xs text-fg-secondary" id={deleteHintId}>
+                          {OPENING_DELETE_HINT}
+                        </p>
+                      )}
+                      {rowErrors.map((message) => (
+                        <ErrorMessage className="mt-1 justify-end whitespace-normal text-xs" key={message} role="presentation">
+                          {message}
+                        </ErrorMessage>
+                      ))}
+                    </ListCell>
+                    <ListCell className="whitespace-nowrap">{date}</ListCell>
+                    <ListActionsCell>
+                      <DeleteButton
+                        aria-describedby={lockedDelete ? deleteHintId : undefined}
+                        disabled={saving || lockedDelete}
+                        label={`Remove ${rate} from ${date}`}
+                        onClick={() => onRemove(row.key)}
                       />
-                    ) : (
-                      <div className="relative h-12 w-40">
-                        <span className="absolute left-3 top-1.5 text-[0.625rem] leading-none text-fg-secondary">Interest Rate Change</span>
-                        <span className="absolute bottom-1.5 left-3 text-sm leading-4 tabular-nums">{rate}</span>
-                      </div>
-                    )}
-                    <span className="pb-1.5 leading-4 text-fg-secondary">{date}</span>
-                  </div>
-                  <Button
-                    aria-describedby={lockedDelete ? deleteHintId : undefined}
-                    aria-label={`Remove ${rate} from ${date}`}
-                    disabled={saving || lockedDelete}
-                    onClick={() => onRemove(row.key)}
-                    size="icon"
-                    type="button"
-                    variant="icon"
-                  >
-                    <X aria-hidden="true" />
-                  </Button>
-                </div>
-                {lockedDelete && <p className="mt-1 text-xs text-fg-secondary" id={deleteHintId}>{OPENING_DELETE_HINT}</p>}
-                {rowErrors.map((message) => (
-                  <ErrorMessage className="mt-1 text-xs" key={message} role="presentation">{message}</ErrorMessage>
-                ))}
-              </li>
-            )
-          })}
-        </ul>
+                    </ListActionsCell>
+                  </ListRow>
+                )
+              })}
+            </ListBody>
+          </ListTable>
+        </ListRegion>
       )}
     </div>
   )

@@ -268,7 +268,7 @@ describe('LoanDetailsForm (new mortgage)', () => {
       expect(summary).toHaveTextContent('Correct the highlighted fields and try again.')
       expect(screen.getByLabelText('Name')).toHaveValue('Home loan')
       const dialog = await openDialog(user)
-      expect(within(dialog).getByRole('listitem')).toHaveTextContent('Enter a valid date')
+      expect(within(dialog).getAllByRole('row')[1]).toHaveTextContent('Enter a valid date')
     })
 
     it('shows server row errors in the dialog and points the summary at Interest Rates', async () => {
@@ -284,7 +284,7 @@ describe('LoanDetailsForm (new mortgage)', () => {
       expect(summary).toHaveTextContent('Correct the interest rate changes in Interest Rates and try again.')
       expect(summary).not.toHaveTextContent('Correct the highlighted fields')
       const dialog = await openDialog(user)
-      expect(within(dialog).getByRole('listitem')).toHaveTextContent('Enter an interest rate from 0 to 100')
+      expect(within(dialog).getAllByRole('row')[1]).toHaveTextContent('Enter an interest rate from 0 to 100')
     })
 
     it('shows a set-level interestRateChanges error in the dialog and the summary, with no "Correct" line', async () => {
@@ -462,7 +462,7 @@ describe('LoanDetailsForm (editing)', () => {
 
       expect(screen.queryByLabelText('New Interest Rate')).not.toBeInTheDocument()
       expect(screen.queryByLabelText('Effective Date')).not.toBeInTheDocument()
-      expect(screen.queryByRole('list', { name: 'Interest Rate Changes' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('region', { name: 'Interest Rate Changes' })).not.toBeInTheDocument()
       expect(screen.queryAllByRole('button', { name: /^Remove / })).toHaveLength(0)
     })
 

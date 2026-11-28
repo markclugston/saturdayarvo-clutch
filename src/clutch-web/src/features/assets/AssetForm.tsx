@@ -1,9 +1,13 @@
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useRef, useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardTitle } from '@/components/ui/card'
 import { ErrorMessage } from '@/components/ui/error-message'
 import { FloatingField } from '@/components/ui/floating-field'
+import {
+  DeleteButton, ListActionsCell, ListActionsHeader, ListBody, ListCard, ListCell, ListHead, ListHeaderCell,
+  ListRow, ListTable,
+} from '@/components/ui/list'
 import { formatDisplayDate } from '@/features/mortgages/loanDraft'
 import type { Currency } from '@/lib/api/schemas'
 import { AddValuationDialog } from './AddValuationDialog'
@@ -15,6 +19,8 @@ import {
   type AssetDraft,
   type AssetDraftErrors,
 } from './assetDraft'
+
+const NO_VALUATIONS_MESSAGE = 'No valuations yet. Add a valuation to record what this asset is worth.'
 
 type AssetFormProps = {
   draft: AssetDraft
@@ -46,6 +52,9 @@ export function AssetForm({
   const addButton = useRef<HTMLButtonElement>(null)
   const currency = currencies.find((candidate) => candidate.code === draft.currencyCode)
   const locked = disabled || saving
+  const valuationsError = errors.valuations
+    ? <ErrorMessage className="text-sm">{errors.valuations}</ErrorMessage>
+    : null
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -102,71 +111,76 @@ export function AssetForm({
         )}
       </Card>
 
-      <Card aria-labelledby="valuations-heading" as="section" className="max-w-xl space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <CardTitle as="h2" id="valuations-heading">Valuations</CardTitle>
-          <Button
-            disabled={locked || !currency}
-            onClick={() => setAdding(true)}
-            ref={addButton}
-            type="button"
-            variant="secondary"
-          >
-            <Plus aria-hidden="true" />
-            Add Valuation
-          </Button>
-        </div>
-        {draft.valuations.length === 0 ? (
-          <p className="text-sm text-fg-secondary">No valuations yet.</p>
-        ) : (
-          <table className="w-full text-left text-sm">
-            <caption className="sr-only">Valuations of this asset, newest first</caption>
-            <thead className="bg-raised">
-              <tr>
-                <th className="px-3 py-2 text-right" scope="col">Value</th>
-                <th className="px-3 py-2" scope="col">Valuation Date</th>
-                <th className="px-3 py-2 text-right" scope="col"><span className="sr-only">Actions</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              {newestFirst(draft.valuations).map((row) => {
-                const date = formatDisplayDate(row.date)
-                const rowErrors = [errors[`${row.key}.value`], errors[`${row.key}.date`]]
-                  .filter((message): message is string => Boolean(message))
-                return (
-                  <tr className="hairline-b" key={row.key}>
-                    <td className="px-3 py-2 text-right tabular-nums">
-                      {currency
-                        ? formatAssetValue(row.value, currency.code, currency.minorUnits)
-                        : row.value}
-                      {rowErrors.map((message) => (
-                        <ErrorMessage className="mt-1 justify-end text-xs" key={message}>{message}</ErrorMessage>
-                      ))}
-                    </td>
-                    <td className="px-3 py-2">{date}</td>
-                    <td className="px-3 py-2 text-right">
-                      <Button
-                        aria-label={`Delete valuation dated ${date}`}
-                        disabled={locked}
-                        onClick={() => {
-                          onChange(removeValuation(draft, row.key))
-                          addButton.current?.focus()
-                        }}
-                        size="icon"
-                        type="button"
-                        variant="tertiary"
-                      >
-                        <Trash2 aria-hidden="true" className="size-4 text-danger" />
-                      </Button>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+      <ListCard
+        aria-labelledby="valuations-heading"
+        as="section"
+        className="max-w-xl"
+        empty={draft.valuations.length === 0
+          ? (
+            <>
+              <p className="text-fg-secondary">{NO_VALUATIONS_MESSAGE}</p>
+              {valuationsError}
+            </>
+          )
+          : undefined}
+        end={valuationsError}
+        label="Valuations"
+        title={(
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <CardTitle as="h2" id="valuations-heading">Valuations</CardTitle>
+            <Button
+              disabled={locked || !currency}
+              onClick={() => setAdding(true)}
+              ref={addButton}
+              type="button"
+              variant="secondary"
+            >
+              <Plus aria-hidden="true" />
+              Add Valuation
+            </Button>
+          </div>
         )}
-        {errors.valuations && <ErrorMessage className="text-sm">{errors.valuations}</ErrorMessage>}
-      </Card>
+      >
+        <ListTable caption="Valuations of this asset, newest first">
+          <ListHead>
+            <tr>
+              <ListHeaderCell numeric>Value</ListHeaderCell>
+              <ListHeaderCell>Valuation Date</ListHeaderCell>
+              <ListActionsHeader />
+            </tr>
+          </ListHead>
+          <ListBody>
+            {newestFirst(draft.valuations).map((row) => {
+              const date = formatDisplayDate(row.date)
+              const rowErrors = [errors[`${row.key}.value`], errors[`${row.key}.date`]]
+                .filter((message): message is string => Boolean(message))
+              return (
+                <ListRow key={row.key}>
+                  <ListCell numeric>
+                    {currency
+                      ? formatAssetValue(row.value, currency.code, currency.minorUnits)
+                      : row.value}
+                    {rowErrors.map((message) => (
+                      <ErrorMessage className="mt-1 justify-end whitespace-normal text-xs" key={message}>{message}</ErrorMessage>
+                    ))}
+                  </ListCell>
+                  <ListCell className="whitespace-nowrap">{date}</ListCell>
+                  <ListActionsCell>
+                    <DeleteButton
+                      disabled={locked}
+                      label={`Delete valuation dated ${date}`}
+                      onClick={() => {
+                        onChange(removeValuation(draft, row.key))
+                        addButton.current?.focus()
+                      }}
+                    />
+                  </ListActionsCell>
+                </ListRow>
+              )
+            })}
+          </ListBody>
+        </ListTable>
+      </ListCard>
 
       <div className="flex flex-wrap gap-3">
         <Button disabled={locked} type="submit">{saving ? 'Saving…' : 'Save'}</Button>

@@ -284,10 +284,10 @@ export async function addRates(user: ReturnType<typeof userEvent.setup>, rates: 
 
 /** The "{rate} {date}" text of each listed change in the open dialog, in list order. */
 export function listedRates(): string[] {
-  const list = within(screen.getByRole('dialog')).queryByRole('list', { name: 'Interest Rate Changes' })
+  const list = within(screen.getByRole('dialog')).queryByRole('region', { name: 'Interest Rate Changes' })
   return list
-    ? within(list).getAllByRole('listitem').map((item) => {
-      const remove = within(item).getByRole('button', { name: /^Remove / })
+    ? within(list).getAllByRole('row').slice(1).map((row) => {
+      const remove = within(row).getByRole('button', { name: /^Remove / })
       return (remove.getAttribute('aria-label') ?? '').replace(/^Remove /, '').replace(' from ', ' ')
     })
     : []

@@ -57,7 +57,7 @@ describe('LoanPayoffTimeline', () => {
     expect(spacer).toHaveClass('shrink-0')
     expect(pinned.trackRef).toHaveBeenCalledWith(track)
     expect(pinned.spacerRef).toHaveBeenCalledWith(spacer)
-    expect(pinned.listRef).toHaveBeenCalledWith(screen.getByRole('group', { name: 'Schedule Rows' }))
+    expect(pinned.listRef).toHaveBeenCalledWith(screen.getByRole('region', { name: 'Schedule Rows' }))
   })
 
   it('leaves the burndown chart card scrolling with the page', () => {

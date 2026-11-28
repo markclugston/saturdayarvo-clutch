@@ -108,15 +108,35 @@ describe('AmortizationSchedule with a Mortgage Account', () => {
     expect(server.balanceRequests).toHaveLength(0)
   })
 
-  it('shows a busy table while loading with no layout shift', async () => {
+  it('shows a spinner and a busy table with its rows while the balances load', async () => {
     const release = server.holdBalances()
     renderWithProviders(<AmortizationSchedule accountId={account.id} duration={3} {...saved} />)
 
     await waitFor(() => expect(screen.getByRole('table')).toHaveAttribute('aria-busy', 'true'))
-    expect(screen.getByRole('status')).toHaveTextContent('Loading account balances')
+    const status = screen.getByRole('status')
+    expect(status).toHaveTextContent('Loading account balances…')
+    expect(status).not.toHaveClass('sr-only')
+    expect(status.querySelector('svg')).toHaveClass('animate-spin')
     expect(screen.getByRole('table')).toHaveAttribute('aria-rowcount', '4')
     await act(async () => release())
     await waitFor(() => expect(screen.getByRole('table')).not.toHaveAttribute('aria-busy'))
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('loads the balances again on Retry, keeping the schedule rows meanwhile', async () => {
+    server.balancesError = problem(500)
+    const user = userEvent.setup()
+    renderWithProviders(<AmortizationSchedule accountId={account.id} duration={3} {...saved} />)
+    expect(await screen.findByText(BALANCES_FAILED_MESSAGE)).toBeInTheDocument()
+    expect(screen.getByRole('table')).toHaveAttribute('aria-rowcount', '4')
+
+    server.balancesError = undefined
+    server.balances = { currencyCode: 'AUD', periodCount: 3, balances: ['1000.00', '990.00', '980.00'] }
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+
+    await waitFor(() => expect(within(screen.getByRole('table')).getByText('$980.00')).toBeInTheDocument())
+    expect(screen.queryByText(BALANCES_FAILED_MESSAGE)).not.toBeInTheDocument()
+    expect(server.balanceRequests).toHaveLength(2)
   })
 
   it('shows a generic message and blank cells when balances fail to load', async () => {
@@ -247,8 +267,8 @@ describe('AmortizationSchedule Forecast Balance column', () => {
   it('right aligns the header and cells with tabular figures', async () => {
     await renderLinked()
 
-    expect(screen.getByRole('columnheader', { name: 'Forecast Balance' })).toHaveClass('justify-end', 'text-right')
-    expect(screen.getByRole('cell', { name: '$100.00' })).toHaveClass('justify-end', 'text-right', 'tabular-nums')
+    expect(screen.getByRole('columnheader', { name: 'Forecast Balance' })).toHaveClass('text-right')
+    expect(screen.getByRole('cell', { name: '$100.00' })).toHaveClass('text-right', 'tabular-nums')
   })
 
   it('is blank while the balances load', async () => {

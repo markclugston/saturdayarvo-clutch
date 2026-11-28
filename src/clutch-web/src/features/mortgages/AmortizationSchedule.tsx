@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState, type Ref } from 'react'
-import { ErrorMessage } from '@/components/ui/error-message'
+import {
+  ListBody, ListCell, ListHead, ListHeaderCell, ListLoadError, ListLoading, ListRegion, ListRow, ListTable,
+} from '@/components/ui/list'
 import { formatCurrencyAmount } from '@/lib/formatCurrencyAmount'
+import { cn } from '@/lib/utils'
 import { useActualBalances } from './actualBalances'
 import { formatCents } from './formatCents'
 import { formatDisplayDate } from './loanDraft'
@@ -23,6 +26,8 @@ export const NOT_CALCULATED = 'Not yet calculated'
 export const BALANCES_FAILED_MESSAGE = 'The account balances could not be loaded.'
 
 const ROW_HEIGHT = 40
+/** Two lines of text fit a row, so a narrow column wraps without making its row taller. */
+const CELL = 'whitespace-normal py-0 leading-tight'
 const FALLBACK_VIEWPORT_HEIGHT = 384
 const OVERSCAN = 8
 
@@ -129,8 +134,9 @@ function AccountSchedule({
   // Details complete: the mortgage's own rows. Incomplete (new, unsaved): monthly rows from the account.
   const rowCount = complete ? duration : (actual.periodCount ?? 0)
   return (
-    <>
-      {failed && <ErrorMessage>{BALANCES_FAILED_MESSAGE}</ErrorMessage>}
+    <div className="flex min-w-0 flex-col gap-3">
+      {loading && <ListLoading>Loading account balances…</ListLoading>}
+      {failed && <ListLoadError onRetry={actual.retry}>{BALANCES_FAILED_MESSAGE}</ListLoadError>}
       {!complete && !loading && rowCount === 0
         ? <p className="text-sm text-fg-secondary">{ENTER_DETAILS_MESSAGE}</p>
         : (
@@ -144,7 +150,7 @@ function AccountSchedule({
               schedule={schedule}
             />
           )}
-    </>
+    </div>
   )
 }
 
@@ -177,7 +183,7 @@ function ScheduleTable({
 }: ScheduleTableProps) {
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportHeight, setViewportHeight] = useState(FALLBACK_VIEWPORT_HEIGHT)
-  const tableRef = useRef<HTMLDivElement>(null)
+  const tableRef = useRef<HTMLTableElement>(null)
 
   // Rows pass out of sight above the page's content area, or above their own list once the card is
   // stopped and the list scrolls: window them against whichever edge is lower.
@@ -218,7 +224,7 @@ function ScheduleTable({
     return calculated ? NOT_CALCULATED : ''
   }
 
-  const columns = balanceColumns ? 'grid-cols-[5rem_1fr_1fr_1fr_1fr]' : 'grid-cols-[5rem_1fr_1fr]'
+  const columnCount = 3 + (balanceColumns?.columns.length ?? 0)
   const first = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN)
   const last = Math.min(rowCount, Math.ceil((scrollTop + viewportHeight) / ROW_HEIGHT) + OVERSCAN)
   const periods: number[] = []
@@ -227,67 +233,64 @@ function ScheduleTable({
   }
 
   return (
-    // No scroll anchoring: swapping rows for spacer height keeps the total height, and the browser's
+    // No scroll anchoring (`page`): swapping rows for spacer height keeps the total height, and the browser's
     // anchor adjustment would move the scroller itself, which renders new rows and moves it again.
-    <div
-      aria-label="Schedule Rows"
-      // Rounded for the focus ring only: at rest the header keeps its square corners.
-      className="min-w-0 overflow-x-auto overflow-y-hidden [overflow-anchor:none] focus-visible:rounded-control focus-visible:focus-ring"
-      ref={listRef}
-      role="group"
-      tabIndex={0}
-    >
-      <div
+    <ListRegion className="min-w-0" label="Schedule Rows" ref={listRef} scroll="page">
+      <ListTable
         aria-busy={balanceColumns?.loading ? true : undefined}
         aria-rowcount={rowCount + 1}
-        className={`${balanceColumns ? 'min-w-140' : 'min-w-80'} text-sm`}
+        caption="Repayment schedule by period"
+        // Fixed, so the columns do not move as other rows are drawn.
+        className={cn('table-fixed', balanceColumns ? 'min-w-140' : 'min-w-80')}
         ref={tableRef}
-        role="table"
       >
-        {balanceColumns?.loading && <p className="sr-only" role="status">Loading account balances</p>}
-        <div
-          aria-rowindex={1}
-          className={`sticky top-0 z-10 grid ${columns} bg-raised font-semibold`}
-          role="row"
-          style={{ height: ROW_HEIGHT }}
-        >
-          <div className="flex items-center justify-end px-3 text-right" role="columnheader">Period</div>
-          <div className="flex items-center px-3" role="columnheader">Date</div>
-          <div className="flex items-center justify-end px-3 text-right" role="columnheader">Bank Schedule</div>
-          {balanceColumns?.columns.map(({ header }) => (
-            <div className="flex items-center justify-end px-3 text-right" key={header} role="columnheader">{header}</div>
-          ))}
-        </div>
-        <div role="rowgroup">
-          {/* No transition on the spacers: under reduced motion index.css would otherwise resize them a
-              frame after the rows, and the list's height would jump, moving its scroll position. */}
-          <div aria-hidden="true" className="transition-none" role="presentation" style={{ height: first * ROW_HEIGHT }} />
+        <colgroup>
+          <col className="w-20" />
+        </colgroup>
+        <ListHead>
+          <tr aria-rowindex={1} style={{ height: ROW_HEIGHT }}>
+            <ListHeaderCell className={CELL} numeric>Period</ListHeaderCell>
+            <ListHeaderCell className={CELL}>Date</ListHeaderCell>
+            <ListHeaderCell className={CELL} numeric>Bank Schedule</ListHeaderCell>
+            {balanceColumns?.columns.map(({ header }) => (
+              <ListHeaderCell className={CELL} key={header} numeric>{header}</ListHeaderCell>
+            ))}
+          </tr>
+        </ListHead>
+        <ListBody>
+          <Spacer columns={columnCount} height={first * ROW_HEIGHT} />
           {periods.map((period) => (
-            <div
-              aria-rowindex={period + 1}
-              className={`grid ${columns} hairline-b`}
-              key={period}
-              role="row"
-              style={{ height: ROW_HEIGHT }}
-            >
-              <div className="flex items-center justify-end px-3 text-right tabular-nums" role="cell">{period}</div>
-              <div className="flex items-center px-3" role="cell">
+            <ListRow aria-rowindex={period + 1} key={period} style={{ height: ROW_HEIGHT }}>
+              <ListCell className={CELL} numeric>{period}</ListCell>
+              <ListCell className={CELL}>
                 {calculated ? periodDate(period, { disbursalDate, paymentFrequency }) : ''}
-              </div>
-              <div
-                className={`flex items-center justify-end px-3 text-right tabular-nums ${bankScheduleCell(period) === NOT_CALCULATED ? 'text-fg-secondary' : ''}`}
-                role="cell"
+              </ListCell>
+              <ListCell
+                className={cn(CELL, bankScheduleCell(period) === NOT_CALCULATED && 'text-fg-secondary')}
+                numeric
               >
                 {bankScheduleCell(period)}
-              </div>
+              </ListCell>
               {balanceColumns?.columns.map(({ header, cell }) => (
-                <div className="flex items-center justify-end px-3 text-right tabular-nums" key={header} role="cell">{cell(period)}</div>
+                <ListCell className={CELL} key={header} numeric>{cell(period)}</ListCell>
               ))}
-            </div>
+            </ListRow>
           ))}
-          <div aria-hidden="true" className="transition-none" role="presentation" style={{ height: (rowCount - last) * ROW_HEIGHT }} />
-        </div>
-      </div>
-    </div>
+          <Spacer columns={columnCount} height={(rowCount - last) * ROW_HEIGHT} />
+        </ListBody>
+      </ListTable>
+    </ListRegion>
+  )
+}
+
+/**
+ * The height of the rows not drawn. No transition: under reduced motion index.css would otherwise resize it a
+ * frame after the rows, and the list's height would jump, moving its scroll position.
+ */
+function Spacer({ columns, height }: { columns: number; height: number }) {
+  return (
+    <tr aria-hidden="true" className="transition-none">
+      <td className="p-0 transition-none" colSpan={columns} style={{ height }} />
+    </tr>
   )
 }

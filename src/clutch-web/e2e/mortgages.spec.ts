@@ -103,7 +103,7 @@ async function watchForSwap(context: BrowserContext) {
     new MutationObserver(() => {
       const state = window as unknown as { chartSeen?: boolean; scheduleSeen?: boolean }
       if (document.querySelector('svg[aria-label^="Line chart of the mortgage balance"]')) state.chartSeen = true
-      if (document.querySelector('[role="table"]')) state.scheduleSeen = true
+      if (document.querySelector('table')) state.scheduleSeen = true
     }).observe(document, { childList: true, subtree: true })
   })
 }

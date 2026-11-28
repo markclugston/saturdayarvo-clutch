@@ -4,6 +4,8 @@ import { randomUUID } from 'node:crypto'
 import { test, expect } from './fixtures.js'
 
 const testPassword = 'Clutch-E2e!Password-2026'
+// A row's delete button is named for its transaction: "Delete {description}, {date}" (031 FR-005).
+const rowDelete = /^Delete (Delete me first|Keep me second), /
 
 async function signIn(context: BrowserContext, email: string) {
   const csrfResponse = await context.request.get('/api/security/csrf-token')
@@ -73,7 +75,7 @@ async function createAccountWithTransactions(page: Page, description: string) {
   await expect(page.getByRole('heading', { name: 'Account Details' })).toBeVisible()
 
   await importDeleteJourneyStatement(page)
-  await expect(page.getByText('Delete me first')).toBeVisible()
+  await expect(page.getByTitle('Delete me first')).toBeVisible()
 }
 
 async function openAccountFromList(page: Page, description: string) {
@@ -90,7 +92,7 @@ async function selectAndExpectTheme(page: Page, mode: 'Light' | 'Dark') {
 
 function deleteButtonFor(page: Page, description: string) {
   return page.getByRole('row').filter({ hasText: description })
-    .getByRole('button', { name: 'Delete transaction' })
+    .getByRole('button', { name: rowDelete })
 }
 
 // Tab from the current focus until the delete action in the given row is focused.
@@ -99,7 +101,7 @@ async function tabToDeleteButtonFor(page: Page, description: string) {
     const focusedInRow = await page.evaluate<boolean>(
       `(() => {
         const element = document.activeElement;
-        return element?.getAttribute("aria-label") === "Delete transaction"
+        return element?.getAttribute("aria-label")?.startsWith("Delete ")
           && (element.closest("tr")?.textContent ?? "").includes(${JSON.stringify(description)});
       })()`,
     )
@@ -154,7 +156,7 @@ const nonTextContrastProbe = `(() => {
   };
   const focused = document.activeElement;
   const focusStyle = getComputedStyle(focused);
-  const icons = Array.from(document.querySelectorAll('[aria-label="Delete transaction"]'))
+  const icons = Array.from(document.querySelectorAll('[aria-label^="Delete "]'))
     .map((element) => contrast(resolve(getComputedStyle(element).color), backdrop(element)));
   return {
     focus: {
@@ -190,10 +192,10 @@ test.describe('delete imported transaction', () => {
     await expect(page.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
     await createAccountWithTransactions(page, `Delete journey ${Date.now()}`)
 
-    const deleteButtons = page.getByRole('button', { name: 'Delete transaction' })
+    const deleteButtons = page.getByRole('button', { name: rowDelete })
     await expect(deleteButtons).toHaveCount(2)
     const targetRow = page.getByRole('row').filter({ hasText: 'Delete me first' })
-    await targetRow.getByRole('button', { name: 'Delete transaction' }).click()
+    await targetRow.getByRole('button', { name: rowDelete }).click()
 
     const dialog = page.getByRole('alertdialog')
     await expect(dialog).toBeVisible()
@@ -212,7 +214,7 @@ test.describe('delete imported transaction', () => {
     expect(durationMs).toBeLessThanOrEqual(500)
 
     await expect(page.getByRole('alertdialog')).toHaveCount(0)
-    await expect(page.getByText('Delete me first')).toHaveCount(0)
+    await expect(page.getByTitle('Delete me first')).toHaveCount(0)
     await expect(page.getByText('Keep me second')).toBeVisible()
     await expect(deleteButtons).toHaveCount(1)
 
@@ -231,11 +233,11 @@ test.describe('delete imported transaction', () => {
     await expect(page.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
     await createAccountWithTransactions(page, `Cancel journey ${Date.now()}`)
 
-    await page.getByRole('button', { name: 'Delete transaction' }).first().click()
+    await page.getByRole('button', { name: rowDelete }).first().click()
     await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel' }).click()
 
     await expect(page.getByRole('alertdialog')).toHaveCount(0)
-    await expect(page.getByText('Delete me first')).toBeVisible()
+    await expect(page.getByTitle('Delete me first')).toBeVisible()
     await expect(page.getByRole('alert')).toHaveCount(0)
     await expectNoAxeViolations(page)
 
@@ -251,14 +253,14 @@ test.describe('delete imported transaction', () => {
     await expect(page.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
     await createAccountWithTransactions(page, `Escape journey ${Date.now()}`)
 
-    await page.getByRole('button', { name: 'Delete transaction' }).first().click()
+    await page.getByRole('button', { name: rowDelete }).first().click()
     await expect(page.getByRole('alertdialog')).toBeVisible()
     await page.keyboard.press('Escape')
 
     await expect(page.getByRole('alertdialog')).toHaveCount(0)
-    await expect(page.getByText('Delete me first')).toBeVisible()
+    await expect(page.getByTitle('Delete me first')).toBeVisible()
     await expect(page.getByText('Keep me second')).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Delete transaction' }).first()).toBeFocused()
+    await expect(page.getByRole('button', { name: rowDelete }).first()).toBeFocused()
 
     await context.close()
   })
@@ -276,14 +278,14 @@ test.describe('delete imported transaction', () => {
     await expect(page.getByRole('button', { name: /select|bulk|delete selected/i })).toHaveCount(0)
 
     for (const remaining of [2, 1]) {
-      await expect(page.getByRole('button', { name: 'Delete transaction' })).toHaveCount(remaining)
-      await page.getByRole('button', { name: 'Delete transaction' }).first().click()
+      await expect(page.getByRole('button', { name: rowDelete })).toHaveCount(remaining)
+      await page.getByRole('button', { name: rowDelete }).first().click()
       await page.getByRole('alertdialog').getByRole('button', { name: 'Delete', exact: true }).click()
       await expect(page.getByRole('alertdialog')).toHaveCount(0)
     }
 
-    await expect(page.getByText('No transactions have been imported to this account.')).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Delete transaction' })).toHaveCount(0)
+    await expect(page.getByText('No transactions yet. Import transactions to see them here.')).toBeVisible()
+    await expect(page.getByRole('button', { name: rowDelete })).toHaveCount(0)
 
     await context.close()
   })
@@ -311,7 +313,7 @@ test.describe('delete imported transaction', () => {
     await dialog.getByRole('button', { name: 'Delete', exact: true }).click()
     await expect(dialog.getByRole('button', { name: 'Deleting…' })).toBeVisible()
     await expect(dialog).toHaveCount(0)
-    await expect(page.getByText('Delete me first')).toHaveCount(0)
+    await expect(page.getByTitle('Delete me first')).toHaveCount(0)
 
     await context.close()
   })
@@ -328,10 +330,10 @@ test.describe('delete imported transaction', () => {
     await deleteButtonFor(page, 'Delete me first').click()
     await page.getByRole('alertdialog').getByRole('button', { name: 'Delete', exact: true }).click()
     await expect(page.getByRole('alertdialog')).toHaveCount(0)
-    await expect(page.getByText('Delete me first')).toHaveCount(0)
+    await expect(page.getByTitle('Delete me first')).toHaveCount(0)
 
     await importDeleteJourneyStatement(page, { reimport: true })
-    await expect(page.getByText('Delete me first')).toBeVisible()
+    await expect(page.getByTitle('Delete me first')).toBeVisible()
 
     await context.close()
   })
@@ -347,7 +349,7 @@ test.describe('delete imported transaction', () => {
     const description = `Close journey ${Date.now()}`
     await createAccountWithTransactions(page, description)
 
-    await page.getByRole('button', { name: 'Delete transaction' }).first().click()
+    await page.getByRole('button', { name: rowDelete }).first().click()
     await expect(page.getByRole('alertdialog')).toBeVisible()
     await context.close()
 
@@ -357,7 +359,7 @@ test.describe('delete imported transaction', () => {
     await reopenedPage.goto(baseUrl)
     await expect(reopenedPage.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
     await openAccountFromList(reopenedPage, description)
-    await expect(reopenedPage.getByText('Delete me first')).toBeVisible()
+    await expect(reopenedPage.getByTitle('Delete me first')).toBeVisible()
     await expect(reopenedPage.getByText('Keep me second')).toBeVisible()
 
     await reopened.close()
@@ -381,11 +383,11 @@ test.describe('delete imported transaction', () => {
     await otherTab.goto(baseUrl)
     await expect(otherTab.getByRole('heading', { name: 'Your Accounts' })).toBeVisible()
     await openAccountFromList(otherTab, description)
-    await expect(otherTab.getByText('Delete me first')).toBeVisible()
+    await expect(otherTab.getByTitle('Delete me first')).toBeVisible()
     await otherTab.getByRole('row').filter({ hasText: 'Delete me first' })
-      .getByRole('button', { name: 'Delete transaction' }).click()
+      .getByRole('button', { name: rowDelete }).click()
     await otherTab.getByRole('alertdialog').getByRole('button', { name: 'Delete', exact: true }).click()
-    await expect(otherTab.getByText('Delete me first')).toHaveCount(0)
+    await expect(otherTab.getByTitle('Delete me first')).toHaveCount(0)
 
     await dialog.getByRole('button', { name: 'Delete', exact: true }).click()
     await expect(dialog.getByRole('alert')).toContainText('This transaction no longer exists.')
@@ -422,7 +424,7 @@ test.describe('delete imported transaction', () => {
       await page.keyboard.press('Space')
       await expect(dialog).toHaveCount(0)
       await expect(trashButton).toBeFocused()
-      await expect(page.getByText('Delete me first')).toBeVisible()
+      await expect(page.getByTitle('Delete me first')).toBeVisible()
 
       await page.keyboard.press('Space')
       await expect(dialog).toBeVisible()
@@ -432,7 +434,7 @@ test.describe('delete imported transaction', () => {
       await expect(dialog.getByRole('button', { name: 'Delete', exact: true })).toBeFocused()
       await page.keyboard.press('Enter')
       await expect(dialog).toHaveCount(0)
-      await expect(page.getByText('Delete me first')).toHaveCount(0)
+      await expect(page.getByTitle('Delete me first')).toHaveCount(0)
       await expect(page.getByText('Keep me second')).toBeVisible()
     }
 
@@ -454,7 +456,7 @@ test.describe('delete imported transaction', () => {
 
     await page.emulateMedia({ colorScheme: 'dark' })
     await expect.poll(isDark).toBe(true)
-    await page.getByRole('button', { name: 'Delete transaction' }).first().click()
+    await page.getByRole('button', { name: rowDelete }).first().click()
     await expect(page.getByRole('alertdialog')).toBeVisible()
     await expectNoAxeViolations(page)
     await page.keyboard.press('Escape')
@@ -480,7 +482,7 @@ test.describe('delete imported transaction', () => {
         await selectAndExpectTheme(page, scheme === 'dark' ? 'Dark' : 'Light')
         await createAccountWithTransactions(page, `Axe ${scheme} ${viewport.width} ${Date.now()}`)
 
-        await page.getByRole('button', { name: 'Delete transaction' }).first().click()
+        await page.getByRole('button', { name: rowDelete }).first().click()
         await expect(page.getByRole('alertdialog')).toBeVisible()
         await expectNoAxeViolations(page)
         await page.keyboard.press('Escape')
@@ -504,7 +506,7 @@ test.describe('delete imported transaction', () => {
 
       // A key press first puts Chromium in keyboard modality so :focus-visible matches programmatic focus.
       await page.keyboard.press('Shift')
-      const trashButtons = page.getByRole('button', { name: 'Delete transaction' })
+      const trashButtons = page.getByRole('button', { name: rowDelete })
       await trashButtons.first().focus()
       await expect(trashButtons.first()).toBeFocused()
       expectNonTextContrast(await probeNonTextContrast(page))
