@@ -57,3 +57,12 @@ Traceability preserved through relocation of implementation requirements into pa
 - SEC-004 added to the templates, `clutch-constitution-check`, the security and frontend skills and the security rule, where it was missing.
 - Supersedes earlier notes that the project is Copilot-only: Claude Code is also in use, with `CLAUDE.md` mirrored to `copilot-instructions.md`.
 - Not yet proven on a feature.
+
+## Constitution 1.9.0 (2026-11-28): list standard
+
+- Rationale: lists differed from one another. The user asked for every list to follow the Assets list, deviating only with explicit approval. MINOR bump.
+- The rules are in `clutch-ui-style` §12, which points to the Assets code for values. No shared list primitive exists yet, so review and tests enforce them, not lint.
+- Interpretation: a list is any collection of records shown as rows or items. Navigation, tab strips, drop-down options, chart legends and toasts are not lists.
+- Interpretation: approval is the user's own words naming the difference, including a feature description that asks for it.
+- Existing lists that differ are listed in §12. They are neither approved nor changed.
+- The `presets/clutch/` commands are unchanged: specify and clarify already read the code map's settled decisions, and plan loads the constitution check.

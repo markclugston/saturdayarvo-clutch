@@ -6,6 +6,7 @@ contains what's described, search for the concern and update the pointer.
 
 **Convention by example:** before adding a file, open its nearest sibling in the same area
 (same folder, or the same layer in another area) and follow its pattern. Don't invent structure.
+Exception: every list follows the list standard below, whatever its siblings do.
 
 | To find… | Read |
 |---|---|
@@ -32,6 +33,7 @@ contains what's described, search for the concern and update the pointer.
 | Numeric right-alignment lint rule (`clutch/numeric-align`) and its tests | `src/clutch-web/eslint-rules/clutch-numeric-align.js`, `clutch-numeric-align.test.js` |
 | Render error boundaries (whole app and page content); console handling of render errors | `src/clutch-web/src/components/error-boundary/` |
 | Percentage and currency entry fields; display formatting of amounts | `src/clutch-web/src/features/mortgages/FormattedNumberField.tsx`; `src/clutch-web/src/lib/formatCurrencyAmount.ts` |
+| List standard: reference list (header, row lines, footer, row actions, states) and its delete confirmation | `src/clutch-web/src/features/assets/AssetsPage.tsx`, `DeleteAssetDialog.tsx`; rules in `clutch-ui-style` §12 |
 | List card stopped at the top of the content panel while the page scroll moves its rows, with the column header held | `src/clutch-web/src/lib/usePinnedList.ts` |
 | Mortgage Actual Balance values shared by the schedule column and the Burndown chart | `src/clutch-web/src/features/mortgages/actualBalances.ts` |
 | Mortgage Forecast Balance calculation (median recent reduction) | `src/clutch-web/src/features/mortgages/forecastBalances.ts` |
@@ -49,3 +51,4 @@ CLARIFICATION. Only a feature that changes it should discuss it.
 
 - Concurrent edits: the version check in `src/Clutch.API/Application/Mortgages/MortgageService.cs`. Add edit leases only when the description asks for them.
 - Performance, scale and observability: the constitution's requirements, with no added targets or mechanisms.
+- Lists: style and behaviour follow the list standard (`clutch-ui-style` §12). Differ only where the user explicitly asks or approves.

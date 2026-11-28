@@ -1,15 +1,15 @@
 <!--
 Sync Impact Report
-- Version: 1.7.0 → 1.8.0 (MINOR: WEB-001 compliance checklist is referenced by plans, not copied)
-- Changed: WEB-001. Rationale: the copied checklist added to every plan and analysis; the
-  completion review still records every item
-- Updated: plan and tasks templates, clutch-constitution-check, clutch-ui-style,
-  clutch-security-review and clutch-frontend (the last two close the 1.7.0 SEC-004 follow-up)
-- Follow-up: none
+- Version: 1.8.0 → 1.9.0 (MINOR: WEB-001 gains a list standard)
+- Changed: WEB-001. Rationale: every list must look and behave like the Assets list; only the
+  user may approve a difference
+- Updated: clutch-ui-style (§12, checklist), clutch-frontend, clutch-constitution-check,
+  ui-design rule, plan and tasks templates, code map, assumptions.md
+- Follow-up: lists built before 1.9.0 differ and are not approved (clutch-ui-style §12)
 -->
 # SaturdayArvo Clutch Constitution
 
-**Version**: 1.8.0 | **Last Amended**: 2026-11-28
+**Version**: 1.9.0 | **Last Amended**: 2026-11-28
 
 ## Governance
 Source of truth: the running code, its lint rules and its automated tests define implementation (design tokens, components, patterns, conventions). This constitution defines obligations, governance and process. Specifications define intent.
@@ -80,6 +80,8 @@ Each heading names the skill holding the process for that requirement. The proce
 - All numbers and currency amounts must be right aligned: numeric and currency table cells and their column headers, numeric entry controls, and displayed amounts and rates. Enforced by the `clutch/numeric-align` lint rule and the `FloatingField` primitive (`docs/code-map.md`).
 - UI work must apply the style guide: the design system implemented in code and its enforcing lint rule and browser tests. Plans must identify the applicable style guide sections and name its compliance checklist as a Constitution Check gate. The completion review must record a result for every checklist item.
 - Style-guide rule changes are made in code first (tokens, primitives, lint rule, browser tests); guidance that references them is updated in the same change.
+- Every list must follow the style guide's list standard: the headers, line styles, scrolling, general styling, behaviour, and edit and remove controls of the Assets list, the reference implementation (`docs/code-map.md`).
+- A list may deviate from the list standard only with the user's explicit approval of that deviation, obtained before it is built and recorded in the plan. A written justification, a differing existing list or an agent's judgment is not approval. An unapproved deviation is a CRITICAL finding.
 
 ## Performance & Observability
 - User-initiated actions must provide visible feedback within 500ms or show progress.

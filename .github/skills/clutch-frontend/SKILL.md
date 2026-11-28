@@ -42,6 +42,7 @@ The lint config has no React plugin, so review these:
 - Navigation and file-selection controls are accessible buttons.
 - New primitives come from shadcn/ui on Base UI, remapped to the tokens. Third-party UI registries require an independent security review (`clutch-security-review`).
 - % and $ entry controls reuse `FormattedNumberField` (WEB-001). Their component tests type and paste invalid characters, assert the field excludes them, then blur and assert the formatted text.
+- Lists and tables follow `clutch-ui-style` §12 (`references/lists.md`), which names the reference implementation and the tests to add; it replaces the nearest-sibling pattern for lists. Any difference needs the user's explicit approval first (WEB-001).
 
 ## Testing
 

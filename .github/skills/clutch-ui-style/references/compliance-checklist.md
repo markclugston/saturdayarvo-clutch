@@ -23,5 +23,10 @@ for every item in the feature's `validation.md`. The
 | [ ] WCAG 2.2 AA (axe) and contrast pass in both themes | Browser |
 | [ ] Visible focus ring on every interactive element | Browser |
 | [ ] Status not conveyed by colour alone | Review |
+| [ ] Lists: structure, column header, row lines, cells and footer match the Assets list (§12) | Component, Review |
+| [ ] Lists: scroll through `usePinnedList`, header held, footers reached at the end (§12) | Component, Browser |
+| [ ] Lists: edit and remove buttons, delete confirmation, and loading, error and empty states match (§12) | Component, Review |
+| [ ] Lists: every difference from §12 has the user's explicit approval recorded in the plan | Review |
 
 Any deviation requires an explicit justification in the plan and is rejected at review otherwise.
+A list deviation also requires the user's explicit approval; justification alone is not enough.

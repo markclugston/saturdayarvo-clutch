@@ -60,6 +60,7 @@ tests first and confirm they fail before implementing.
 Include each applicable row from the plan's Constitution Check. Delete rows that are N/A there.
 
 - [ ] TXXX Browser test for critical journey in `<e2e spec path>` (WEB-001)
+- [ ] TXXX Add each new or changed list to `pinnedLists` and states in `src/clutch-web/e2e/style-guide.spec.ts` (WEB-001, `clutch-ui-style` §12)
 - [ ] TXXX Independent query review of changed queries (DOT-002, `clutch-data-access`)
 - [ ] TXXX Migration review with rollback/backfill plan (OPS-001, `clutch-data-access`)
 - [ ] TXXX Independent security review of the full diff (SEC-001..004, `clutch-security-review`)

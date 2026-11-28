@@ -47,8 +47,11 @@ N/A: WEB-001 (no clutch-web changes)
 
 - When WEB-001 applies: list the applicable style guide sections (by §) and name
   `clutch-ui-style/references/compliance-checklist.md` as a gate. Do not copy it into the plan.
+- When the feature adds or changes a list or table: §12 is an applicable section. A difference
+  from it needs the user's explicit approval (WEB-001): ask before planning it, and keep the WEB-001
+  row PENDING until answered. Record the date and the user's words in Complexity Tracking.
 - Any deviation goes in the plan's Complexity Tracking table with a justification. An unjustified
-  deviation is a CRITICAL finding.
+  deviation, or an unapproved list deviation, is a CRITICAL finding.
 - Re-evaluate the Constitution Check after design (Phase 1).
 
 ## 3. Tasks
@@ -72,6 +75,7 @@ Work is complete only when all of these hold. Record each with evidence:
 - [ ] Required database reviews completed (`clutch-data-access`)
 - [ ] Independent security review completed and all findings remediated and verified (`clutch-security-review`)
 - [ ] Every UI compliance checklist item validated and its result recorded, if WEB-001 applies
+- [ ] Every list difference from `clutch-ui-style` §12 has the user's explicit approval recorded
 - [ ] No blocking findings remain
 
 Reporting rules:

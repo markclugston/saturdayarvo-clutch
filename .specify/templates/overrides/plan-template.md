@@ -52,6 +52,8 @@ N/A: [ID (reason), ...]
 
 [If WEB-001 applies: list the applicable style guide sections (§). Gate: every item in `clutch-ui-style/references/compliance-checklist.md`. Do not copy the checklist here.]
 
+[If a list or table is added or changed: it follows §12. Ask the user before planning any difference, and record each approval (date, their words) in Complexity Tracking.]
+
 ## Project Structure
 
 ### Documentation (this feature)

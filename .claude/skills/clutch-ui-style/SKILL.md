@@ -1,6 +1,6 @@
 ---
 name: "clutch-ui-style"
-description: "Clutch UI style guide and compliance checklist (WEB-001): layout, forms, tokens, themes, accessibility. Use for any UI planning, implementation or review."
+description: "Clutch UI style guide and compliance checklist (WEB-001): layout, forms, lists and tables, tokens, themes, accessibility. Use for any UI planning, implementation or review."
 metadata:
   author: "saturdayarvo-clutch"
   governs: "WEB-001"
@@ -23,6 +23,7 @@ read them from the code. MUST / MUST NOT / SHOULD are used in the RFC 2119 sense
 | Contrast, focus outline, surface lightness, no pure-white text, transition timing, toast and tab-strip layout | — | `src/clutch-web/e2e/style-guide.spec.ts` (axe WCAG 2.2 AA tags, both themes) |
 | Right alignment of numbers and currency (cells, headers, numeric inputs, displayed amounts) | `src/clutch-web/eslint-rules/clutch-numeric-align.js`; numeric inputs in `components/ui/floating-field.tsx` | `npm run lint` (`clutch-numeric-align.test.js`); `floating-field.test.tsx` |
 | % and $ entry fields | `src/clutch-web/src/features/mortgages/FormattedNumberField.tsx` | Its component tests |
+| Lists: header, row lines, scrolling, row actions, states (§12) | `src/clutch-web/src/features/assets/AssetsPage.tsx`, `DeleteAssetDialog.tsx`; `src/lib/usePinnedList.ts` | `AssetsPage.test.tsx`, `usePinnedList.test.ts`; pinned-list tests in `e2e/style-guide.spec.ts`; review |
 
 If guidance here disagrees with the code, raise the conflict (constitution Governance). Do not
 pick a side.
@@ -45,12 +46,13 @@ pick a side.
 | 7, 8, 9 | [references/typography-motion-a11y.md](references/typography-motion-a11y.md) | Text, casing, motion, contrast, focus |
 | 10 | The Source of truth table above | Editing tokens, primitives, theme runtime or the lint rule |
 | 11 | [references/compliance-checklist.md](references/compliance-checklist.md) | Every completion review for UI work |
+| 12 | [references/lists.md](references/lists.md) | Any list or table: new or changed, including its actions and states |
 
 ## Use by phase
 
 - **Plan:** list the applicable sections (by §) and name the compliance checklist as a Constitution Check gate; do not copy it.
-- **Implement:** build from the primitives (`docs/code-map.md`); open the nearest sibling and follow its pattern. Do not restyle primitives with ad-hoc classes.
-- **Review / completion:** run lint and the style-guide browser tests, then review the checklist items marked *Review*. A deviation without explicit justification in the plan is rejected.
+- **Implement:** build from the primitives (`docs/code-map.md`); open the nearest sibling and follow its pattern (for a list, the reference in §12). Do not restyle primitives with ad-hoc classes.
+- **Review / completion:** run lint and the style-guide browser tests, then review the checklist items marked *Review*. A deviation without explicit justification in the plan is rejected; a list deviation also needs the user's explicit approval (§12).
 
 ## Review failures (reject on sight)
 
@@ -60,6 +62,7 @@ pick a side.
 - Labels, headings or button text not in Title Case.
 - A % or $ field not built on the shared formatted field.
 - A number, rate or currency amount that is not right aligned, including its column header. The lint rule catches formatter calls in `td`/`th` and raw numeric inputs; review the rest (div-based grids, standalone values, headers).
+- A list that differs from §12 without the user's explicit approval recorded in the plan.
 
 ## Changing the style guide
 
