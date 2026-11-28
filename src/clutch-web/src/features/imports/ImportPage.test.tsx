@@ -113,6 +113,7 @@ describe('ImportPage', () => {
       accountId: account.id,
       currencyCode: 'AUD',
       rowCount: 1,
+      importRowCount: 1,
       duplicateConfirmationRequired: false,
       expiresAtUtc: '2025-01-15T14:00:00.000Z',
       rows: [{
@@ -122,6 +123,7 @@ describe('ImportPage', () => {
         amount: '1234.50',
         direction: 'Outgoing',
         isPossibleDuplicate: false,
+        isExcluded: false,
       }],
     })
     vi.mocked(cancelImportReview).mockResolvedValue(undefined)
@@ -728,12 +730,53 @@ describe('ImportPage', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Your previous settings remain unchanged.')
   })
 
+  it.each([
+    { importRowCount: 1, excluded: [false, true] },
+    { importRowCount: 0, excluded: [true, true] },
+  ])('confirms a review with excluded rows, leaving $importRowCount to import', async ({ importRowCount, excluded }) => {
+    vi.mocked(createImportReview).mockResolvedValue({
+      id: '550e8400-e29b-41d4-a716-446655440005',
+      accountId: account.id,
+      currencyCode: 'AUD',
+      rowCount: excluded.length,
+      importRowCount,
+      duplicateConfirmationRequired: false,
+      expiresAtUtc: '2025-01-15T14:00:00.000Z',
+      rows: excluded.map((isExcluded, index) => ({
+        sourceRowNumber: index + 2,
+        transactionDate: '2025-01-15',
+        description: `Purchase ${index + 1}`,
+        amount: '10.00',
+        direction: 'Outgoing' as const,
+        isPossibleDuplicate: false,
+        isExcluded,
+      })),
+    })
+    vi.mocked(confirmImportReview).mockResolvedValue({
+      importedCount: importRowCount,
+      completedAtUtc: '2025-01-15T13:50:00.000Z',
+      settingsSaved: true,
+    })
+    const { user } = await showOwnReview()
+
+    expect(screen.getByText(`${importRowCount} transactions will be imported into this account in AUD.`))
+      .toBeInTheDocument()
+    expect(screen.getAllByText('Will Not Be Imported')).toHaveLength(excluded.filter(Boolean).length)
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Confirm Import' }))
+
+    expect(await screen.findByText(`${importRowCount} transactions imported successfully.`))
+      .toBeInTheDocument()
+    expect(confirmImportReview).toHaveBeenCalledWith('550e8400-e29b-41d4-a716-446655440005', false)
+  })
+
   it('requires explicit confirmation to import flagged rows and keeps cancellation available', async () => {
     vi.mocked(createImportReview).mockResolvedValue({
       id: '550e8400-e29b-41d4-a716-446655440003',
       accountId: account.id,
       currencyCode: 'AUD',
       rowCount: 1,
+      importRowCount: 1,
       duplicateConfirmationRequired: true,
       expiresAtUtc: '2025-01-15T14:00:00.000Z',
       rows: [{
@@ -743,6 +786,7 @@ describe('ImportPage', () => {
         amount: '1234.50',
         direction: 'Outgoing',
         isPossibleDuplicate: true,
+        isExcluded: false,
       }],
     })
 
@@ -767,15 +811,15 @@ describe('ImportPage', () => {
     )
     await user.click(screen.getByRole('button', { name: 'Review Import' }))
 
-    expect(await screen.findByText(/Confirming will import every valid row/))
+    expect(await screen.findByText(/Confirming will import these possible duplicates/))
       .toBeInTheDocument()
     const confirmButton = screen.getByRole('button', { name: 'Confirm Import' })
     expect(confirmButton).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Cancel Review' })).toBeEnabled()
 
-    await user.click(screen.getByLabelText(
-      /I reviewed the possible duplicates and want to import every valid row/,
-    ))
+    await user.click(screen.getByRole('checkbox', {
+      name: 'I reviewed the possible duplicates and want to import them.',
+    }))
     expect(confirmButton).toBeEnabled()
     await user.click(confirmButton)
     await waitFor(() =>
@@ -792,6 +836,7 @@ describe('ImportPage', () => {
       accountId: account.id,
       currencyCode: 'AUD',
       rowCount: 1,
+      importRowCount: 1,
       duplicateConfirmationRequired: true,
       expiresAtUtc: '2025-01-15T14:00:00.000Z',
       rows: [{
@@ -801,6 +846,7 @@ describe('ImportPage', () => {
         amount: '1234.50',
         direction: 'Outgoing',
         isPossibleDuplicate: true,
+        isExcluded: false,
       }],
     })
 
@@ -825,7 +871,7 @@ describe('ImportPage', () => {
       'dot-decimal-comma-grouping',
     )
     await user.click(screen.getByRole('button', { name: 'Review Import' }))
-    await screen.findByText(/Confirming will import every valid row/)
+    await screen.findByText(/Confirming will import these possible duplicates/)
     await user.click(screen.getByRole('button', { name: 'Cancel Review' }))
 
     await waitFor(() =>

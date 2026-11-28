@@ -7,6 +7,8 @@ using System.Text.Json;
 using Clutch.API.Api.ProblemDetails;
 using Clutch.API.Application.Imports;
 using Clutch.API.Domain.Imports;
+using Clutch.API.Domain.Shared;
+using Clutch.API.Domain.Transactions;
 using Clutch.API.Infrastructure.Imports;
 using Clutch.API.Infrastructure.Persistence;
 using Clutch.API.Infrastructure.Persistence.Entities;
@@ -226,6 +228,225 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
         var plainPage = await plainList.Content.ReadFromJsonAsync<TransactionPage>();
         Assert.NotNull(plainPage);
         Assert.Null(Assert.Single(plainPage.Items).Balance);
+    }
+
+    [Theory]
+    [Trait("Category", "SqlServer")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Rows_that_leave_the_balance_unchanged_are_marked_and_not_saved(bool newestFirst)
+    {
+        using var client = CreateClient();
+        await RegisterAndSignInAsync(client);
+        var account = await CreateAccountAsync(client, "Authorisation account", "AUD");
+        string[] chronological =
+        [
+            "2025-01-15,Salary,100.00,1100.00",
+            "2025-01-15,Fuel hold,-40.00,1100.00",
+            "2025-01-15,Fuel,-50.00,1050.00",
+            "2025-01-15,Refund AUTHORISATION ONLY,25.00,1075.00",
+        ];
+        var fileRows = newestFirst ? chronological.Reverse().ToArray() : chronological;
+
+        using var reviewResponse = await CreateReviewAsync(
+            client,
+            account.Id,
+            "Date,Description,Amount,Balance\n" + string.Join('\n', fileRows),
+            SignedMapping() with { BalanceColumn = 3 });
+        Assert.Equal(HttpStatusCode.Created, reviewResponse.StatusCode);
+        var review = await reviewResponse.Content.ReadFromJsonAsync<ReviewResponse>();
+        Assert.NotNull(review);
+        Assert.Equal(4, review.RowCount);
+        Assert.Equal(3, review.ImportRowCount);
+        Assert.Equal(["Fuel hold"], review.Rows.Where(row => row.IsExcluded).Select(row => row.Description));
+        Assert.Equal(newestFirst ? 4 : 3, review.Rows.Single(row => row.IsExcluded).SourceRowNumber);
+
+        using var confirmation = await SendJsonAsync(
+            client,
+            HttpMethod.Post,
+            $"/api/import-reviews/{review.Id}/confirm",
+            new { confirmPossibleDuplicates = false });
+        Assert.Equal(HttpStatusCode.OK, confirmation.StatusCode);
+        var confirmed = await confirmation.Content.ReadFromJsonAsync<ConfirmResponse>();
+        Assert.NotNull(confirmed);
+        Assert.Equal(3, confirmed.ImportedCount);
+
+        await using var scope = fixture.Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var saved = await db.Transactions
+            .AsNoTracking()
+            .Where(candidate => candidate.AccountId == account.Id)
+            .OrderBy(candidate => candidate.Sequence)
+            .Select(candidate => new { candidate.Description, candidate.Sequence })
+            .ToListAsync();
+        // The authorisation takes no sequence number and the rest stay in chronological order.
+        Assert.Equal(["Salary", "Fuel", "Refund AUTHORISATION ONLY"], saved.Select(row => row.Description));
+        Assert.Equal([1, 2, 3], saved.Select(row => row.Sequence));
+    }
+
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task Excluded_rows_never_require_duplicate_confirmation()
+    {
+        using var client = CreateClient();
+        await RegisterAndSignInAsync(client);
+        var account = await CreateAccountAsync(client, "Excluded duplicates", "AUD");
+        var mapping = SignedMapping() with { BalanceColumn = 3 };
+
+        async Task<ReviewResponse> ReviewAsync(string csv)
+        {
+            using var response = await CreateReviewAsync(client, account.Id, csv, mapping);
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+            var review = await response.Content.ReadFromJsonAsync<ReviewResponse>();
+            Assert.NotNull(review);
+            return review;
+        }
+
+        Task<HttpResponseMessage> ConfirmAsync(Guid reviewId) => SendJsonAsync(
+            client,
+            HttpMethod.Post,
+            $"/api/import-reviews/{reviewId}/confirm",
+            new { confirmPossibleDuplicates = false });
+
+        // Save a transaction that matches the later authorisation.
+        var seed = await ReviewAsync(
+            "Date,Description,Amount,Balance\n2025-01-15,Fuel hold,-40.00,500.00");
+        using var seedConfirmation = await ConfirmAsync(seed.Id);
+        Assert.Equal(HttpStatusCode.OK, seedConfirmation.StatusCode);
+
+        var review = await ReviewAsync(
+            "Date,Description,Amount,Balance\n"
+            + "2025-01-15,Salary,100.00,1100.00\n"
+            + "2025-01-15,Fuel hold,-40.00,1100.00\n"
+            + "2025-01-15,Fuel,-50.00,1050.00");
+        Assert.False(review.DuplicateConfirmationRequired);
+        Assert.All(review.Rows, row => Assert.False(row.IsPossibleDuplicate));
+        Assert.True(review.Rows.Single(row => row.Description == "Fuel hold").IsExcluded);
+
+        // A duplicate saved after the review was created is reported; the excluded row never is.
+        await using (var scope = fixture.Factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert.True(Currency.TryGet("AUD", out var currency));
+            Assert.True(Transaction.TryCreate(
+                account.Id,
+                new DateOnly(2025, 1, 15),
+                "Salary",
+                100m,
+                TransactionDirection.Incoming,
+                null,
+                2,
+                currency!,
+                DateTimeOffset.UtcNow,
+                out var concurrent));
+            db.Transactions.Add(concurrent!);
+            await db.SaveChangesAsync();
+        }
+
+        using var rejected = await ConfirmAsync(review.Id);
+        Assert.Equal(HttpStatusCode.Conflict, rejected.StatusCode);
+        using var problem = JsonDocument.Parse(await rejected.Content.ReadAsStringAsync());
+        Assert.Equal(
+            ["2"],
+            problem.RootElement.GetProperty("errors").GetProperty("rowNumbers")
+                .EnumerateArray().Select(value => value.GetString()));
+    }
+
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task Authorisation_descriptions_are_not_saved_from_a_file_without_balances()
+    {
+        using var client = CreateClient();
+        await RegisterAndSignInAsync(client);
+        var account = await CreateAccountAsync(client, "No balance authorisations", "AUD");
+
+        // Only the excluded first row's date shows that the file runs oldest first.
+        using var reviewResponse = await CreateReviewAsync(
+            client,
+            account.Id,
+            "Date,Description,Amount\n"
+            + "2025-01-14,Fuel authorisation only,-40.00\n"
+            + "2025-01-15,Water Authority,-50.00\n"
+            + "2025-01-15,Hotel PRE-AUTH,-200.00\n"
+            + "2025-01-15,Salary,100.00",
+            SignedMapping());
+        Assert.Equal(HttpStatusCode.Created, reviewResponse.StatusCode);
+        var review = await reviewResponse.Content.ReadFromJsonAsync<ReviewResponse>();
+        Assert.NotNull(review);
+        Assert.Equal(4, review.RowCount);
+        Assert.Equal(2, review.ImportRowCount);
+        Assert.Equal([2, 4], review.Rows.Where(row => row.IsExcluded).Select(row => row.SourceRowNumber));
+
+        using var confirmation = await SendJsonAsync(
+            client,
+            HttpMethod.Post,
+            $"/api/import-reviews/{review.Id}/confirm",
+            new { confirmPossibleDuplicates = false });
+        Assert.Equal(HttpStatusCode.OK, confirmation.StatusCode);
+        var confirmed = await confirmation.Content.ReadFromJsonAsync<ConfirmResponse>();
+        Assert.NotNull(confirmed);
+        Assert.Equal(2, confirmed.ImportedCount);
+
+        await using var scope = fixture.Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var saved = await db.Transactions
+            .AsNoTracking()
+            .Where(candidate => candidate.AccountId == account.Id)
+            .OrderBy(candidate => candidate.Sequence)
+            .Select(candidate => candidate.Description)
+            .ToListAsync();
+        Assert.Equal(["Water Authority", "Salary"], saved);
+    }
+
+    [Fact]
+    [Trait("Category", "SqlServer")]
+    public async Task Confirming_a_review_with_every_row_excluded_completes_and_saves_no_transactions()
+    {
+        using var client = CreateClient();
+        await RegisterAndSignInAsync(client);
+        var account = await CreateAccountAsync(client, "All excluded", "AUD");
+
+        using var reviewResponse = await CreateReviewAsync(
+            client,
+            account.Id,
+            "Date,Description,Amount\n"
+            + "2025-01-15,Fuel AUTH HOLD,-40.00\n"
+            + "2025-01-15,Fuel AUTH HOLD,-40.00",
+            SignedMapping());
+        Assert.Equal(HttpStatusCode.Created, reviewResponse.StatusCode);
+        var review = await reviewResponse.Content.ReadFromJsonAsync<ReviewResponse>();
+        Assert.NotNull(review);
+        Assert.Equal(2, review.RowCount);
+        Assert.Equal(0, review.ImportRowCount);
+        // The two rows match each other, but neither will be imported.
+        Assert.False(review.DuplicateConfirmationRequired);
+        Assert.All(review.Rows, row => Assert.True(row.IsExcluded));
+        Assert.All(review.Rows, row => Assert.False(row.IsPossibleDuplicate));
+
+        using var confirmation = await SendJsonAsync(
+            client,
+            HttpMethod.Post,
+            $"/api/import-reviews/{review.Id}/confirm",
+            new { confirmPossibleDuplicates = false });
+        Assert.Equal(HttpStatusCode.OK, confirmation.StatusCode);
+        var confirmed = await confirmation.Content.ReadFromJsonAsync<ConfirmResponse>();
+        Assert.NotNull(confirmed);
+        Assert.Equal(0, confirmed.ImportedCount);
+        Assert.True(confirmed.SettingsSaved);
+
+        await using var scope = fixture.Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.False(await db.Transactions.AnyAsync(candidate => candidate.AccountId == account.Id));
+        Assert.False(await db.ImportReviews.AnyAsync(candidate => candidate.Id == review.Id));
+        Assert.False(await db.ImportReviewRows.AnyAsync(row => row.ReviewId == review.Id));
+        Assert.True(await db.Accounts.AnyAsync(candidate =>
+            candidate.Id == account.Id
+            && candidate.ActiveImportId == null
+            && candidate.LastSuccessfulImportAtUtc != null));
+        Assert.Equal(1, await db.Audits.CountAsync(audit =>
+            audit.EventCode == "ImportConfirmed"
+            && audit.Description.Contains(account.Description)
+            && audit.OccurredAtUtc == confirmed.CompletedAtUtc));
     }
 
     [Fact]
@@ -1574,6 +1795,7 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
         Guid AccountId,
         string CurrencyCode,
         int RowCount,
+        int ImportRowCount,
         bool DuplicateConfirmationRequired,
         DateTimeOffset ExpiresAtUtc,
         ReviewRowResponse[] Rows);
@@ -1585,6 +1807,7 @@ public sealed class ImportWorkflowTests(SqlServerFixture fixture)
         string Amount,
         string Direction,
         bool IsPossibleDuplicate,
+        bool IsExcluded,
         string? Balance = null);
 
     private sealed record ConfirmResponse(

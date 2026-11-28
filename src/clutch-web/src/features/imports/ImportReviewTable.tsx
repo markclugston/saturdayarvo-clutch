@@ -24,13 +24,12 @@ export function ImportReviewTable({ review, currencyCode }: ImportReviewTablePro
           <div>
             <CardTitle as="h2" id="import-review-heading">Review Transactions</CardTitle>
             <p>
-              {review.rowCount} transactions will be imported into this account in {currencyCode}.
+              {review.importRowCount} transactions will be imported into this account in {currencyCode}.
             </p>
           </div>
           {review.duplicateConfirmationRequired && (
             <p className="rounded-control bg-warning-bg p-3 text-warning" role="status">
-              Possible duplicates are highlighted. Confirming will import every valid row,
-              including these possible duplicates.
+              Possible duplicates are highlighted. Confirming will import these possible duplicates.
             </p>
           )}
         </>
@@ -70,6 +69,7 @@ export function ImportReviewTable({ review, currencyCode }: ImportReviewTablePro
               )}
               <ListCell className="whitespace-nowrap">
                 {row.isPossibleDuplicate && <StatusChip status="warning">Possible Duplicate</StatusChip>}
+                {row.isExcluded && <StatusChip status="warning">Will Not Be Imported</StatusChip>}
               </ListCell>
             </ListRow>
           ))}

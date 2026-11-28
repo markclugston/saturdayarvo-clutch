@@ -131,7 +131,12 @@ public sealed class ImportReviewService(
                 createdAt.Add(ReviewLifetime),
                 ImportMappingSettingsSerializer.CurrentSchemaVersion,
                 ImportMappingSettingsSerializer.Serialize(mapping));
-            review.AddRows(await CreateReviewRows(review.Id, parsed.Rows, accountId, cancellationToken));
+            review.AddRows(await CreateReviewRows(
+                review.Id,
+                parsed.Rows,
+                accountId,
+                mapping.BalanceColumn is not null,
+                cancellationToken));
             dbContext.ImportReviews.Add(review);
             auditWriter.Add(account.Description, ownerUserId, "ReviewCreated", createdAt);
             var result = ToResponse(review, account.CurrencyCode);
@@ -689,8 +694,19 @@ public sealed class ImportReviewService(
         Guid reviewId,
         IReadOnlyList<ParsedImportRow> parsedRows,
         Guid accountId,
+        bool hasBalanceColumn,
         CancellationToken cancellationToken)
     {
+        var excludedRows = ImportExclusions.Determine(
+            parsedRows.Select(row => new ImportExclusionRow(
+                new ImportOrderRow(
+                    row.SourceRowNumber,
+                    row.TransactionDate,
+                    row.Amount,
+                    row.Direction,
+                    row.Balance),
+                row.Description)).ToArray(),
+            hasBalanceColumn).ExcludedRowNumbers;
         var firstDate = parsedRows.Min(row => row.TransactionDate);
         var lastDate = parsedRows.Max(row => row.TransactionDate);
         var existingTransactions = await dbContext.Transactions
@@ -707,13 +723,15 @@ public sealed class ImportReviewService(
             .ToListAsync(cancellationToken);
         var duplicateRows = DuplicateDetector.FindDuplicateRows(
             existingTransactions,
-            parsedRows.Select(row => new ImportFingerprintRow(
-                row.SourceRowNumber,
-                new TransactionFingerprint(
-                    row.TransactionDate,
-                    row.Description,
-                    row.Amount,
-                    row.Direction))));
+            parsedRows
+                .Where(row => !excludedRows.Contains(row.SourceRowNumber))
+                .Select(row => new ImportFingerprintRow(
+                    row.SourceRowNumber,
+                    new TransactionFingerprint(
+                        row.TransactionDate,
+                        row.Description,
+                        row.Amount,
+                        row.Direction))));
 
         return parsedRows
             .Select(row => new ImportReviewRow(
@@ -724,7 +742,8 @@ public sealed class ImportReviewService(
                 row.Amount,
                 row.Direction,
                 duplicateRows.Contains(row.SourceRowNumber),
-                row.Balance))
+                row.Balance,
+                excludedRows.Contains(row.SourceRowNumber)))
             .ToArray();
     }
 
@@ -752,6 +771,7 @@ public sealed class ImportReviewService(
             review.AccountId,
             currencyCode,
             review.Rows.Count,
+            review.Rows.Count(row => !row.IsExcluded),
             review.DuplicateConfirmationRequired,
             review.ExpiresAtUtc,
             review.Rows.OrderBy(row => row.SourceRowNumber).Select(row => new ImportReviewRowResponse(
@@ -761,6 +781,7 @@ public sealed class ImportReviewService(
                 row.Amount.ToString("0.############################", CultureInfo.InvariantCulture),
                 row.Direction.ToString(),
                 row.IsPossibleDuplicate,
+                row.IsExcluded,
                 row.Balance?.ToString("0.############################", CultureInfo.InvariantCulture))).ToArray());
 
     private static ApiProblemException ToProblem(ImportValidationException exception)
@@ -833,6 +854,7 @@ public sealed record ImportReviewResponse(
     Guid AccountId,
     string CurrencyCode,
     int RowCount,
+    int ImportRowCount,
     bool DuplicateConfirmationRequired,
     DateTimeOffset ExpiresAtUtc,
     IReadOnlyList<ImportReviewRowResponse> Rows);
@@ -844,4 +866,5 @@ public sealed record ImportReviewRowResponse(
     string Amount,
     string Direction,
     bool IsPossibleDuplicate,
+    bool IsExcluded,
     string? Balance = null);

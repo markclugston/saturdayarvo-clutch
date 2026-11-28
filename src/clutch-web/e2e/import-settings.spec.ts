@@ -315,6 +315,7 @@ test.describe('account import settings', () => {
             accountId,
             currencyCode: 'AUD',
             rowCount: 1,
+            importRowCount: 1,
             duplicateConfirmationRequired: false,
             expiresAtUtc: '2025-01-15T14:00:00.000Z',
             rows: [{
@@ -324,6 +325,7 @@ test.describe('account import settings', () => {
               amount: '10.00',
               direction: 'Outgoing',
               isPossibleDuplicate: false,
+              isExcluded: false,
             }],
           },
         })

@@ -8,6 +8,7 @@ const review: ImportReview = {
   accountId: '550e8400-e29b-41d4-a716-446655440000',
   currencyCode: 'AUD',
   rowCount: 1,
+  importRowCount: 1,
   duplicateConfirmationRequired: true,
   expiresAtUtc: '2025-01-15T14:00:00.000Z',
   rows: [{
@@ -17,15 +18,33 @@ const review: ImportReview = {
     amount: '10.00',
     direction: 'Outgoing',
     isPossibleDuplicate: true,
+    isExcluded: false,
   }],
 }
 
+/** Five previewed rows, of which the second and fourth are excluded by the server. */
+const withExclusions: ImportReview = {
+  ...review,
+  rowCount: 5,
+  importRowCount: 3,
+  duplicateConfirmationRequired: false,
+  rows: ['Salary', 'Fuel hold', 'Fuel', 'Hotel hold', 'Hotel'].map((description, index) => ({
+    ...review.rows[0]!,
+    sourceRowNumber: index + 2,
+    description,
+    isPossibleDuplicate: false,
+    isExcluded: index === 1 || index === 3,
+  })),
+}
+
+const bodyRows = () => screen.getAllByRole('row').slice(1)
+
 describe('ImportReviewTable', () => {
-  it('announces duplicate warnings and explains that flagged rows are still imported', () => {
+  it('announces duplicate warnings and explains that possible duplicates are still imported', () => {
     render(<ImportReviewTable review={review} currencyCode="AUD" />)
 
     expect(screen.getByRole('status')).toHaveTextContent(
-      'Confirming will import every valid row, including these possible duplicates.',
+      /^Possible duplicates are highlighted\. Confirming will import these possible duplicates\.$/,
     )
     expect(screen.getByText('Possible Duplicate')).toBeInTheDocument()
   })
@@ -86,6 +105,48 @@ describe('ImportReviewTable', () => {
     )
 
     expect(within(screen.getAllByRole('row')[1]!).getAllByRole('cell').at(-1)).toBeEmptyDOMElement()
+  })
+
+  it('keeps excluded rows in their usual position, marked in the Warning cell', () => {
+    render(<ImportReviewTable review={withExclusions} currencyCode="AUD" />)
+
+    const rows = bodyRows()
+    expect(rows.map((row) => within(row).getByTitle(/./).textContent))
+      .toEqual(['Salary', 'Fuel hold', 'Fuel', 'Hotel hold', 'Hotel'])
+    // The indication is visible text, so assistive technology reads it with the row.
+    expect(rows.map((row) => within(row).getAllByRole('cell').at(-1)!.textContent))
+      .toEqual(['', 'Will Not Be Imported', '', 'Will Not Be Imported', ''])
+    const chip = within(rows[1]!).getByText('Will Not Be Imported')
+    expect(chip).toHaveClass('rounded-chip', 'bg-warning-bg', 'text-warning')
+    expect(chip).not.toHaveAttribute('aria-hidden')
+  })
+
+  it('marks no row when no row is excluded', () => {
+    render(<ImportReviewTable review={review} currencyCode="AUD" />)
+
+    expect(screen.queryByText('Will Not Be Imported')).not.toBeInTheDocument()
+  })
+
+  it('counts only the rows that will be imported', () => {
+    render(<ImportReviewTable review={withExclusions} currencyCode="AUD" />)
+
+    expect(screen.getByText('3 transactions will be imported into this account in AUD.')).toBeInTheDocument()
+  })
+
+  it('states that nothing will be imported when every row is excluded', () => {
+    render(
+      <ImportReviewTable
+        currencyCode="AUD"
+        review={{
+          ...withExclusions,
+          importRowCount: 0,
+          rows: withExclusions.rows.map((row) => ({ ...row, isExcluded: true })),
+        }}
+      />,
+    )
+
+    expect(screen.getByText('0 transactions will be imported into this account in AUD.')).toBeInTheDocument()
+    expect(screen.getAllByText('Will Not Be Imported')).toHaveLength(5)
   })
 
   it('omits the Balance column when no row has a balance', () => {

@@ -101,17 +101,23 @@ const importReview = {
   id: reviewId,
   accountId,
   currencyCode: 'AUD',
-  rowCount: 2,
+  rowCount: 3,
+  importRowCount: 2,
   duplicateConfirmationRequired: true,
   expiresAtUtc: '2099-01-01T00:00:00Z',
   rows: [
     {
       sourceRowNumber: 2, transactionDate: '2024-01-02', description: 'Coffee', amount: '4.50',
-      direction: 'Outgoing', isPossibleDuplicate: true, balance: '95.50',
+      direction: 'Outgoing', isPossibleDuplicate: true, isExcluded: false, balance: '95.50',
     },
     {
       sourceRowNumber: 3, transactionDate: '2024-01-03', description: 'Salary', amount: '2000.00',
-      direction: 'Incoming', isPossibleDuplicate: false, balance: '2095.50',
+      direction: 'Incoming', isPossibleDuplicate: false, isExcluded: false, balance: '2095.50',
+    },
+    // 032: a row that will not be imported.
+    {
+      sourceRowNumber: 4, transactionDate: '2024-01-04', description: 'Fuel AUTH HOLD', amount: '40.00',
+      direction: 'Outgoing', isPossibleDuplicate: false, isExcluded: true, balance: '2095.50',
     },
   ],
 }
@@ -126,6 +132,7 @@ const longAssetDetail = {
 const longImportReview = {
   ...importReview,
   rowCount: 60,
+  importRowCount: 60,
   rows: Array.from({ length: 60 }, (_, index) => ({
     ...importReview.rows[index % 2]!,
     sourceRowNumber: index + 2,
@@ -726,6 +733,8 @@ const states: StateDef[] = [
     reach: async (page) => {
       await openImportReview(page)
       await expect(page.getByText('Possible Duplicate', { exact: true })).toBeVisible()
+      await expect(page.getByRole('row', { name: /Fuel AUTH HOLD.*Will Not Be Imported/ })).toBeVisible()
+      await expect(page.getByText('2 transactions will be imported into this account in AUD.')).toBeVisible()
       await expect(page.getByRole('checkbox')).toBeVisible()
     },
   },

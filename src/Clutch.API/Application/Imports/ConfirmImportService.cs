@@ -177,6 +177,8 @@ public sealed class ConfirmImportService(
             return await RollbackOutcomeAsync(transaction, InvalidStagedData());
         }
 
+        // Excluded rows are never saved or counted as duplicates; there may be nothing left to save.
+        var importRows = reviewRows.Where(row => !row.IsExcluded).ToArray();
         var firstDate = reviewRows.Min(row => row.TransactionDate);
         var lastDate = reviewRows.Max(row => row.TransactionDate);
         var savedRows = await dbContext.Transactions
@@ -203,7 +205,7 @@ public sealed class ConfirmImportService(
             .ToHashSet();
         var duplicateRows = DuplicateDetector.FindDuplicateRows(
             existingTransactions,
-            reviewRows.Select(row => new ImportFingerprintRow(
+            importRows.Select(row => new ImportFingerprintRow(
                 row.SourceRowNumber,
                 new TransactionFingerprint(
                     row.TransactionDate,
@@ -224,22 +226,42 @@ public sealed class ConfirmImportService(
             return ConfirmOutcome.Failed(DuplicateConfirmationRequired(duplicateRows), cleanupAttempt: false);
         }
 
-        var transactions = new List<Transaction>(reviewRows.Length);
+        if (review.SchemaVersion is null || review.MappingJson is null)
+        {
+            return await RollbackOutcomeAsync(transaction, InvalidStagedData());
+        }
+
+        var mapping = ImportMappingSettingsSerializer.Deserialize(
+            review.SchemaVersion.Value,
+            review.MappingJson);
+        var transactions = new List<Transaction>(importRows.Length);
         var now = timeProvider.GetUtcNow();
         // Each date's rows go in chronological order after that date's saved rows; saved rows are
-        // never renumbered (FR-002). Balances only decide the file direction.
-        var orderRows = reviewRows
-            .Select(row => new ImportOrderRow(
-                row.SourceRowNumber,
-                row.TransactionDate,
-                row.Amount,
-                row.Direction,
-                row.Balance))
-            .ToArray();
+        // never renumbered (FR-002). Balances only decide the file direction, which is read from
+        // every staged row by the same rule that marked the exclusions.
+        var direction = ImportExclusions.Determine(
+            reviewRows
+                .Select(row => new ImportExclusionRow(
+                    new ImportOrderRow(
+                        row.SourceRowNumber,
+                        row.TransactionDate,
+                        row.Amount,
+                        row.Direction,
+                        row.Balance),
+                    row.Description))
+                .ToArray(),
+            mapping.BalanceColumn is not null).Direction;
         var groups = ImportOrdering.ChronologicalGroups(
-            orderRows,
-            ImportOrdering.InferDirection(orderRows));
-        var rowsByNumber = reviewRows.ToDictionary(row => row.SourceRowNumber);
+            importRows
+                .Select(row => new ImportOrderRow(
+                    row.SourceRowNumber,
+                    row.TransactionDate,
+                    row.Amount,
+                    row.Direction,
+                    row.Balance))
+                .ToArray(),
+            direction);
+        var rowsByNumber = importRows.ToDictionary(row => row.SourceRowNumber);
         foreach (var (date, group) in groups.OrderBy(entry => entry.Key))
         {
             var sequence = maxSequenceByDate.GetValueOrDefault(date);
@@ -267,19 +289,6 @@ public sealed class ConfirmImportService(
             }
         }
 
-        if (transactions.Count == 0)
-        {
-            return await RollbackOutcomeAsync(transaction, InvalidStagedData());
-        }
-
-        if (review.SchemaVersion is null || review.MappingJson is null)
-        {
-            return await RollbackOutcomeAsync(transaction, InvalidStagedData());
-        }
-
-        var mapping = ImportMappingSettingsSerializer.Deserialize(
-            review.SchemaVersion.Value,
-            review.MappingJson);
         dbContext.Transactions.AddRange(transactions);
         await accountImportSettingsService.SaveAsync(account.Id, mapping, cancellationToken);
         account.MarkSuccessfulImport(now);

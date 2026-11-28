@@ -28,27 +28,12 @@ public static class ImportOrdering
     /// </summary>
     public static ImportDirection InferDirection(IReadOnlyList<ImportOrderRow> rows)
     {
-        ArgumentNullException.ThrowIfNull(rows);
-        var ordered = InFileOrder(rows);
-
-        if (ordered.Length >= 2)
+        if (InferDirectionFromBalances(rows) is { } fromBalances)
         {
-            var oldestFirst = true;
-            var newestFirst = true;
-            for (var index = 0; index < ordered.Length - 1; index++)
-            {
-                var current = ordered[index];
-                var next = ordered[index + 1];
-                oldestFirst &= Reconciles(earlier: current, later: next);
-                newestFirst &= Reconciles(earlier: next, later: current);
-            }
-
-            if (oldestFirst != newestFirst)
-            {
-                return oldestFirst ? ImportDirection.OldestFirst : ImportDirection.NewestFirst;
-            }
+            return fromBalances;
         }
 
+        var ordered = InFileOrder(rows);
         if (ordered.Length == 0)
         {
             return ImportDirection.NewestFirst;
@@ -57,6 +42,37 @@ public static class ImportOrdering
         return ordered[0].TransactionDate < ordered[^1].TransactionDate
             ? ImportDirection.OldestFirst
             : ImportDirection.NewestFirst;
+    }
+
+    /// <summary>
+    /// The direction in which every adjacent pair of balances reconciles, or null when there are
+    /// fewer than two rows or when both or neither direction reconciles.
+    /// </summary>
+    public static ImportDirection? InferDirectionFromBalances(IReadOnlyList<ImportOrderRow> rows)
+    {
+        ArgumentNullException.ThrowIfNull(rows);
+        var ordered = InFileOrder(rows);
+        if (ordered.Length < 2)
+        {
+            return null;
+        }
+
+        var oldestFirst = true;
+        var newestFirst = true;
+        for (var index = 0; index < ordered.Length - 1; index++)
+        {
+            var current = ordered[index];
+            var next = ordered[index + 1];
+            oldestFirst &= Reconciles(earlier: current, later: next);
+            newestFirst &= Reconciles(earlier: next, later: current);
+        }
+
+        if (oldestFirst == newestFirst)
+        {
+            return null;
+        }
+
+        return oldestFirst ? ImportDirection.OldestFirst : ImportDirection.NewestFirst;
     }
 
     /// <summary>

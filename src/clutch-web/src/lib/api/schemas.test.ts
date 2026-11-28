@@ -61,6 +61,7 @@ describe('API schemas', () => {
         accountId: '550e8400-e29b-41d4-a716-446655440000',
         currencyCode: 'AUD',
         rowCount: 1,
+        importRowCount: 1,
         duplicateConfirmationRequired: false,
         expiresAtUtc: timestamp,
         rows: [{
@@ -70,6 +71,7 @@ describe('API schemas', () => {
           amount: '10.6',
           direction: 'Outgoing',
           isPossibleDuplicate: false,
+          isExcluded: false,
         }],
       }).success).toBe(true)
       expect(ConfirmImportResponseSchema.safeParse({
@@ -85,6 +87,50 @@ describe('API schemas', () => {
       importedCount: 1,
       completedAtUtc: '2025-01-15T14:00:00',
     }).success).toBe(false)
+  })
+
+  describe('import schemas with excluded rows', () => {
+    const row = {
+      sourceRowNumber: 2,
+      transactionDate: '2025-01-15',
+      description: 'Fuel AUTH HOLD',
+      amount: '40',
+      direction: 'Outgoing',
+      isPossibleDuplicate: false,
+      isExcluded: true,
+    }
+    const review = {
+      id: '550e8400-e29b-41d4-a716-446655440002',
+      accountId: '550e8400-e29b-41d4-a716-446655440000',
+      currencyCode: 'AUD',
+      rowCount: 1,
+      importRowCount: 0,
+      duplicateConfirmationRequired: false,
+      expiresAtUtc: '2025-01-15T14:00:00Z',
+      rows: [row],
+    }
+
+    it('keeps the server exclusion decision, with no rows left to import', () => {
+      const parsed = ImportReviewSchema.parse(review)
+
+      expect(parsed.importRowCount).toBe(0)
+      expect(parsed.rows[0]!.isExcluded).toBe(true)
+    })
+
+    it.each([undefined, -1, 1.5, '1'])('rejects the import row count %s', (importRowCount) => {
+      expect(ImportReviewSchema.safeParse({ ...review, importRowCount }).success).toBe(false)
+    })
+
+    it.each([undefined, 'true'])('rejects the row exclusion flag %s', (isExcluded) => {
+      expect(ImportReviewSchema.safeParse({ ...review, rows: [{ ...row, isExcluded }] }).success).toBe(false)
+    })
+
+    it('accepts a confirmation that saved no transactions, but not a negative count', () => {
+      const confirmation = { completedAtUtc: '2025-01-15T14:00:00Z', settingsSaved: true }
+
+      expect(ConfirmImportResponseSchema.safeParse({ ...confirmation, importedCount: 0 }).success).toBe(true)
+      expect(ConfirmImportResponseSchema.safeParse({ ...confirmation, importedCount: -1 }).success).toBe(false)
+    })
   })
 
   describe('mortgage schemas', () => {

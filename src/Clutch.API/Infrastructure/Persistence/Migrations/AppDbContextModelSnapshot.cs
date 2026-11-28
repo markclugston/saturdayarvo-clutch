@@ -346,6 +346,9 @@ namespace Clutch.API.Infrastructure.Persistence.Migrations
                         .IsUnicode(false)
                         .HasColumnType("varchar(16)");
 
+                    b.Property<bool>("IsExcluded")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsPossibleDuplicate")
                         .HasColumnType("bit");
 

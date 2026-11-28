@@ -39,6 +39,7 @@ export const ImportReviewRowSchema = z.object({
   amount: z.string().regex(/^[0-9]+(\.[0-9]+)?$/),
   direction: z.enum(['Incoming', 'Outgoing']),
   isPossibleDuplicate: z.boolean(),
+  isExcluded: z.boolean(),
   balance: z.string().regex(/^-?[0-9]+(\.[0-9]+)?$/).nullable().optional(),
 })
 
@@ -47,13 +48,14 @@ export const ImportReviewSchema = z.object({
   accountId: z.uuid(),
   currencyCode: z.string().regex(/^[A-Z]{3}$/),
   rowCount: z.number().int().positive(),
+  importRowCount: z.number().int().nonnegative(),
   duplicateConfirmationRequired: z.boolean(),
   expiresAtUtc: z.iso.datetime({ offset: true }),
   rows: z.array(ImportReviewRowSchema),
 })
 
 export const ConfirmImportResponseSchema = z.object({
-  importedCount: z.number().int().positive(),
+  importedCount: z.number().int().nonnegative(),
   completedAtUtc: z.iso.datetime({ offset: true }),
   settingsSaved: z.boolean(),
 })

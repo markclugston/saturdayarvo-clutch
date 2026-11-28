@@ -353,8 +353,7 @@ export function ImportPage({ accountId, onBack }: ImportPageProps) {
                   type="checkbox"
                 />
                 <span>
-                  I reviewed the possible duplicates and want to import every valid row,
-                  including the flagged rows.
+                  I reviewed the possible duplicates and want to import them.
                 </span>
               </label>
             )}

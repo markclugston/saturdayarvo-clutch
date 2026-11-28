@@ -64,9 +64,70 @@ public sealed class ImportStateTests
         Assert.Single(review.Rows);
     }
 
+    [Fact]
+    public void Review_row_is_included_unless_it_is_constructed_as_excluded()
+    {
+        var reviewId = Guid.NewGuid();
+
+        Assert.False(Row(reviewId, 2).IsExcluded);
+        Assert.True(Row(reviewId, 3, isExcluded: true).IsExcluded);
+    }
+
+    [Fact]
+    public void Excluded_row_cannot_be_constructed_as_a_possible_duplicate()
+    {
+        Assert.Throws<ArgumentException>(
+            () => Row(Guid.NewGuid(), 2, isPossibleDuplicate: true, isExcluded: true));
+    }
+
+    [Fact]
+    public void Excluded_row_is_never_marked_as_a_possible_duplicate()
+    {
+        var row = Row(Guid.NewGuid(), 2, isExcluded: true);
+
+        row.MarkPossibleDuplicate();
+
+        Assert.False(row.IsPossibleDuplicate);
+        Assert.True(row.IsExcluded);
+    }
+
+    [Fact]
+    public void Duplicate_confirmation_ignores_excluded_rows()
+    {
+        var review = NewReview();
+        review.AddRows([Row(review.Id, 2), Row(review.Id, 3, isExcluded: true)]);
+
+        review.UpdateDuplicateWarnings(new HashSet<int> { 3 });
+
+        Assert.False(review.DuplicateConfirmationRequired);
+
+        review.UpdateDuplicateWarnings(new HashSet<int> { 2, 3 });
+
+        Assert.True(review.DuplicateConfirmationRequired);
+        Assert.Equal(
+            [2],
+            review.Rows.Where(row => row.IsPossibleDuplicate).Select(row => row.SourceRowNumber));
+    }
+
+    [Fact]
+    public void Review_of_only_excluded_rows_can_be_claimed_for_confirmation()
+    {
+        var review = NewReview();
+        review.AddRows([Row(review.Id, 2, isExcluded: true)]);
+
+        Assert.False(review.DuplicateConfirmationRequired);
+        Assert.True(review.TryClaimProcessing(Guid.NewGuid(), DateTimeOffset.UtcNow));
+    }
+
     private static ImportReview CreateReview()
     {
-        var review = new ImportReview(
+        var review = NewReview();
+        review.AddRows([Row(review.Id, 2)]);
+        return review;
+    }
+
+    private static ImportReview NewReview() =>
+        new(
             Guid.NewGuid(),
             Guid.NewGuid(),
             "owner",
@@ -74,17 +135,19 @@ public sealed class ImportStateTests
             DateTimeOffset.UtcNow.AddMinutes(5),
             1,
             """{"dateColumn":0}""");
-        review.AddRows(
-        [
-            new ImportReviewRow(
-                review.Id,
-                2,
-                new DateOnly(2025, 1, 1),
-                "Market",
-                12.34m,
-                TransactionDirection.Incoming,
-                false),
-        ]);
-        return review;
-    }
+
+    private static ImportReviewRow Row(
+        Guid reviewId,
+        int sourceRowNumber,
+        bool isPossibleDuplicate = false,
+        bool isExcluded = false) =>
+        new(
+            reviewId,
+            sourceRowNumber,
+            new DateOnly(2025, 1, 1),
+            "Market",
+            12.34m,
+            TransactionDirection.Incoming,
+            isPossibleDuplicate,
+            isExcluded: isExcluded);
 }

@@ -219,6 +219,7 @@ describe('session loading', () => {
       accountId: 'account-1',
       currencyCode: 'AUD',
       rowCount: 1,
+      importRowCount: 1,
       duplicateConfirmationRequired: false,
       expiresAtUtc: '2025-01-15T14:00:00.000Z',
       rows: [{
@@ -228,6 +229,7 @@ describe('session loading', () => {
         amount: '10.00',
         direction: 'Outgoing',
         isPossibleDuplicate: false,
+        isExcluded: false,
       }],
     })
     vi.mocked(confirmImportReview).mockResolvedValue({

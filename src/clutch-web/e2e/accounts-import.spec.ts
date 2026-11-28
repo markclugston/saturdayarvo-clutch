@@ -173,7 +173,8 @@ test.describe('authenticated personal accounts and transaction import', () => {
       name: 'duplicate-transactions.csv',
       mimeType: 'text/csv',
       buffer: Buffer.from(
-        `Date,Description,Amount\n2025-01-15,Duplicate ${description},12.50\n2025-01-15,Duplicate ${description},12.50`,
+        `Date,Description,Amount\n2025-01-15,Duplicate ${description},12.50\n2025-01-15,Duplicate ${description},12.50`
+        + `\n2025-01-15,Pending AUTH ${description},-40.00`,
       ),
     })
     await page.getByLabel('Transaction Date Column').selectOption('0')
@@ -186,6 +187,9 @@ test.describe('authenticated personal accounts and transaction import', () => {
     await page.getByRole('button', { name: 'Review Import' }).click()
 
     await expect(page.getByRole('status').filter({ hasText: 'Possible duplicates are highlighted' })).toBeVisible()
+    await expect(page.getByRole('row', { name: /Pending AUTH .*Will Not Be Imported/ })).toBeVisible()
+    await expect(page.getByText('Will Not Be Imported', { exact: true })).toHaveCount(1)
+    await expect(page.getByText('2 transactions will be imported into this account in AUD.')).toBeVisible()
     const accessibility = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
       .analyze()
@@ -199,6 +203,8 @@ test.describe('authenticated personal accounts and transaction import', () => {
     await expect(page.getByRole('status').filter({ hasText: '2 transactions imported successfully' })).toBeVisible()
     await page.getByRole('button', { name: 'Return to Account' }).click()
     await expect(page.getByRole('button', { name: 'Back to Accounts' })).toBeFocused()
+    await expect(page.getByRole('cell', { name: `Duplicate ${description}`, exact: true })).toHaveCount(2)
+    await expect(page.getByText(`Pending AUTH ${description}`)).toHaveCount(0)
 
     await page.getByRole('combobox', { name: 'Theme' }).selectOption('System')
     await page.emulateMedia({ colorScheme: 'dark' })

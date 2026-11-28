@@ -17,13 +17,15 @@ public sealed class ImportReviewRow
         decimal amount,
         TransactionDirection direction,
         bool isPossibleDuplicate,
-        decimal? balance = null)
+        decimal? balance = null,
+        bool isExcluded = false)
     {
         if (reviewId == Guid.Empty
             || sourceRowNumber < 2
             || !AccountDescriptionValidator.IsValid(description)
             || amount < 0
-            || !Enum.IsDefined(direction))
+            || !Enum.IsDefined(direction)
+            || (isExcluded && isPossibleDuplicate))
         {
             throw new ArgumentException("The import review row is invalid.");
         }
@@ -36,6 +38,7 @@ public sealed class ImportReviewRow
         Direction = direction;
         IsPossibleDuplicate = isPossibleDuplicate;
         Balance = balance;
+        IsExcluded = isExcluded;
     }
 
     public Guid ReviewId { get; private set; }
@@ -54,5 +57,9 @@ public sealed class ImportReviewRow
 
     public bool IsPossibleDuplicate { get; private set; }
 
-    public void MarkPossibleDuplicate() => IsPossibleDuplicate = true;
+    /// <summary>An excluded row is shown on the review but never saved.</summary>
+    public bool IsExcluded { get; private set; }
+
+    // An excluded row is never imported, so it cannot need duplicate confirmation.
+    public void MarkPossibleDuplicate() => IsPossibleDuplicate = !IsExcluded;
 }
