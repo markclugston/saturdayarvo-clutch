@@ -33,7 +33,7 @@ Exception: every list follows the list standard below, whatever its siblings do.
 | Numeric right-alignment lint rule (`clutch/numeric-align`) and its tests | `src/clutch-web/eslint-rules/clutch-numeric-align.js`, `clutch-numeric-align.test.js` |
 | Render error boundaries (whole app and page content); console handling of render errors | `src/clutch-web/src/components/error-boundary/` |
 | Percentage and currency entry fields; display formatting of amounts | `src/clutch-web/src/features/mortgages/FormattedNumberField.tsx`; `src/clutch-web/src/lib/formatCurrencyAmount.ts` |
-| List standard: reference list (header, row lines, footer, row actions, states) and its delete confirmation | `src/clutch-web/src/features/assets/AssetsPage.tsx`, `DeleteAssetDialog.tsx`; rules in `clutch-ui-style` §12 |
+| List standard: shared list parts and delete confirmation, and the reference list | `src/clutch-web/src/components/ui/list.tsx`, `delete-dialog.tsx`; `src/clutch-web/src/features/assets/AssetsPage.tsx`; rules in `clutch-ui-style` §12 |
 | List card stopped at the top of the content panel while the page scroll moves its rows, with the column header held | `src/clutch-web/src/lib/usePinnedList.ts` |
 | Mortgage Actual Balance values shared by the schedule column and the Burndown chart | `src/clutch-web/src/features/mortgages/actualBalances.ts` |
 | Mortgage Forecast Balance calculation (median recent reduction) | `src/clutch-web/src/features/mortgages/forecastBalances.ts` |

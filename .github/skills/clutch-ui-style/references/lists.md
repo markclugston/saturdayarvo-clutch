@@ -1,15 +1,17 @@
 # Lists (style guide §12)
 
-Every list follows the Assets list (WEB-001). It is the reference implementation, not an example:
-open it before planning or building any list, and take classes, sizes and wording patterns from it.
+Every list follows the Assets list (WEB-001). Its parts are shared: build every list from them
+and do not restyle them. Open the Assets list before planning or building any list, and take sizes
+and wording patterns from it.
 
 | Concern | Reference (`src/clutch-web/src/`) |
 |---|---|
-| Card, table, header, rows, footer, row actions, page states | `features/assets/AssetsPage.tsx` |
-| Delete confirmation | `features/assets/DeleteAssetDialog.tsx` |
-| Removing an unsaved row from a form (this behaviour only; see Existing differences) | `features/assets/AssetForm.tsx` |
+| Card, region, table, header, rows, cells, row buttons, loading, failure and empty states | `components/ui/list.tsx` |
+| Delete confirmation | `components/ui/delete-dialog.tsx` |
+| The reference list, with its footer and truncated cells | `features/assets/AssetsPage.tsx` |
+| Removing an unsaved row from a form | `features/assets/AssetForm.tsx` |
 | Scrolling | `lib/usePinnedList.ts` |
-| Tests | `features/assets/AssetsPage.test.tsx`; `pinnedLists` in `../e2e/style-guide.spec.ts` |
+| Tests | `components/ui/list.test.tsx`; `pinnedLists` in `../e2e/style-guide.spec.ts` |
 
 For a list, follow these files, not the nearest sibling.
 
@@ -51,8 +53,8 @@ A list may differ from this section only when the user explicitly approves that 
 
 ## Scrolling
 
-Use `usePinnedList`, wired as in the reference (track, sticky card, list region, spacer). Do not
-re-implement it or give a list its own vertical scrollbar.
+`ListCard` wires `usePinnedList`; a card that holds more than a list uses the hook with
+`ListRegion`. Do not re-implement it or give a list its own vertical scrollbar.
 
 - A card taller than the content panel stops at its top, with a margin, while one page scroll
   moves the rows. The column header stays where it is in the card. Scrolling back reverses this.
@@ -92,19 +94,15 @@ Show only the actions the spec asks for.
 A new or changed list has component tests for its headers, cells, row actions, dialog and states.
 Add it to `pinnedLists` and to the style-guide states in `e2e/style-guide.spec.ts`.
 
-## Existing differences
+## Approved differences
 
-These lists were built before the standard. Their differences are **not approved**, and none of
-them is a pattern to copy. Do not change them unasked (ARC-001). A feature that touches one must
-raise its differences with the user, who decides whether to align it or approve them. Remove a row
-when its list is aligned or its difference approved.
+The user approved these on 2026-11-28 (their words, or the option they chose). Each covers only
+what it names, and none is a pattern to copy. Do not change them unasked (ARC-001).
 
-| List (`features/`) | Main differences |
-|---|---|
-| `accounts/TransactionsTable.tsx` | Delete name does not identify the row; description does not truncate; loading and load-failure states |
-| `accounts/AccountsPage.tsx` (account tiles) | Tiles, not a table; no pinned scrolling |
-| `assets/AssetForm.tsx` (valuations) | No scrolling region or pinned scrolling |
-| `imports/ImportReviewTable.tsx` | No pinned scrolling or sticky header; shows a dash for no warning |
-| `mortgages/AmortizationSchedule.tsx` | Virtualised grid of `div`s with a `table` role; no caption |
-| `mortgages/InterestRateChangesDialog.tsx` | Tiles with its own scrollbar; remove uses an `X` icon |
-| `categories/CategoriesPage.tsx` | No column header or row lines; several cards; no pinned scrolling |
+| List (`features/`) | Approved difference | Approval |
+|---|---|---|
+| `categories/CategoriesPage.tsx` | Everything, including its states and delete dialog | "Approve as is"; "just like categories is different" |
+| `accounts/AccountsPage.tsx` | Everything: account tiles, states and the add form | "the account table should stay as is. its not a list in the same way as the others"; "dont change accounts" |
+| `mortgages/InterestRateChangesDialog.tsx` | Scrolls within the dialog, with no pinned scrolling | "Table styled like Assets, still scrolling below the add inputs" |
+| `mortgages/InterestRateChangesDialog.tsx` | Adds through inputs above the table | "Inputs stay above the table; recorded as an approved difference" |
+| `accounts/AccountDetails.tsx` (transactions) | Secondary "Import Transactions" button above the heading, not a primary "Add" button | "No change to the button; recorded as an approved difference" |

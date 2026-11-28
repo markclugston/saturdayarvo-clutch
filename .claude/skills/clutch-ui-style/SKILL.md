@@ -23,7 +23,7 @@ read them from the code. MUST / MUST NOT / SHOULD are used in the RFC 2119 sense
 | Contrast, focus outline, surface lightness, no pure-white text, transition timing, toast and tab-strip layout | — | `src/clutch-web/e2e/style-guide.spec.ts` (axe WCAG 2.2 AA tags, both themes) |
 | Right alignment of numbers and currency (cells, headers, numeric inputs, displayed amounts) | `src/clutch-web/eslint-rules/clutch-numeric-align.js`; numeric inputs in `components/ui/floating-field.tsx` | `npm run lint` (`clutch-numeric-align.test.js`); `floating-field.test.tsx` |
 | % and $ entry fields | `src/clutch-web/src/features/mortgages/FormattedNumberField.tsx` | Its component tests |
-| Lists: header, row lines, scrolling, row actions, states (§12) | `src/clutch-web/src/features/assets/AssetsPage.tsx`, `DeleteAssetDialog.tsx`; `src/lib/usePinnedList.ts` | `AssetsPage.test.tsx`, `usePinnedList.test.ts`; pinned-list tests in `e2e/style-guide.spec.ts`; review |
+| Lists: header, row lines, scrolling, row actions, states (§12) | `src/clutch-web/src/components/ui/list.tsx`, `delete-dialog.tsx`; `src/lib/usePinnedList.ts`; reference list `features/assets/AssetsPage.tsx` | `list.test.tsx`, `delete-dialog.test.tsx`, `usePinnedList.test.ts`; pinned-list tests in `e2e/style-guide.spec.ts`; review |
 
 If guidance here disagrees with the code, raise the conflict (constitution Governance). Do not
 pick a side.

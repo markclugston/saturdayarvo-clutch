@@ -66,3 +66,4 @@ Traceability preserved through relocation of implementation requirements into pa
 - Interpretation: approval is the user's own words naming the difference, including a feature description that asks for it.
 - Existing lists that differ are listed in §12. They are neither approved nor changed.
 - The `presets/clutch/` commands are unchanged: specify and clarify already read the code map's settled decisions, and plan loads the constitution check.
+- Same day, feature 031 added the shared list parts and aligned the older lists or recorded the user's approvals. This replaces the two points above about a shared primitive and unapproved lists. The numeric alignment lint rule now covers the list cells; the rest of §12 is still enforced by tests and review.

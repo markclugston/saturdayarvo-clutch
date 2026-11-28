@@ -5,7 +5,7 @@ Sync Impact Report
   user may approve a difference
 - Updated: clutch-ui-style (§12, checklist), clutch-frontend, clutch-constitution-check,
   ui-design rule, plan and tasks templates, code map, assumptions.md
-- Follow-up: lists built before 1.9.0 differ and are not approved (clutch-ui-style §12)
+- Follow-up: none (feature 031 aligned older lists or recorded approvals, clutch-ui-style §12)
 -->
 # SaturdayArvo Clutch Constitution
 
